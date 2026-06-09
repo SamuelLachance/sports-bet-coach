@@ -15,7 +15,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "picks", label: "Picks du jour" },
   { id: "calendar", label: "Calendrier" },
   { id: "leagues", label: "Ligues" },
-  { id: "stats", label: "Bankroll" },
+  { id: "stats", label: "Trends" },
   { id: "settings", label: "Paramètres" },
 ];
 
