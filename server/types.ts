@@ -32,6 +32,9 @@ export interface SheetPick {
   postingTime?: string;
   line?: string;
   rawRow: number;
+  /** VS-group or orphan bucket within a multi-game sheet row */
+  gameSlot?: number;
+  signalCol?: number;
 }
 
 export type SignalPolarity = "positive" | "negative" | "inverted";

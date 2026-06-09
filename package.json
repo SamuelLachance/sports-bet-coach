@@ -12,6 +12,7 @@
     "build:pages": "tsx server/scripts/export-pages-data.ts && npm run build --prefix client",
     "sync": "tsx server/scripts/sync-sheets.ts",
     "test:confidence": "tsx server/scripts/test-confidence.ts",
+    "test:game-association": "tsx server/tests/gameAssociation.test.ts",
     "start": "tsx server/index.ts"
   },
   "dependencies": {

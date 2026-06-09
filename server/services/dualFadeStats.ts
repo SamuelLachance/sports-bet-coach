@@ -11,7 +11,9 @@ import type {
 } from "../types.js";
 import type { ConfidenceStatsCache } from "./historicalStats.js";
 import type { FullHistoryStatsCache } from "./fullHistoryStats.js";
+import { pickBelongsToGame } from "./calendar.js";
 import { categoryForSignal } from "./signalMapping.js";
+import type { CalendarGame } from "../types.js";
 
 export const DUAL_FADE_STATS_FILE = "dual-fade-stats.json";
 
@@ -769,20 +771,50 @@ export function resolveDualFadeMatch(
   };
 }
 
-/** Find book/square picks on same raw row for dual-fade detection */
+/** Find opposing book/square fade pair for a specific ESPN matchup (not just sheet row). */
 export function findDualFadePair(
   picks: SheetPick[],
-  rawRow: number,
-  league: string
+  league: string,
+  game?: Pick<CalendarGame, "homeTeam" | "awayTeam">
 ): { book?: SheetPick; square?: SheetPick } {
-  const rowPicks = picks.filter(
+  const fadePicks = picks.filter(
     (p) =>
-      p.rawRow === rawRow &&
       (p.league === league || p.league === "UNKNOWN") &&
       (p.signalType === "book_needs_fade" || p.signalType === "square_fade")
   );
-  return {
-    book: rowPicks.find((p) => p.signalType === "book_needs_fade"),
-    square: rowPicks.find((p) => p.signalType === "square_fade"),
-  };
+
+  const books = fadePicks.filter((p) => p.signalType === "book_needs_fade");
+  const squares = fadePicks.filter((p) => p.signalType === "square_fade");
+
+  const gameCtx: CalendarGame | undefined = game
+    ? {
+        id: "game-filter",
+        league: "MLB",
+        homeTeam: game.homeTeam,
+        awayTeam: game.awayTeam,
+        homeAbbr: "",
+        awayAbbr: "",
+        startTime: "",
+        status: "",
+      }
+    : undefined;
+
+  for (const book of books) {
+    for (const square of squares) {
+      if (!isOpposingDualFade(book, square)) continue;
+      if (gameCtx && !pickBelongsToGame(book.pick, book.opponent, gameCtx)) continue;
+      if (gameCtx && !pickBelongsToGame(square.pick, square.opponent, gameCtx)) continue;
+      if (
+        game &&
+        book.gameSlot != null &&
+        square.gameSlot != null &&
+        book.gameSlot !== square.gameSlot
+      ) {
+        continue;
+      }
+      return { book, square };
+    }
+  }
+
+  return {};
 }

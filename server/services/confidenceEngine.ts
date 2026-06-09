@@ -22,6 +22,11 @@ import {
   resolveDualFadeMatch,
   type DualFadeStatsCache,
 } from "./dualFadeStats.js";
+import {
+  pickBelongsToGame,
+  resolveGameTeamDisplay,
+  validateRecommendedTeam,
+} from "./calendar.js";
 import { FADE_SIGNALS, SIGNAL_LABELS_FR } from "./signalMapping.js";
 
 export interface ConfidenceInput {
@@ -75,7 +80,7 @@ function displayTeamName(text: string): string {
   return text.replace(/\s*[+-]?\d+\.?\d*\s*$/g, "").replace(/\s+/g, " ").trim();
 }
 
-/** Group picks on same game (ESPN id, team pair, or same sheet row) */
+/** Group picks on same game (ESPN id, team pair, or VS slot within a sheet row) */
 export function buildGameKey(
   pick: SheetPick,
   slatePicks?: SheetPick[],
@@ -99,29 +104,23 @@ export function buildGameKey(
     return `${league}:${[team, opp].sort().join("|")}`;
   }
 
-  if (slatePicks) {
-    const sameRow = slatePicks.filter(
+  if (slatePicks && pick.gameSlot != null) {
+    const slotPeers = slatePicks.filter(
       (p) =>
         p.rawRow === pick.rawRow &&
+        p.gameSlot === pick.gameSlot &&
         sportLeague(p) === league &&
         p.id !== pick.id &&
         !p.line
     );
-    const linked = sameRow.filter((p) => {
-      const otherTeam = normalizeTeamName(p.pick);
-      const myOpp = pick.opponent ? normalizeTeamName(pick.opponent) : "";
-      const theirOpp = p.opponent ? normalizeTeamName(p.opponent) : "";
-      return myOpp === otherTeam || theirOpp === team;
-    });
-    if (linked.length > 0) {
-      const teams = [team, ...linked.map((p) => normalizeTeamName(p.pick))].sort();
-      if (teams.length >= 2) {
-        return `${league}:row-${pick.rawRow}:${teams[0]}|${teams[1]}`;
-      }
+    const teams = [team, ...slotPeers.map((p) => normalizeTeamName(p.pick))].sort();
+    if (teams.length >= 2) {
+      return `${league}:row-${pick.rawRow}:slot-${pick.gameSlot}:${teams[0]}|${teams[1]}`;
     }
+    return `${league}:row-${pick.rawRow}:slot-${pick.gameSlot}:${team}`;
   }
 
-  return `${league}:row-${pick.rawRow}:${team}`;
+  return `${league}:pick-${pick.id}`;
 }
 
 /** @deprecated use buildGameKey — kept for internal cross-signal lookups */
@@ -180,7 +179,8 @@ function findCrossSignalAdjustments(
   const related = slatePicks.filter(
     (p) =>
       p.id !== pick.id &&
-      (gameKey(p, slatePicks) === key || p.rawRow === pick.rawRow)
+      gameKey(p, slatePicks) === key &&
+      (pick.gameSlot == null || p.gameSlot === pick.gameSlot)
   );
 
   let delta = 0;
@@ -229,7 +229,11 @@ function extractOpponentName(pick: SheetPick, slatePicks: SheetPick[]): string |
 
   const team = normalizeTeamName(pick.pick);
   const sameRow = slatePicks.filter(
-    (p) => p.rawRow === pick.rawRow && sportLeague(p) === sportLeague(pick) && p.id !== pick.id
+    (p) =>
+      p.rawRow === pick.rawRow &&
+      sportLeague(p) === sportLeague(pick) &&
+      p.id !== pick.id &&
+      (pick.gameSlot == null || p.gameSlot === pick.gameSlot)
   );
 
   for (const other of sameRow) {
@@ -732,6 +736,31 @@ function matchupLabels(
   };
 }
 
+function filterRecsForGame(recs: MatchedRecommendation[]): MatchedRecommendation[] {
+  const game = recs.find((r) => r.matchedGame)?.matchedGame;
+  if (!game) return recs;
+
+  return recs.filter((rec) => {
+    if (!rec.matchedGame) return false;
+    if (rec.matchedGame.id !== game.id) return false;
+    return pickBelongsToGame(rec.pick, rec.opponent, game);
+  });
+}
+
+function clampWinnerToGame(
+  winnerDisplay: string,
+  winnerNorm: string,
+  game: CalendarGame | undefined
+): { display: string; norm: string } {
+  if (!game) return { display: winnerDisplay, norm: winnerNorm };
+
+  const resolved = resolveGameTeamDisplay(winnerDisplay, game);
+  if (resolved) {
+    return { display: resolved, norm: normalizeTeamName(resolved) };
+  }
+  return { display: winnerDisplay, norm: winnerNorm };
+}
+
 function resolveSingleGame(
   gameKey: string,
   recs: MatchedRecommendation[],
@@ -739,6 +768,8 @@ function resolveSingleGame(
   dualStats?: DualFadeStatsCache,
   slatePicks?: SheetPick[]
 ): { consolidated: GameConsolidatedRecommendation; updatedRecs: MatchedRecommendation[] } {
+  recs = filterRecsForGame(recs);
+
   const contributions = recs
     .map((r) => contributionForRec(r, stats))
     .filter((c): c is TeamEdgeContribution => c != null);
@@ -775,15 +806,24 @@ function resolveSingleGame(
   let dualFadeReasoning = "";
   let dualFadeConfidence: number | undefined;
 
-  if (dualStats && slatePicks?.length) {
+  const matchedGame = recs.find((r) => r.matchedGame)?.matchedGame;
+
+  if (dualStats && slatePicks?.length && matchedGame) {
     const league = sportLeagueFromRec(recs[0]);
-    const rawRow = getRawRowFromRecs(recs, slatePicks);
-    const pair = findDualFadePair(slatePicks, rawRow, league);
+    const pair = findDualFadePair(slatePicks, league, {
+      homeTeam: matchedGame.homeTeam,
+      awayTeam: matchedGame.awayTeam,
+    });
     const resolution = resolveDualFadeMatch(pair.book, pair.square, dualStats, league);
 
     if (resolution?.isDualFade) {
-      winnerNorm = resolution.recommendedSideNorm;
-      winnerDisplay = resolution.recommendedSide;
+      const clamped = clampWinnerToGame(
+        resolution.recommendedSide,
+        resolution.recommendedSideNorm,
+        matchedGame
+      );
+      winnerNorm = clamped.norm;
+      winnerDisplay = clamped.display;
       winnerEdge = resolution.confidence;
       margin = resolution.confidence - (runnerEdge || 0);
       dualFadeReasoning = resolution.reasoning;
@@ -808,8 +848,13 @@ function resolveSingleGame(
         cross.notes.push(`${b.label}: ${b.detail ?? b.value}`);
       }
     } else if (resolution?.isStandalone && recs.length === 1) {
-      winnerNorm = resolution.recommendedSideNorm;
-      winnerDisplay = resolution.recommendedSide;
+      const clamped = clampWinnerToGame(
+        resolution.recommendedSide,
+        resolution.recommendedSideNorm,
+        matchedGame
+      );
+      winnerNorm = clamped.norm;
+      winnerDisplay = clamped.display;
       winnerEdge = resolution.confidence;
       margin = resolution.confidence;
       dualFadeReasoning = resolution.reasoning;
@@ -831,6 +876,20 @@ function resolveSingleGame(
     confidence = clamp(confidence - 10, 50, 65);
   }
   confidence = Math.round(confidence);
+
+  if (matchedGame && !validateRecommendedTeam(winnerDisplay, matchedGame)) {
+    const fallback = clampWinnerToGame(
+      sorted[0]?.[1].display ?? winnerDisplay,
+      sorted[0]?.[0] ?? winnerNorm,
+      matchedGame
+    );
+    winnerDisplay = fallback.display;
+    winnerNorm = fallback.norm;
+    winnerEdge = sorted[0]?.[1].edge ?? winnerEdge;
+    dualFadeReasoning = "";
+    dualFadeConfidence = undefined;
+    dualFadeInfo = undefined;
+  }
 
   const { awayTeam, homeTeam } = matchupLabels(recs);
   const breakdown: ConfidenceBreakdownItem[] = [
@@ -954,15 +1013,6 @@ function sportLeagueFromRec(rec: MatchedRecommendation): string {
   return map[rec.league] || rec.league;
 }
 
-function getRawRowFromRecs(recs: MatchedRecommendation[], slatePicks?: SheetPick[]): number {
-  if (!slatePicks?.length) return 0;
-  for (const rec of recs) {
-    const pick = slatePicks.find((p) => p.id === rec.id);
-    if (pick?.rawRow) return pick.rawRow;
-  }
-  return 0;
-}
-
 export interface GameConflictResult {
   recommendations: MatchedRecommendation[];
   gameRecommendations: GameConsolidatedRecommendation[];
@@ -994,8 +1044,14 @@ export function resolveGameConflicts(
     if (recs.length === 1) {
       const single = recs[0];
       const league = sportLeagueFromRec(single);
-      const rawRow = getRawRowFromRecs([single], slatePicks);
-      const pair = slatePicks ? findDualFadePair(slatePicks, rawRow, league) : {};
+      const game = single.matchedGame;
+      const pair =
+        slatePicks && game
+          ? findDualFadePair(slatePicks, league, {
+              homeTeam: game.homeTeam,
+              awayTeam: game.awayTeam,
+            })
+          : {};
       const isStandaloneFade =
         (single.signalType === "book_needs_fade" || single.signalType === "square_fade") &&
         !pair.book &&

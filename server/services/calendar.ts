@@ -102,6 +102,7 @@ const TEAM_ALIASES: Record<string, string[]> = {
   pirates: ["pittsburgh pirates", "pit"],
   braves: ["atlanta braves", "atl"],
   royals: ["kansas city royals", "kc"],
+  philadelphia: ["phillies", "philadelphia phillies", "phi"],
 };
 
 function normalizeTeam(name: string): string {
@@ -112,23 +113,65 @@ function normalizeTeam(name: string): string {
     .trim();
 }
 
+function abbrMatchesPick(pick: string, abbr: string): boolean {
+  if (!abbr || abbr.length < 2) return false;
+  if (pick === abbr) return true;
+  const re = new RegExp(`(^|\\s)${abbr}(\\s|$)`);
+  return re.test(pick);
+}
+
 function teamMatches(pickTeam: string, gameTeam: string, gameAbbr: string): boolean {
   const pick = normalizeTeam(pickTeam);
   const team = normalizeTeam(gameTeam);
   const abbr = gameAbbr.toLowerCase();
 
-  if (team.includes(pick) || pick.includes(team)) return true;
-  if (abbr && pick.includes(abbr)) return true;
+  if (pick === team) return true;
+  if (team.startsWith(pick + " ") || pick.startsWith(team + " ")) return true;
+  if (abbr && abbrMatchesPick(pick, abbr)) return true;
 
   for (const [key, aliases] of Object.entries(TEAM_ALIASES)) {
     const all = [key, ...aliases].map(normalizeTeam);
-    const pickHit = all.some((a) => pick.includes(a) || a.includes(pick));
-    const teamHit = all.some((a) => team.includes(a) || a.includes(team));
+    const pickHit = all.some((a) => pick === a || pick.startsWith(a + " ") || a.startsWith(pick + " "));
+    const teamHit = all.some((a) => team === a || team.startsWith(a + " ") || a.startsWith(team + " "));
     if (pickHit && teamHit) return true;
   }
 
-  const pickWords = pick.split(" ").filter((w) => w.length > 2);
-  return pickWords.some((w) => team.includes(w));
+  const pickWords = pick.split(" ").filter((w) => w.length > 3);
+  return pickWords.some((w) => team.includes(w) || w.includes(team));
+}
+
+export function pickTeamInGame(teamName: string, game: CalendarGame): boolean {
+  return (
+    teamMatches(teamName, game.homeTeam, game.homeAbbr) ||
+    teamMatches(teamName, game.awayTeam, game.awayAbbr)
+  );
+}
+
+/** A sheet pick belongs to an ESPN game only when its team (and opponent, if set) are in that matchup. */
+export function pickBelongsToGame(
+  pick: string,
+  opponent: string | undefined,
+  game: CalendarGame
+): boolean {
+  if (!pickTeamInGame(pick, game)) return false;
+  if (opponent) return pickTeamInGame(opponent, game);
+  return true;
+}
+
+export function resolveGameTeamDisplay(
+  teamName: string,
+  game: CalendarGame
+): string | undefined {
+  if (teamMatches(teamName, game.awayTeam, game.awayAbbr)) return game.awayTeam;
+  if (teamMatches(teamName, game.homeTeam, game.homeAbbr)) return game.homeTeam;
+  return undefined;
+}
+
+export function validateRecommendedTeam(
+  recommendedTeam: string,
+  game: CalendarGame
+): boolean {
+  return pickTeamInGame(recommendedTeam, game);
 }
 
 export function matchPickToGame(
@@ -137,18 +180,7 @@ export function matchPickToGame(
   games: CalendarGame[]
 ): CalendarGame | undefined {
   for (const game of games) {
-    const teams = [game.homeTeam, game.awayTeam, game.homeAbbr, game.awayAbbr];
-    const pickHit = teams.some((t) => teamMatches(pick, t, ""));
-    if (!pickHit) continue;
-
-    if (opponent) {
-      const oppHit =
-        teamMatches(opponent, game.homeTeam, game.homeAbbr) ||
-        teamMatches(opponent, game.awayTeam, game.awayAbbr);
-      if (oppHit) return game;
-    } else {
-      return game;
-    }
+    if (pickBelongsToGame(pick, opponent, game)) return game;
   }
   return undefined;
 }

@@ -98,7 +98,8 @@ function App() {
     >
       {error && tab !== "settings" && (
         <div className="bg-danger/10 border border-danger/30 text-danger rounded-lg p-3 mb-4 text-sm">
-          {error}{isStaticDeploy ? "" : " — Vérifiez que le serveur API tourne sur le port 3001."}
+          {error}
+          {!isStaticDeploy && " — Vérifiez que le serveur API tourne sur le port 3001."}
         </div>
       )}
 

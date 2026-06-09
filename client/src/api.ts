@@ -1,6 +1,10 @@
 ﻿import type { MatchedRecommendation, StatsResponse, SyncStatus } from "./types";
+import { runClientSync } from "./sync/pipeline";
+import { getClientSnapshot, setClientSnapshot } from "./sync/state";
 
 const STATIC_API = import.meta.env.VITE_STATIC_API === "true";
+const CLIENT_SYNC =
+  import.meta.env.VITE_CLIENT_SYNC === "true" || STATIC_API;
 const BASE = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
 
 const STATIC_ROUTES: Record<string, string> = {
@@ -12,7 +16,7 @@ const STATIC_ROUTES: Record<string, string> = {
 
 function resolveUrl(pathWithQuery: string): string {
   const [path, query = ""] = pathWithQuery.split("?");
-  if (STATIC_API) {
+  if (STATIC_API && !getClientSnapshot()) {
     const file = STATIC_ROUTES[path];
     if (!file) throw new Error(`Endpoint statique inconnu: ${path}`);
     return `${BASE}api/${file}${query ? `?${query}` : ""}`;
@@ -20,7 +24,27 @@ function resolveUrl(pathWithQuery: string): string {
   return `/api${pathWithQuery}`;
 }
 
+function snapshotRecData(league?: string) {
+  const snap = getClientSnapshot();
+  if (!snap) throw new Error("Aucune donnée synchronisée");
+  let recommendations = snap.recommendations;
+  if (league && league !== "ALL") {
+    recommendations = recommendations.filter((r) => r.league === league);
+  }
+  return {
+    date: snap.date,
+    timezone: "America/Toronto",
+    count: recommendations.length,
+    recommendations,
+    gameRecommendations: snap.gameRecommendations,
+    games: snap.games,
+  };
+}
+
 export async function fetchRecommendations(league?: string) {
+  if (getClientSnapshot()) {
+    return snapshotRecData(league);
+  }
   const params = league && league !== "ALL" ? `?league=${league}` : "";
   const res = await fetch(resolveUrl(`/recommendations${params}`));
   if (!res.ok) throw new Error("Impossible de charger les recommandations");
@@ -42,6 +66,14 @@ export async function fetchRecommendations(league?: string) {
 }
 
 export async function fetchCalendar(date?: string) {
+  if (getClientSnapshot()) {
+    const snap = getClientSnapshot()!;
+    return {
+      date: date || snap.date,
+      timezone: "America/Toronto",
+      games: snap.games,
+    };
+  }
   const params = date ? `?date=${date}` : "";
   const res = await fetch(resolveUrl(`/calendar${params}`));
   if (!res.ok) throw new Error("Impossible de charger le calendrier");
@@ -49,26 +81,35 @@ export async function fetchCalendar(date?: string) {
 }
 
 export async function fetchStats() {
+  if (getClientSnapshot()) {
+    return getClientSnapshot()!.stats;
+  }
   const res = await fetch(resolveUrl("/stats"));
   if (!res.ok) throw new Error("Impossible de charger les statistiques");
   return res.json() as Promise<StatsResponse>;
 }
 
 export async function fetchSyncStatus() {
+  if (getClientSnapshot()) {
+    return getClientSnapshot()!.syncStatus;
+  }
   const res = await fetch(resolveUrl("/sync/status"));
   if (!res.ok) throw new Error("Impossible de charger le statut");
   return res.json() as Promise<SyncStatus>;
 }
 
 export async function triggerSync() {
-  if (STATIC_API) {
-    throw new Error(
-      "La synchronisation en direct n'est pas disponible sur GitHub Pages. Les données sont mises à jour à chaque déploiement."
-    );
+  if (CLIENT_SYNC) {
+    const snapshot = await runClientSync();
+    setClientSnapshot(snapshot);
+    return { ok: true, status: snapshot.syncStatus };
   }
   const res = await fetch("/api/sync", { method: "POST" });
   if (!res.ok) throw new Error("Échec de la synchronisation");
   return res.json();
 }
 
+/** True when the app loads baked JSON snapshots (GitHub Pages initial load). */
 export const isStaticDeploy = STATIC_API;
+/** True when the Sync button can refresh data in the browser. */
+export const isClientSyncEnabled = CLIENT_SYNC;
