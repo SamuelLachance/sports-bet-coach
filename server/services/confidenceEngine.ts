@@ -1,6 +1,7 @@
 import type {
   CalendarGame,
   ConfidenceBreakdownItem,
+  GameConsolidatedRecommendation,
   LeagueCode,
   MatchedRecommendation,
   SheetPick,
@@ -52,16 +53,57 @@ function sportLeague(pick: SheetPick): string {
   return map[pick.league] || pick.league;
 }
 
-/** Group picks on same game (same row or same team matchup) */
-function gameKey(pick: SheetPick): string {
+function displayTeamName(text: string): string {
+  return text.replace(/\s*[+-]?\d+\.?\d*\s*$/g, "").replace(/\s+/g, " ").trim();
+}
+
+/** Group picks on same game (ESPN id, team pair, or same sheet row) */
+export function buildGameKey(
+  pick: SheetPick,
+  slatePicks?: SheetPick[],
+  matchedGame?: CalendarGame
+): string {
   const league = sportLeague(pick);
-  const team = normalizeTeamName(pick.pick);
-  const opp = pick.opponent ? normalizeTeamName(pick.opponent) : "";
-  if (opp) {
-    const pair = [team, opp].sort().join("|");
-    return `${league}:${pair}`;
+
+  if (matchedGame) {
+    return `${league}:espn-${matchedGame.id}`;
   }
+
+  const team = normalizeTeamName(pick.pick);
+  let opp = pick.opponent ? normalizeTeamName(pick.opponent) : "";
+
+  if (!opp && slatePicks) {
+    const oppName = extractOpponentName(pick, slatePicks);
+    if (oppName) opp = normalizeTeamName(oppName);
+  }
+
+  if (opp) {
+    return `${league}:${[team, opp].sort().join("|")}`;
+  }
+
+  if (slatePicks) {
+    const sameRow = slatePicks.filter(
+      (p) =>
+        p.rawRow === pick.rawRow &&
+        sportLeague(p) === league &&
+        p.id !== pick.id &&
+        !p.line
+    );
+    if (sameRow.length > 0) {
+      const teams = [team, ...sameRow.map((p) => normalizeTeamName(p.pick))].sort();
+      if (teams.length >= 2) {
+        return `${league}:row-${pick.rawRow}:${teams[0]}|${teams[1]}`;
+      }
+      return `${league}:row-${pick.rawRow}`;
+    }
+  }
+
   return `${league}:row-${pick.rawRow}:${team}`;
+}
+
+/** @deprecated use buildGameKey — kept for internal cross-signal lookups */
+function gameKey(pick: SheetPick, slatePicks?: SheetPick[]): string {
+  return buildGameKey(pick, slatePicks);
 }
 
 function picksSameSide(a: SheetPick, b: SheetPick): boolean {
@@ -105,9 +147,11 @@ function findCrossSignalAdjustments(
   slatePicks: SheetPick[],
   rules: CrossSignalRule[]
 ): { delta: number; notes: string[] } {
-  const key = gameKey(pick);
+  const key = gameKey(pick, slatePicks);
   const related = slatePicks.filter(
-    (p) => p.id !== pick.id && (gameKey(p) === key || p.rawRow === pick.rawRow)
+    (p) =>
+      p.id !== pick.id &&
+      (gameKey(p, slatePicks) === key || p.rawRow === pick.rawRow)
   );
 
   let delta = 0;
@@ -332,6 +376,366 @@ export function applyConfidenceToRecommendation(
     signalPolarity: result.signalPolarity,
     edgeLabel: result.edgeLabel,
   };
+}
+
+// ---------------------------------------------------------------------------
+// GAME-LEVEL CONFLICT RESOLUTION
+// ---------------------------------------------------------------------------
+//
+// Rules (applied per matchup when 2+ picks share the same gameKey):
+//
+// 1. GROUPING — buildGameKey() uses ESPN game id, sorted team pair, or same
+//    sheet row (e.g. Book Needs col + Square col on one MLB line).
+//
+// 2. EFFECTIVE TEAM — each pick maps to one supported team after inversion:
+//    • inverted fade → opponent side (historically losing fade = bet other side)
+//    • positive sharp / whale / model → pick side
+//    • negative non-inverted → weak support for pick side
+//
+// 3. NET EDGE — per team, sum weighted edge:
+//    weight = sampleWeight × |blendedRoi|/150 (stronger historical inversion = more weight)
+//    inverted edge = opponentConfidence × weight
+//    positive edge = confidence × 0.55
+//
+// 4. DOUBLE FADE (Book Needs + Square on OPPOSITE sides of same game):
+//    Both fades are inverted; whichever signal has worse (more negative) ROI gets
+//    a reliability bonus (+12% edge). Apply "Double fade public/book" penalty (-8)
+//    to both sides when edges are within 15% — signals cancel out.
+//
+// 5. SHARP + FADE CONFLUENCE — sharp_money or mega_sharps supporting the same
+//    team as an inverted fade adds +12 edge to that team.
+//
+// 6. OUTPUT — one GameConsolidatedRecommendation per multi-pick game.
+//    Conflicting individual picks get gameConflict=true, dampened confidence,
+//    and conflictNote pointing to the match-level winner.
+// ---------------------------------------------------------------------------
+
+interface TeamEdgeContribution {
+  pickId: string;
+  signalType: SignalType;
+  teamNorm: string;
+  teamDisplay: string;
+  edge: number;
+  note: string;
+}
+
+function signalSampleWeight(stats: ConfidenceStatsCache, signal: SignalType): number {
+  const s = stats.signals[signal];
+  return clamp(Math.log10(Math.max(s.sampleSize, 1) + 1) / 2.5, 0.3, 1);
+}
+
+function signalRoiWeight(stats: ConfidenceStatsCache, signal: SignalType): number {
+  const s = stats.signals[signal];
+  return clamp(Math.abs(s.blendedRoi) / 150, 0.5, 1.5);
+}
+
+function invertBoostForSignal(stats: ConfidenceStatsCache, signal: SignalType): number {
+  const s = stats.signals[signal];
+  return clamp(70 - s.blendedRoi / 15, 65, 92);
+}
+
+function effectiveTeamForRec(rec: MatchedRecommendation): {
+  teamNorm: string;
+  teamDisplay: string;
+} | null {
+  if (rec.line) return null;
+
+  if (rec.signalPolarity === "inverted" && rec.opponentPick) {
+    return {
+      teamNorm: normalizeTeamName(rec.opponentPick),
+      teamDisplay: displayTeamName(rec.opponentPick),
+    };
+  }
+
+  return {
+    teamNorm: normalizeTeamName(rec.pick),
+    teamDisplay: displayTeamName(rec.pick),
+  };
+}
+
+function contributionForRec(
+  rec: MatchedRecommendation,
+  stats: ConfidenceStatsCache
+): TeamEdgeContribution | null {
+  const team = effectiveTeamForRec(rec);
+  if (!team) return null;
+
+  const sampleW = signalSampleWeight(stats, rec.signalType);
+  const roiW = signalRoiWeight(stats, rec.signalType);
+  const weight = sampleW * roiW;
+
+  let edge: number;
+  let note: string;
+
+  if (rec.signalPolarity === "inverted") {
+    const boost = rec.opponentConfidence ?? invertBoostForSignal(stats, rec.signalType);
+    edge = boost * weight;
+    note = `${SIGNAL_LABELS_FR[rec.signalType]} fade → ${team.teamDisplay} (+${Math.round(edge)})`;
+  } else if (rec.signalPolarity === "positive") {
+    edge = rec.confidence * 0.55 * weight;
+    note = `${SIGNAL_LABELS_FR[rec.signalType]} → ${team.teamDisplay} (+${Math.round(edge)})`;
+  } else {
+    edge = rec.confidence * 0.2 * weight;
+    note = `${SIGNAL_LABELS_FR[rec.signalType]} (faible) → ${team.teamDisplay}`;
+  }
+
+  return {
+    pickId: rec.id,
+    signalType: rec.signalType,
+    teamNorm: team.teamNorm,
+    teamDisplay: team.teamDisplay,
+    edge,
+    note,
+  };
+}
+
+function applyGameCrossSignalRules(
+  contributions: TeamEdgeContribution[],
+  stats: ConfidenceStatsCache
+): { edgeDelta: Map<string, number>; notes: string[]; dampenConfidence: boolean } {
+  const edgeDelta = new Map<string, number>();
+  const notes: string[] = [];
+  let dampenConfidence = false;
+
+  const signals = new Set(contributions.map((c) => c.signalType));
+  const hasBook = signals.has("book_needs_fade");
+  const hasSquare = signals.has("square_fade");
+  const teamsSupported = new Set(contributions.map((c) => c.teamNorm));
+
+  if (hasBook && hasSquare && teamsSupported.size > 1) {
+    notes.push("Double fade Book Needs + Square sur côtés opposés");
+    const bookRoi = Math.abs(stats.signals.book_needs_fade.blendedRoi);
+    const squareRoi = Math.abs(stats.signals.square_fade.blendedRoi);
+
+    for (const c of contributions) {
+      if (c.signalType === "book_needs_fade" && bookRoi >= squareRoi) {
+        edgeDelta.set(c.teamNorm, (edgeDelta.get(c.teamNorm) ?? 0) + 12);
+        notes.push(`Book Needs ROI plus négatif → bonus ${c.teamDisplay}`);
+      } else if (c.signalType === "square_fade" && squareRoi > bookRoi) {
+        edgeDelta.set(c.teamNorm, (edgeDelta.get(c.teamNorm) ?? 0) + 12);
+        notes.push(`Square ROI plus négatif → bonus ${c.teamDisplay}`);
+      }
+    }
+
+    dampenConfidence = true;
+    notes.push("Pénalité double fade opposé (-8 par côté)");
+    for (const team of teamsSupported) {
+      edgeDelta.set(team, (edgeDelta.get(team) ?? 0) - 8);
+    }
+  }
+
+  const sharpTypes: SignalType[] = ["sharp_money", "mega_sharps"];
+  const fades = contributions.filter((c) => FADE_SIGNALS.has(c.signalType));
+  const sharps = contributions.filter((c) => sharpTypes.includes(c.signalType));
+
+  for (const sharp of sharps) {
+    for (const fade of fades) {
+      if (sharp.teamNorm === fade.teamNorm) {
+        edgeDelta.set(sharp.teamNorm, (edgeDelta.get(sharp.teamNorm) ?? 0) + 12);
+        notes.push(`Confluence sharp+fade → ${sharp.teamDisplay} (+12)`);
+      } else {
+        notes.push(`Sharp vs fade opposés (${sharp.teamDisplay} vs ${fade.teamDisplay})`);
+      }
+    }
+  }
+
+  return { edgeDelta, notes: [...new Set(notes)], dampenConfidence };
+}
+
+function matchupLabels(
+  recs: MatchedRecommendation[]
+): { awayTeam: string; homeTeam: string } {
+  const game = recs.find((r) => r.matchedGame)?.matchedGame;
+  if (game) {
+    return { awayTeam: game.awayTeam, homeTeam: game.homeTeam };
+  }
+
+  const teams = new Set<string>();
+  for (const rec of recs) {
+    if (rec.line) continue;
+    teams.add(displayTeamName(rec.pick));
+    if (rec.opponent) teams.add(displayTeamName(rec.opponent));
+    if (rec.opponentPick) teams.add(displayTeamName(rec.opponentPick));
+  }
+  const list = [...teams].slice(0, 2);
+  return {
+    awayTeam: list[0] ?? "Équipe A",
+    homeTeam: list[1] ?? "Équipe B",
+  };
+}
+
+function resolveSingleGame(
+  gameKey: string,
+  recs: MatchedRecommendation[],
+  stats: ConfidenceStatsCache
+): { consolidated: GameConsolidatedRecommendation; updatedRecs: MatchedRecommendation[] } {
+  const contributions = recs
+    .map((r) => contributionForRec(r, stats))
+    .filter((c): c is TeamEdgeContribution => c != null);
+
+  const teamEdges = new Map<string, { edge: number; display: string; notes: string[] }>();
+
+  for (const c of contributions) {
+    const existing = teamEdges.get(c.teamNorm) ?? { edge: 0, display: c.teamDisplay, notes: [] };
+    existing.edge += c.edge;
+    existing.notes.push(c.note);
+    teamEdges.set(c.teamNorm, existing);
+  }
+
+  const cross = applyGameCrossSignalRules(contributions, stats);
+  for (const [team, delta] of cross.edgeDelta) {
+    const existing = teamEdges.get(team);
+    if (existing) existing.edge += delta;
+  }
+
+  const sorted = [...teamEdges.entries()].sort((a, b) => b[1].edge - a[1].edge);
+  const winnerEntry = sorted[0];
+  const runnerUp = sorted[1];
+  const winnerNorm = winnerEntry?.[0] ?? "";
+  const winnerDisplay = winnerEntry?.[1].display ?? "";
+  const winnerEdge = winnerEntry?.[1].edge ?? 0;
+  const runnerEdge = runnerUp?.[1].edge ?? 0;
+  const margin = winnerEdge - runnerEdge;
+  const maxEdge = Math.max(winnerEdge, 1);
+
+  const teamsSupported = new Set(contributions.map((c) => c.teamNorm));
+  const hasConflict = recs.length > 1 && teamsSupported.size > 1;
+
+  let confidence = clamp(55 + (margin / maxEdge) * 35, 52, 88);
+  if (cross.dampenConfidence && margin / maxEdge < 0.2) {
+    confidence = clamp(confidence - 12, 50, 72);
+  }
+  if (hasConflict && margin / maxEdge < 0.08) {
+    confidence = clamp(confidence - 10, 50, 65);
+  }
+  confidence = Math.round(confidence);
+
+  const { awayTeam, homeTeam } = matchupLabels(recs);
+  const breakdown: ConfidenceBreakdownItem[] = [
+    {
+      key: "game_net_edge",
+      label: `Edge net — ${winnerDisplay}`,
+      value: Math.round(winnerEdge * 10) / 10,
+      impact: confidence - 50,
+      detail: sorted.map(([t, v]) => `${v.display}: ${Math.round(v.edge)}`).join(" · "),
+    },
+  ];
+
+  if (cross.notes.length > 0) {
+    breakdown.push({
+      key: "game_cross_signal",
+      label: "Règles croisées (match)",
+      value: cross.notes.length,
+      impact: 0,
+      detail: cross.notes.join(" · "),
+    });
+  }
+
+  for (const c of contributions) {
+    breakdown.push({
+      key: `pick_${c.pickId}`,
+      label: SIGNAL_LABELS_FR[c.signalType],
+      value: Math.round(c.edge * 10) / 10,
+      impact: Math.round(c.edge),
+      detail: c.note,
+    });
+  }
+
+  const reasoningParts = [
+    `Match: ${awayTeam} @ ${homeTeam}`,
+    `Recommandation: ${winnerDisplay} (${confidence}%)`,
+    ...contributions.map((c) => c.note),
+    ...(cross.notes.length ? [`Règles: ${cross.notes.join("; ")}`] : []),
+  ];
+
+  const consolidated: GameConsolidatedRecommendation = {
+    gameKey,
+    league: recs[0].league,
+    awayTeam,
+    homeTeam,
+    recommendedTeam: winnerDisplay,
+    confidence,
+    confidenceBreakdown: breakdown,
+    hasConflict,
+    pickIds: recs.map((r) => r.id),
+    reasoning: reasoningParts.join(" · "),
+    matchedGame: recs.find((r) => r.matchedGame)?.matchedGame,
+  };
+
+  const updatedRecs = recs.map((rec) => {
+    const standalone =
+      rec.signalPolarity === "inverted" && rec.opponentConfidence != null
+        ? rec.opponentConfidence
+        : rec.confidence;
+
+    if (!hasConflict) {
+      return {
+        ...rec,
+        gameKey,
+        consolidatedTeam: winnerDisplay,
+        consolidatedConfidence: confidence,
+      };
+    }
+
+    const eff = effectiveTeamForRec(rec);
+    const alignsWithWinner = eff?.teamNorm === winnerNorm;
+
+    return {
+      ...rec,
+      gameKey,
+      gameConflict: true,
+      conflictNote: "Conflit — voir recommandation match",
+      standaloneConfidence: standalone,
+      consolidatedTeam: winnerDisplay,
+      consolidatedConfidence: confidence,
+      confidence: alignsWithWinner ? Math.min(rec.confidence, 38) : Math.min(rec.confidence, 32),
+      opponentConfidence:
+        rec.opponentConfidence != null
+          ? Math.min(rec.opponentConfidence, alignsWithWinner ? 42 : 35)
+          : rec.opponentConfidence,
+      edgeLabel: "Conflit — voir recommandation match",
+    };
+  });
+
+  return { consolidated, updatedRecs };
+}
+
+export interface GameConflictResult {
+  recommendations: MatchedRecommendation[];
+  gameRecommendations: GameConsolidatedRecommendation[];
+}
+
+export function resolveGameConflicts(
+  recommendations: MatchedRecommendation[],
+  stats: ConfidenceStatsCache
+): GameConflictResult {
+  const byGame = new Map<string, MatchedRecommendation[]>();
+
+  for (const rec of recommendations) {
+    const key = rec.gameKey ?? rec.id;
+    if (!byGame.has(key)) byGame.set(key, []);
+    byGame.get(key)!.push(rec);
+  }
+
+  const gameRecommendations: GameConsolidatedRecommendation[] = [];
+  const recById = new Map<string, MatchedRecommendation>();
+
+  for (const [key, recs] of byGame) {
+    if (recs.length === 1) {
+      const single = recs[0];
+      recById.set(single.id, { ...single, gameKey: key });
+      continue;
+    }
+
+    const { consolidated, updatedRecs } = resolveSingleGame(key, recs, stats);
+    gameRecommendations.push(consolidated);
+    for (const rec of updatedRecs) {
+      recById.set(rec.id, rec);
+    }
+  }
+
+  const ordered = recommendations.map((r) => recById.get(r.id) ?? r);
+  return { recommendations: ordered, gameRecommendations };
 }
 
 /** Static baseline for before/after comparison */

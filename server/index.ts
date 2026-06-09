@@ -98,7 +98,9 @@ app.get("/api/recommendations", async (req, res) => {
     const leagues = getActiveLeagues(sheets);
     const dateKey = todayDateKey();
     const games = await fetchAllSchedules(leagues, dateKey);
-    let recs = await buildRecommendations(sheets, games);
+    const built = await buildRecommendations(sheets, games);
+    let recs = built.recommendations;
+    const gameRecommendations = built.gameRecommendations;
 
     const league = req.query.league as LeagueCode | "ALL" | undefined;
     if (league) recs = filterByLeague(recs, league);
@@ -111,6 +113,7 @@ app.get("/api/recommendations", async (req, res) => {
       timezone: TIMEZONE,
       count: recs.length,
       recommendations: recs,
+      gameRecommendations,
       games,
     });
   } catch (err) {

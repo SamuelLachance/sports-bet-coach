@@ -10,8 +10,10 @@ import { parseDailyPerformanceCsv, parseYearlyPerformanceCsv } from "../parsers/
 import { parseArchiveCsv } from "../parsers/archive.js";
 import { buildHistoricalStats } from "../services/historicalStats.js";
 import {
+  buildGameKey,
   computeConfidence,
   LEGACY_SIGNAL_CONFIDENCE,
+  resolveGameConflicts,
 } from "../services/confidenceEngine.js";
 import { SIGNAL_LABELS_FR } from "../services/signalMapping.js";
 import type { ParsedSheets } from "../types.js";
@@ -110,6 +112,82 @@ async function main() {
 
   console.log(`\nCross-signal rules loaded: ${stats.crossSignalRules.length}`);
   console.log(`Archive days: ${stats.archiveDays}\n`);
+
+  // --- Game conflict resolution (Cubs @ Rockies regression) ---
+  console.log("=== Game conflict resolution ===\n");
+
+  const cubsRockiesPicks = sheets.dailyPicks.filter(
+    (p) =>
+      /COLORADO|CUBS/i.test(p.pick) ||
+      (p.opponent && /COLORADO|CUBS/i.test(p.opponent))
+  );
+
+  if (cubsRockiesPicks.length >= 2) {
+    const rawRecs = cubsRockiesPicks.map((pick) => {
+      const result = computeConfidence({ pick, stats, slatePicks: sheets.dailyPicks });
+      return {
+        id: pick.id,
+        league: pick.league,
+        signalType: pick.signalType,
+        signalLabel: SIGNAL_LABELS_FR[pick.signalType],
+        pick: pick.pick,
+        opponent: pick.opponent,
+        confidence: result.confidence,
+        confidenceBreakdown: result.confidenceBreakdown,
+        opponentPick: result.opponentPick,
+        opponentConfidence: result.opponentConfidence,
+        signalPolarity: result.signalPolarity,
+        edgeLabel: result.edgeLabel,
+        reasoning: "",
+        status: "pending" as const,
+        gameDate: "2026-06-09",
+        gameKey: buildGameKey(pick, sheets.dailyPicks),
+      };
+    });
+
+    const { gameRecommendations, recommendations } = resolveGameConflicts(rawRecs, stats);
+
+    console.log("Cubs @ Rockies picks (before conflict resolution):");
+    for (const r of rawRecs) {
+      console.log(
+        `  ${r.pick} (${SIGNAL_LABELS_FR[r.signalType]}) → inverted: ${r.opponentPick ?? "N/A"} @ ${r.opponentConfidence ?? r.confidence}%`
+      );
+    }
+
+    if (gameRecommendations.length > 0) {
+      const g = gameRecommendations[0];
+      console.log(`\n✓ Match recommendation: ${g.recommendedTeam} @ ${g.confidence}%`);
+      console.log(`  Conflict resolved: ${g.hasConflict}`);
+      console.log(`  Reasoning: ${g.reasoning.slice(0, 120)}...`);
+
+      const highStandalone = recommendations.filter(
+        (r) => (r.standaloneConfidence ?? r.opponentConfidence ?? 0) >= 75
+      );
+      const bothHighPrimary = rawRecs.filter(
+        (r) => (r.opponentConfidence ?? r.confidence) >= 75
+      ).length >= 2;
+
+      if (bothHighPrimary && g.confidence < 90) {
+        console.log("\n✓ PASS: No longer showing both sides as ~80%+ primary picks");
+      } else if (g.hasConflict) {
+        console.log("\n✓ PASS: Conflict detected and consolidated to one winner");
+      }
+
+      for (const r of recommendations) {
+        if (r.gameConflict) {
+          console.log(
+            `  Pick ${r.pick}: conflict dampened → ${r.opponentConfidence ?? r.confidence}% (standalone was ${r.standaloneConfidence}%)`
+          );
+        }
+      }
+    } else {
+      console.log("  (No multi-pick game group found — check gameKey grouping)");
+    }
+  } else {
+    console.log("  Cubs/Rockies picks not found in daily sheet — skipping regression");
+  }
+
+  console.log("");
 }
 
 main().catch((err) => {

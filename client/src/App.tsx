@@ -23,6 +23,9 @@ function App() {
   const [recommendations, setRecommendations] = useState<MatchedRecommendation[]>(
     []
   );
+  const [gameRecommendations, setGameRecommendations] = useState<
+    import("./types").GameConsolidatedRecommendation[]
+  >([]);
   const [games, setGames] = useState<CalendarGame[]>([]);
   const [leagues, setLeagues] = useState<string[]>([]);
   const [date, setDate] = useState("");
@@ -41,6 +44,7 @@ function App() {
         fetchSyncStatus(),
       ]);
       setRecommendations(recData.recommendations);
+      setGameRecommendations(recData.gameRecommendations ?? []);
       setGames(recData.games);
       setDate(recData.date);
       setLeagues(statusData.leagues);
@@ -98,7 +102,11 @@ function App() {
       )}
 
       {tab === "picks" && (
-        <DailyPicks recommendations={recommendations} leagues={leagues} />
+        <DailyPicks
+          recommendations={recommendations}
+          gameRecommendations={gameRecommendations}
+          leagues={leagues}
+        />
       )}
       {tab === "calendar" && <CalendarView games={games} date={date} />}
       {tab === "leagues" && (

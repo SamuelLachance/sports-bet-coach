@@ -57,6 +57,9 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
           <span className={`badge bg-surface-raised ${polarity.class} border border-surface-border`}>
             {polarity.text}
           </span>
+          {rec.gameConflict && (
+            <span className="badge bg-warning/20 text-warning">Conflit match</span>
+          )}
         </div>
         <div className="text-right">
           <div className={`text-2xl font-bold font-display ${confidenceColor(rec.confidence)}`}>
@@ -77,6 +80,26 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
         <p className="text-slate-400 text-sm mb-2">
           vs <span className="text-slate-200">{rec.opponent}</span>
         </p>
+      )}
+
+      {rec.gameConflict && rec.consolidatedTeam && (
+        <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3 text-sm">
+          <div className="text-xs text-warning uppercase tracking-wide mb-1">
+            {rec.conflictNote ?? "Conflit — voir recommandation match"}
+          </div>
+          <p className="text-slate-300">
+            Décision match:{" "}
+            <span className="font-semibold text-accent-glow">{rec.consolidatedTeam}</span>
+            {rec.consolidatedConfidence != null && (
+              <span className="text-slate-400"> ({rec.consolidatedConfidence}%)</span>
+            )}
+          </p>
+          {rec.standaloneConfidence != null && (
+            <p className="text-xs text-slate-500 mt-1">
+              Confiance standalone (avant résolution): {rec.standaloneConfidence}%
+            </p>
+          )}
+        </div>
       )}
 
       {rec.signalPolarity === "inverted" && rec.opponentPick && (

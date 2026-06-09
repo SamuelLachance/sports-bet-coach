@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
-import type { MatchedRecommendation } from "../types";
+import type { GameConsolidatedRecommendation, MatchedRecommendation } from "../types";
+import { GameRecommendationCard } from "./GameRecommendationCard";
 import { PickCard } from "./PickCard";
 
 interface DailyPicksProps {
   recommendations: MatchedRecommendation[];
+  gameRecommendations?: GameConsolidatedRecommendation[];
   leagues: string[];
 }
 
@@ -18,7 +20,7 @@ const SIGNAL_FILTERS = [
   { id: "model_best_values", label: "Modèle" },
 ];
 
-export function DailyPicks({ recommendations, leagues }: DailyPicksProps) {
+export function DailyPicks({ recommendations, gameRecommendations = [], leagues }: DailyPicksProps) {
   const [leagueFilter, setLeagueFilter] = useState("ALL");
   const [signalFilter, setSignalFilter] = useState("all");
 
@@ -31,6 +33,15 @@ export function DailyPicks({ recommendations, leagues }: DailyPicksProps) {
   }, [recommendations, leagueFilter, signalFilter]);
 
   const matched = filtered.filter((r) => r.matchedGame).length;
+  const conflicts = filtered.filter((r) => r.gameConflict).length;
+
+  const visibleGameRecs = useMemo(() => {
+    if (!gameRecommendations.length) return [];
+    const filteredIds = new Set(filtered.map((r) => r.id));
+    return gameRecommendations.filter((g) =>
+      g.pickIds.some((id) => filteredIds.has(id))
+    );
+  }, [gameRecommendations, filtered]);
 
   return (
     <div className="space-y-6">
@@ -38,7 +49,7 @@ export function DailyPicks({ recommendations, leagues }: DailyPicksProps) {
         <StatBox label="Picks totaux" value={recommendations.length} />
         <StatBox label="Affichés" value={filtered.length} accent />
         <StatBox label="Matchs confirmés" value={matched} />
-        <StatBox label="Ligues actives" value={leagues.length} />
+        <StatBox label="Conflits résolus" value={conflicts || visibleGameRecs.length} />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -73,6 +84,9 @@ export function DailyPicks({ recommendations, leagues }: DailyPicksProps) {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
+          {visibleGameRecs.map((game) => (
+            <GameRecommendationCard key={game.gameKey} game={game} />
+          ))}
           {filtered.map((rec) => (
             <PickCard key={rec.id} rec={rec} />
           ))}

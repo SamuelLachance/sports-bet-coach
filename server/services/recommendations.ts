@@ -10,7 +10,9 @@ import type {
 import { getConfidenceStats } from "./confidenceCache.js";
 import {
   applyConfidenceToRecommendation,
+  buildGameKey,
   computeConfidence,
+  resolveGameConflicts,
 } from "./confidenceEngine.js";
 import { SIGNAL_LABELS_FR } from "./signalMapping.js";
 import { matchPickToGame, todayDisplayDate } from "./calendar.js";
@@ -66,11 +68,14 @@ export async function buildRecommendations(
   sheets: ParsedSheets,
   games: CalendarGame[],
   targetDate?: string
-): Promise<MatchedRecommendation[]> {
+): Promise<{
+  recommendations: MatchedRecommendation[];
+  gameRecommendations: import("../types.js").GameConsolidatedRecommendation[];
+}> {
   const gameDate = targetDate || todayDisplayDate();
   const stats = await getConfidenceStats(sheets);
 
-  return sheets.dailyPicks.map((pick) => {
+  const rawRecs = sheets.dailyPicks.map((pick) => {
     const sportLeague = sportLeagueForPick(pick);
     const leagueGames = games.filter((g) => g.league === sportLeague);
     const matchedGame = matchPickToGame(pick.pick, pick.opponent, leagueGames);
@@ -96,10 +101,13 @@ export async function buildRecommendations(
       status: inferStatus(matchedGame),
       matchedGame,
       gameDate,
+      gameKey: buildGameKey(pick, sheets.dailyPicks, matchedGame),
     };
 
     return applyConfidenceToRecommendation(base, confidenceResult);
   });
+
+  return resolveGameConflicts(rawRecs, stats);
 }
 
 export function getActiveLeagues(sheets: ParsedSheets): import("../types.js").LeagueCode[] {

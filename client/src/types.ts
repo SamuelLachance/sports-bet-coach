@@ -44,6 +44,20 @@ export interface ConfidenceBreakdownItem {
   detail?: string;
 }
 
+export interface GameConsolidatedRecommendation {
+  gameKey: string;
+  league: LeagueCode;
+  awayTeam: string;
+  homeTeam: string;
+  recommendedTeam: string;
+  confidence: number;
+  confidenceBreakdown: ConfidenceBreakdownItem[];
+  hasConflict: boolean;
+  pickIds: string[];
+  reasoning: string;
+  matchedGame?: CalendarGame;
+}
+
 export interface MatchedRecommendation {
   id: string;
   league: LeagueCode;
@@ -64,6 +78,12 @@ export interface MatchedRecommendation {
   status: "recommended" | "pending" | "matched" | "settled";
   matchedGame?: CalendarGame;
   gameDate: string;
+  gameKey?: string;
+  gameConflict?: boolean;
+  conflictNote?: string;
+  standaloneConfidence?: number;
+  consolidatedTeam?: string;
+  consolidatedConfidence?: number;
 }
 
 export interface LeaguePerformance {

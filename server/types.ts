@@ -92,6 +92,20 @@ export interface CalendarGame {
   venue?: string;
 }
 
+export interface GameConsolidatedRecommendation {
+  gameKey: string;
+  league: LeagueCode;
+  awayTeam: string;
+  homeTeam: string;
+  recommendedTeam: string;
+  confidence: number;
+  confidenceBreakdown: ConfidenceBreakdownItem[];
+  hasConflict: boolean;
+  pickIds: string[];
+  reasoning: string;
+  matchedGame?: CalendarGame;
+}
+
 export interface MatchedRecommendation {
   id: string;
   league: LeagueCode;
@@ -112,6 +126,17 @@ export interface MatchedRecommendation {
   status: "recommended" | "pending" | "matched" | "settled";
   matchedGame?: CalendarGame;
   gameDate: string;
+  /** Stable key grouping picks on the same matchup */
+  gameKey?: string;
+  /** True when this pick disagrees with another signal on the same game */
+  gameConflict?: boolean;
+  /** French note pointing to consolidated match recommendation */
+  conflictNote?: string;
+  /** Pre-conflict resolution confidence (for transparency) */
+  standaloneConfidence?: number;
+  /** Winning side from game-level consolidation */
+  consolidatedTeam?: string;
+  consolidatedConfidence?: number;
 }
 
 export interface SyncStatus {

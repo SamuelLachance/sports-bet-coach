@@ -11,6 +11,7 @@ export async function fetchRecommendations(league?: string) {
     timezone: string;
     count: number;
     recommendations: MatchedRecommendation[];
+    gameRecommendations?: import("./types").GameConsolidatedRecommendation[];
     games: import("./types").CalendarGame[];
   }>;
 }
