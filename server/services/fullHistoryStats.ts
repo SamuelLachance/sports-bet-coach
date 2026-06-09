@@ -100,9 +100,18 @@ export interface CrossSignalConfluence {
   label: string;
 }
 
+export interface FullHistorySampleMeta {
+  weeksTracked: number;
+  monthsTracked: number;
+  performancePeriods: number;
+  totalPicksTracked: number;
+  archiveDays: number;
+}
+
 export interface FullHistoryStatsCache {
   computedAt: string;
   archiveDays: number;
+  historicalSample: FullHistorySampleMeta;
   performanceTabPeriods: string[];
   signals: Record<SignalType, SignalFullProfile>;
   profitableCombos: ProfitableCombo[];
@@ -448,9 +457,42 @@ export function buildFullHistoryStats(
 
   const crossSignalConfluence = buildCrossSignalConfluence(signals);
 
+  const weeksTracked = ALL_SIGNALS.reduce((sum, sig) => {
+    const profile = signals[sig];
+    const signalWeeks = Object.values(profile.byLeague).reduce(
+      (s, l) => s + l.weeks.filter((w) => w.wins + w.losses > 0).length,
+      0
+    );
+    return sum + signalWeeks;
+  }, 0);
+
+  let monthsTracked = 0;
+  for (const sig of ["book_needs_fade", "square_fade"] as SignalType[]) {
+    const category = categoryForSignal(sig);
+    const rows = performanceYearly.filter(
+      (r) => r.category === category && r.league.toLowerCase().startsWith("total")
+    );
+    for (const row of rows) {
+      monthsTracked += Object.values(row.months).filter((v) => v != null).length;
+    }
+  }
+  monthsTracked = Math.round(monthsTracked / 2);
+
+  const totalPicksTracked = ALL_SIGNALS.reduce(
+    (s, sig) => s + signals[sig].sampleSize,
+    0
+  );
+
   return {
     computedAt: new Date().toISOString(),
     archiveDays,
+    historicalSample: {
+      weeksTracked: Math.max(weeksTracked, Math.round(monthsTracked * 4.33)),
+      monthsTracked,
+      performancePeriods: parsed.blocks.length,
+      totalPicksTracked,
+      archiveDays,
+    },
     performanceTabPeriods: parsed.blocks.map((b) => b.periodKey),
     signals,
     profitableCombos: profitableCombos.slice(0, 30),

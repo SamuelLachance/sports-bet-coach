@@ -324,7 +324,15 @@ async function main() {
 
 
 
-  console.log("\n=== Dual-fade stats (archives + tracker + weekly) ===\n");
+  console.log("\n=== Dual-fade stats (full historical dataset) ===\n");
+
+  const hs = dualStats.historicalSample;
+  console.log(
+    `Sample AVANT (limité): ${dualStats.coOccurrence.dualActiveDays} jours co-actifs (onglet perf. quotidienne)`
+  );
+  console.log(
+    `Sample APRÈS (complet): ${hs.weeks} semaines · ${hs.months} mois · ${hs.archiveDays} jours archives · ${hs.totalPicksTracked} picks · ${hs.totalDataPoints} points de données`
+  );
 
   console.log(
 
@@ -339,10 +347,14 @@ async function main() {
       `Weekly 4sem: Book ${fullHistory.dualFadeWeekly.bookNeedsLast4Weeks.toFixed(1)}u (${fullHistory.dualFadeWeekly.bookNeedsWeeklyTrend}) · Square ${fullHistory.dualFadeWeekly.squareLast4Weeks.toFixed(1)}u (${fullHistory.dualFadeWeekly.squareWeeklyTrend})`
 
     );
+    console.log(
+      `Full history meta: ${fullHistory.historicalSample.weeksTracked} sem. · ${fullHistory.historicalSample.monthsTracked} mois · ${fullHistory.historicalSample.totalPicksTracked} picks · ${fullHistory.historicalSample.performancePeriods} périodes perf.`
+    );
 
   }
 
   console.log(`Archive rule: ${dualStats.archiveTrend.resolutionRule}`);
+  console.log(`Archive trend sampleSize: ${dualStats.archiveTrend.sampleSize} (was ~20 dual-active days)`);
 
 
 

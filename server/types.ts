@@ -92,13 +92,24 @@ export interface CalendarGame {
   venue?: string;
 }
 
+export interface DualFadeHistoricalSampleInfo {
+  weeks: number;
+  months: number;
+  archiveDays: number;
+  totalPicksTracked: number;
+  totalDataPoints: number;
+  label: string;
+}
+
 export interface DualFadeInfo {
   isDualFade: boolean;
   bookNeedsFadeTeam?: string;
   squareFadeTeam?: string;
   strongerFadeColumn?: "book_needs_fade" | "square_fade";
   archiveWinRate?: number;
+  /** @deprecated Use historicalSample instead */
   archiveSampleDays?: number;
+  historicalSample?: DualFadeHistoricalSampleInfo;
 }
 
 export interface GameConsolidatedRecommendation {

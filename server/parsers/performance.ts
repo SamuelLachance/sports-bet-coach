@@ -134,7 +134,12 @@ export function parseYearlyPerformanceCsv(csv: string): YearlyPerformanceRow[] {
       continue;
     }
 
-    if (YEARLY_CATEGORIES.includes(col0)) {
+    const hasMonthData = MONTHS.some((_, idx) => {
+      const val = row[idx + 1];
+      return val !== undefined && String(val).trim() !== "";
+    });
+
+    if (YEARLY_CATEGORIES.includes(col0) && !hasMonthData) {
       currentCategory = col0;
       categoryAllTime = null;
       continue;

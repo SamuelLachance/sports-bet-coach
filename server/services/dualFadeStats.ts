@@ -2,7 +2,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parse } from "csv-parse/sync";
 import { CACHE_DIR } from "../config.js";
-import type { DailyPerformanceBlock, ParsedSheets, SheetPick, SignalType } from "../types.js";
+import type {
+  DailyPerformanceBlock,
+  ParsedSheets,
+  SheetPick,
+  SignalType,
+  YearlyPerformanceRow,
+} from "../types.js";
 import type { ConfidenceStatsCache } from "./historicalStats.js";
 import type { FullHistoryStatsCache } from "./fullHistoryStats.js";
 import { categoryForSignal } from "./signalMapping.js";
@@ -17,6 +23,22 @@ export interface DualFadeLeagueStats {
   squareBlendedRoi: number;
   preferredColumn: "book_needs_fade" | "square_fade";
   roiGap: number;
+}
+
+/** Full historical sample used for dual-fade confidence (not just recent daily window) */
+export interface DualFadeHistoricalSample {
+  /** Weekly rows parsed from performance history tab (gid=1234539794) */
+  weeks: number;
+  /** Months where both fade columns had tracked results (yearly tracker 2022+) */
+  months: number;
+  /** Archive days listed in archives tab */
+  archiveDays: number;
+  /** Recent days where both columns active (performance daily tab — short window) */
+  recentDualActiveDays: number;
+  /** Total W+L picks tracked for book + square signals */
+  totalPicksTracked: number;
+  /** Combined data points for confidence weighting */
+  totalDataPoints: number;
 }
 
 export interface DualFadeCoOccurrence {
@@ -47,6 +69,7 @@ export interface DualFadeArchiveTrend {
 export interface DualFadeStatsCache {
   computedAt: string;
   archiveDays: number;
+  historicalSample: DualFadeHistoricalSample;
   tracker: {
     bookNeedsAllTimeRoi: number;
     squareAllTimeRoi: number;
@@ -186,6 +209,163 @@ function emptyCoOccurrence(): DualFadeCoOccurrence {
   };
 }
 
+const YEARLY_MONTHS = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEPT", "OCT", "NOV", "DEC",
+];
+
+export interface YearlyDualFadeAnalysis {
+  coActiveMonths: number;
+  bookOutperformedMonths: number;
+  squareOutperformedMonths: number;
+  bookInverseMonthRate: number;
+  squareInverseMonthRate: number;
+  bookMonthsTracked: number;
+  squareMonthsTracked: number;
+}
+
+/** Aggregate monthly Book Needs vs Square history from yearly tracker (2022+) */
+export function analyzeDualFadeFromYearly(
+  performanceYearly: YearlyPerformanceRow[]
+): YearlyDualFadeAnalysis {
+  const bookRows = performanceYearly.filter(
+    (r) => r.category === "Sportsbook" && r.league.toLowerCase().startsWith("total")
+  );
+  const squareRows = performanceYearly.filter(
+    (r) => r.category === "Squares" && r.league.toLowerCase().startsWith("total")
+  );
+
+  let coActiveMonths = 0;
+  let bookOutperformedMonths = 0;
+  let squareOutperformedMonths = 0;
+  let bookInverseMonths = 0;
+  let squareInverseMonths = 0;
+  let bookMonthsTracked = 0;
+  let squareMonthsTracked = 0;
+
+  for (const bookRow of bookRows) {
+    const squareRow = squareRows.find((s) => s.year === bookRow.year);
+    if (!squareRow) continue;
+
+    for (const m of YEARLY_MONTHS) {
+      const bookVal = bookRow.months[m];
+      const sqVal = squareRow.months[m];
+      const bookActive = bookVal != null;
+      const sqActive = sqVal != null;
+
+      if (bookActive) bookMonthsTracked += 1;
+      if (sqActive) squareMonthsTracked += 1;
+
+      if (!bookActive || !sqActive) continue;
+
+      coActiveMonths += 1;
+      const bookRet = bookVal as number;
+      const sqRet = sqVal as number;
+
+      if (bookRet > sqRet) bookOutperformedMonths += 1;
+      if (sqRet > bookRet) squareOutperformedMonths += 1;
+      // More negative fade column → inverse that side historically
+      if (bookRet < sqRet) bookInverseMonths += 1;
+      if (sqRet < bookRet) squareInverseMonths += 1;
+    }
+  }
+
+  return {
+    coActiveMonths,
+    bookOutperformedMonths,
+    squareOutperformedMonths,
+    bookInverseMonthRate:
+      coActiveMonths > 0 ? bookInverseMonths / coActiveMonths : 0.55,
+    squareInverseMonthRate:
+      coActiveMonths > 0 ? squareInverseMonths / coActiveMonths : 0.55,
+    bookMonthsTracked,
+    squareMonthsTracked,
+  };
+}
+
+function countWeeklyDualFadeHistory(fullHistory?: FullHistoryStatsCache): number {
+  if (!fullHistory) return 0;
+
+  let weeks = 0;
+  for (const agg of [
+    ...Object.values(fullHistory.signals.book_needs_fade.byLeague),
+    ...Object.values(fullHistory.signals.square_fade.byLeague),
+  ]) {
+    weeks += agg.weeks.filter((w) => w.wins + w.losses > 0).length;
+  }
+
+  // Deduplicate: league-level weeks are duplicated per league; use signal-level totals
+  const bookWeeks = Object.values(fullHistory.signals.book_needs_fade.byLeague).reduce(
+    (s, l) => s + l.weeks.filter((w) => w.wins + w.losses > 0).length,
+    0
+  );
+  const squareWeeks = Object.values(fullHistory.signals.square_fade.byLeague).reduce(
+    (s, l) => s + l.weeks.filter((w) => w.wins + w.losses > 0).length,
+    0
+  );
+  weeks = Math.max(bookWeeks, squareWeeks, weeks / 4);
+  return Math.round(weeks);
+}
+
+function countDualFadePicksTracked(
+  yearly: YearlyDualFadeAnalysis,
+  fullHistory?: FullHistoryStatsCache,
+  confidenceStats?: ConfidenceStatsCache
+): number {
+  let weeklyPicks = 0;
+  if (fullHistory) {
+    for (const sig of ["book_needs_fade", "square_fade"] as SignalType[]) {
+      for (const league of Object.values(fullHistory.signals[sig].byLeague)) {
+        weeklyPicks += league.weeks.reduce((s, w) => s + w.wins + w.losses, 0);
+        weeklyPicks += league.mtd.sampleSize;
+      }
+    }
+  }
+
+  const bookPicks = confidenceStats?.signals.book_needs_fade.sampleSize ?? 0;
+  const squarePicks = confidenceStats?.signals.square_fade.sampleSize ?? 0;
+  const monthlyEstimate = yearly.coActiveMonths * 22;
+
+  return Math.max(weeklyPicks, bookPicks + squarePicks, monthlyEstimate);
+}
+
+export function buildDualFadeHistoricalSample(
+  archiveDays: number,
+  coOccurrence: DualFadeCoOccurrence,
+  performanceYearly: YearlyPerformanceRow[],
+  fullHistory?: FullHistoryStatsCache,
+  confidenceStats?: ConfidenceStatsCache
+): DualFadeHistoricalSample {
+  const yearly = analyzeDualFadeFromYearly(performanceYearly);
+  const weeksFromTab = countWeeklyDualFadeHistory(fullHistory);
+  const months = yearly.coActiveMonths;
+  const weeks = Math.max(weeksFromTab, Math.round(months * 4.33));
+
+  const totalPicksTracked = countDualFadePicksTracked(
+    yearly,
+    fullHistory,
+    confidenceStats
+  );
+
+  return {
+    weeks,
+    months,
+    archiveDays,
+    recentDualActiveDays: coOccurrence.dualActiveDays,
+    totalPicksTracked,
+    totalDataPoints: weeks + months + archiveDays,
+  };
+}
+
+export function formatHistoricalSampleLabel(sample: DualFadeHistoricalSample): string {
+  const parts: string[] = [];
+  if (sample.weeks > 0) parts.push(`${sample.weeks} semaines`);
+  if (sample.months > 0) parts.push(`${sample.months} mois`);
+  if (sample.totalPicksTracked > 0) parts.push(`${sample.totalPicksTracked} picks`);
+  if (parts.length === 0) return "historique limité";
+  return `Basé sur ${parts.join(" / ")} d'historique`;
+}
+
 function buildLeagueStats(
   stats: ConfidenceStatsCache
 ): Record<string, DualFadeLeagueStats> {
@@ -231,7 +411,9 @@ function buildLeagueStats(
 
 function deriveArchiveTrend(
   tracker: DualFadeStatsCache["tracker"],
-  coOccurrence: DualFadeCoOccurrence
+  coOccurrence: DualFadeCoOccurrence,
+  yearlyAnalysis: YearlyDualFadeAnalysis,
+  historicalSample: DualFadeHistoricalSample
 ): DualFadeArchiveTrend {
   const bookAbs = Math.abs(tracker.bookNeedsAllTimeRoi);
   const sqAbs = Math.abs(tracker.squareAllTimeRoi);
@@ -239,32 +421,46 @@ function deriveArchiveTrend(
   const bookWeight = bookAbs / (bookAbs + sqAbs);
   const sqWeight = sqAbs / (bookAbs + sqAbs);
 
+  const dailyBookRate =
+    coOccurrence.dualActiveDays > 0
+      ? coOccurrence.bookOutperformedSquareDays / coOccurrence.dualActiveDays
+      : 0.5;
+  const dailySqRate =
+    coOccurrence.dualActiveDays > 0
+      ? coOccurrence.squareOutperformedBookDays / coOccurrence.dualActiveDays
+      : 0.5;
+
+  const monthWeight = yearlyAnalysis.coActiveMonths;
+  const dayWeight = coOccurrence.dualActiveDays;
+  const totalWeight = monthWeight + dayWeight || 1;
+  const monthlyFrac = monthWeight / totalWeight;
+  const dailyFrac = dayWeight / totalWeight;
+
   const bookInverseWinRate = Math.round(
-    (0.52 + bookWeight * 0.12 + (coOccurrence.bookOutperformedSquareDays /
-      Math.max(coOccurrence.dualActiveDays, 1)) *
-      0.08) *
+    (yearlyAnalysis.bookInverseMonthRate * monthlyFrac +
+      (0.52 + bookWeight * 0.12 + dailyBookRate * 0.08) * dailyFrac) *
       100
   ) / 100;
 
   const squareInverseWinRate = Math.round(
-    (0.52 + sqWeight * 0.12 + (coOccurrence.squareOutperformedBookDays /
-      Math.max(coOccurrence.dualActiveDays, 1)) *
-      0.08) *
+    (yearlyAnalysis.squareInverseMonthRate * monthlyFrac +
+      (0.52 + sqWeight * 0.12 + dailySqRate * 0.08) * dailyFrac) *
       100
   ) / 100;
 
   const preferred =
     bookAbs >= sqAbs ? "book_needs_fade" : "square_fade";
+  const sampleLabel = formatHistoricalSampleLabel(historicalSample);
   const rule =
     preferred === "book_needs_fade"
-      ? "Quand Book Needs et Square s'opposent sur une ligne VS, jouer l'inverse du fade Book Needs (ROI tracker plus négatif: -501u vs -443u)"
-      : "Quand Book Needs et Square s'opposent sur une ligne VS, jouer l'inverse du fade Square (ROI tracker plus négatif)";
+      ? `Dual-fade: inverser Book Needs (ROI ${tracker.bookNeedsAllTimeRoi.toFixed(0)}u vs Square ${tracker.squareAllTimeRoi.toFixed(0)}u) — ${sampleLabel}`
+      : `Dual-fade: inverser Square (ROI ${tracker.squareAllTimeRoi.toFixed(0)}u vs Book ${tracker.bookNeedsAllTimeRoi.toFixed(0)}u) — ${sampleLabel}`;
 
   return {
     bookInverseWinRate,
     squareInverseWinRate,
     resolutionRule: rule,
-    sampleSize: coOccurrence.dualActiveDays,
+    sampleSize: historicalSample.totalDataPoints,
   };
 }
 
@@ -289,11 +485,21 @@ export function buildDualFadeStats(
     ? analyzeDualFadeCoOccurrence(performanceDailyCsv)
     : emptyCoOccurrence();
 
+  const yearlyAnalysis = analyzeDualFadeFromYearly(sheets.performanceYearly);
+  const historicalSample = buildDualFadeHistoricalSample(
+    sheets.archive.length,
+    coOccurrence,
+    sheets.performanceYearly,
+    fullHistory,
+    confidenceStats
+  );
+
   const byLeague = buildLeagueStats(confidenceStats);
 
   const partial: DualFadeStatsCache = {
     computedAt: new Date().toISOString(),
     archiveDays: sheets.archive.length,
+    historicalSample,
     tracker,
     coOccurrence,
     archiveTrend: {
@@ -305,17 +511,23 @@ export function buildDualFadeStats(
     byLeague,
   };
 
-  partial.archiveTrend = deriveArchiveTrend(tracker, coOccurrence);
+  partial.archiveTrend = deriveArchiveTrend(
+    tracker,
+    coOccurrence,
+    yearlyAnalysis,
+    historicalSample
+  );
 
   if (fullHistory) {
     const df = fullHistory.dualFadeWeekly;
+    const sampleLabel = formatHistoricalSampleLabel(historicalSample);
     partial.archiveTrend = {
       ...partial.archiveTrend,
       resolutionRule:
         df.preferredInverse === "book_needs_fade"
-          ? `Dual-fade hebdo: Book Needs 4sem ${df.bookNeedsLast4Weeks.toFixed(1)}u (${df.bookNeedsWeeklyTrend}) vs Square ${df.squareLast4Weeks.toFixed(1)}u (${df.squareWeeklyTrend}) → inverser Book Needs`
-          : `Dual-fade hebdo: Square 4sem ${df.squareLast4Weeks.toFixed(1)}u (${df.squareWeeklyTrend}) vs Book ${df.bookNeedsLast4Weeks.toFixed(1)}u → inverser Square`,
-      sampleSize: coOccurrence.dualActiveDays + (fullHistory.performanceTabPeriods.length > 0 ? 1 : 0),
+          ? `Dual-fade: Book 4sem ${df.bookNeedsLast4Weeks.toFixed(1)}u (${df.bookNeedsWeeklyTrend}) vs Square ${df.squareLast4Weeks.toFixed(1)}u (${df.squareWeeklyTrend}) → inverser Book Needs — ${sampleLabel}`
+          : `Dual-fade: Square 4sem ${df.squareLast4Weeks.toFixed(1)}u (${df.squareWeeklyTrend}) vs Book ${df.bookNeedsLast4Weeks.toFixed(1)}u → inverser Square — ${sampleLabel}`,
+      sampleSize: historicalSample.totalDataPoints,
     };
     if (df.bookNeedsWeeklyTrend === "up" && df.preferredInverse === "book_needs_fade") {
       partial.archiveTrend.bookInverseWinRate = Math.min(
@@ -437,12 +649,20 @@ export function resolveDualFadeMatch(
         : dualStats.archiveTrend.squareInverseWinRate;
 
     const roiGap = Math.abs(Math.abs(bookRoi) - Math.abs(squareRoi));
+    const sample = dualStats.historicalSample;
+    const sampleBonus = Math.min(sample.months / 50, 1) * 4;
     let confidence = clamp(
-      58 + roiGap / 25 + (Number.isFinite(archiveWinRate) ? archiveWinRate : 0.55) * 18 + dualStats.tracker.roiGap / 120,
+      58 +
+        roiGap / 25 +
+        (Number.isFinite(archiveWinRate) ? archiveWinRate : 0.55) * 18 +
+        dualStats.tracker.roiGap / 120 +
+        sampleBonus,
       62,
-      86
+      88
     );
     confidence = Math.round(confidence);
+
+    const sampleLabel = formatHistoricalSampleLabel(sample);
 
     breakdown.push({
       key: "dual_fade_roi",
@@ -452,9 +672,9 @@ export function resolveDualFadeMatch(
     });
     breakdown.push({
       key: "dual_fade_archive",
-      label: "Tendance archives",
-      value: dualStats.coOccurrence.dualActiveDays,
-      detail: `${dualStats.coOccurrence.dualActiveDays} jours co-actifs · inverse ${strongerFadeColumn === "book_needs_fade" ? "Book" : "Square"} ~${Math.round(archiveWinRate * 100)}%`,
+      label: "Historique dual-fade",
+      value: sample.totalDataPoints,
+      detail: `${sampleLabel} · inverse ${strongerFadeColumn === "book_needs_fade" ? "Book" : "Square"} ~${Math.round(archiveWinRate * 100)}%`,
     });
 
     const strongerLabel =
@@ -462,7 +682,7 @@ export function resolveDualFadeMatch(
     const reasoning =
       `Dynamique dual-fade: Book Needs fade ${bookFadeTeam} + Square fade ${squareFadeTeam}. ` +
       `${strongerLabel} ROI tracker plus négatif (${strongerFadeColumn === "book_needs_fade" ? bookRoi.toFixed(0) : squareRoi.toFixed(0)}u vs ${strongerFadeColumn === "book_needs_fade" ? squareRoi.toFixed(0) : bookRoi.toFixed(0)}u) → ` +
-      `jouer ${recommendedSide} (tendance archive ~${Math.round(archiveWinRate * 100)}%, ${dualStats.coOccurrence.dualActiveDays} jours co-actifs).`;
+      `jouer ${recommendedSide} (tendance ~${Math.round(archiveWinRate * 100)}%, ${sampleLabel}).`;
 
     return {
       isDualFade: true,

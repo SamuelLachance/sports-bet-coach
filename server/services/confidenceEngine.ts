@@ -18,6 +18,7 @@ import {
 } from "./fullHistoryStats.js";
 import {
   findDualFadePair,
+  formatHistoricalSampleLabel,
   resolveDualFadeMatch,
   type DualFadeStatsCache,
 } from "./dualFadeStats.js";
@@ -787,13 +788,21 @@ function resolveSingleGame(
       margin = resolution.confidence - (runnerEdge || 0);
       dualFadeReasoning = resolution.reasoning;
       dualFadeConfidence = resolution.confidence;
+      const hs = dualStats.historicalSample;
       dualFadeInfo = {
         isDualFade: true,
         bookNeedsFadeTeam: resolution.bookNeedsFadeTeam,
         squareFadeTeam: resolution.squareFadeTeam,
         strongerFadeColumn: resolution.strongerFadeColumn,
         archiveWinRate: resolution.archiveWinRate,
-        archiveSampleDays: dualStats.coOccurrence.dualActiveDays,
+        historicalSample: {
+          weeks: hs.weeks,
+          months: hs.months,
+          archiveDays: hs.archiveDays,
+          totalPicksTracked: hs.totalPicksTracked,
+          totalDataPoints: hs.totalDataPoints,
+          label: formatHistoricalSampleLabel(hs),
+        },
       };
       for (const b of resolution.breakdown) {
         cross.notes.push(`${b.label}: ${b.detail ?? b.value}`);

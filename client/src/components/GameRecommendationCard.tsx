@@ -96,8 +96,9 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
               <>
                 {" "}
                 (~{Math.round(game.dualFade.archiveWinRate * 100)}%
-                {game.dualFade.archiveSampleDays != null &&
-                  ` · ${game.dualFade.archiveSampleDays} jours co-actifs`}
+                {game.dualFade.historicalSample
+                  ? ` · ${game.dualFade.historicalSample.label}`
+                  : null}
                 )
               </>
             )}
