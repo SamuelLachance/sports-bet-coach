@@ -7,7 +7,7 @@ import type {
   SheetPick,
   SignalType,
 } from "../types.js";
-import { getConfidenceStats } from "./confidenceCache.js";
+import { getConfidenceStats, getDualFadeStats, getFullHistoryStats } from "./confidenceCache.js";
 import {
   applyConfidenceToRecommendation,
   buildGameKey,
@@ -74,6 +74,8 @@ export async function buildRecommendations(
 }> {
   const gameDate = targetDate || todayDisplayDate();
   const stats = await getConfidenceStats(sheets);
+  const dualStats = (await getDualFadeStats()) ?? undefined;
+  const fullHistory = (await getFullHistoryStats()) ?? undefined;
 
   const rawRecs = sheets.dailyPicks.map((pick) => {
     const sportLeague = sportLeagueForPick(pick);
@@ -85,6 +87,7 @@ export async function buildRecommendations(
       matchedGame,
       stats,
       slatePicks: sheets.dailyPicks,
+      fullHistory,
     });
 
     const base = {
@@ -107,7 +110,10 @@ export async function buildRecommendations(
     return applyConfidenceToRecommendation(base, confidenceResult);
   });
 
-  return resolveGameConflicts(rawRecs, stats);
+  return resolveGameConflicts(rawRecs, stats, {
+    dualStats,
+    slatePicks: sheets.dailyPicks,
+  });
 }
 
 export function getActiveLeagues(sheets: ParsedSheets): import("../types.js").LeagueCode[] {

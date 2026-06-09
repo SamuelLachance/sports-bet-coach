@@ -92,6 +92,15 @@ export interface CalendarGame {
   venue?: string;
 }
 
+export interface DualFadeInfo {
+  isDualFade: boolean;
+  bookNeedsFadeTeam?: string;
+  squareFadeTeam?: string;
+  strongerFadeColumn?: "book_needs_fade" | "square_fade";
+  archiveWinRate?: number;
+  archiveSampleDays?: number;
+}
+
 export interface GameConsolidatedRecommendation {
   gameKey: string;
   league: LeagueCode;
@@ -104,6 +113,12 @@ export interface GameConsolidatedRecommendation {
   pickIds: string[];
   reasoning: string;
   matchedGame?: CalendarGame;
+  /** Present when Book Needs + Square oppose on same VS row */
+  dualFade?: DualFadeInfo;
+  highConviction?: boolean;
+  historicalWinRate?: number;
+  historicalRoi?: number;
+  weeklyTrend?: "up" | "down" | "flat";
 }
 
 export interface MatchedRecommendation {
@@ -137,6 +152,11 @@ export interface MatchedRecommendation {
   /** Winning side from game-level consolidation */
   consolidatedTeam?: string;
   consolidatedConfidence?: number;
+  /** Historical stats for this signal × league */
+  historicalWinRate?: number;
+  historicalRoi?: number;
+  weeklyTrend?: "up" | "down" | "flat";
+  highConviction?: boolean;
 }
 
 export interface SyncStatus {

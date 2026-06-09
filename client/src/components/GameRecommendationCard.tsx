@@ -7,6 +7,12 @@ function confidenceColor(c: number) {
   return "text-warning";
 }
 
+function trendArrow(t?: "up" | "down" | "flat") {
+  if (t === "up") return "↑";
+  if (t === "down") return "↓";
+  return "→";
+}
+
 function impactSign(n: number) {
   return n >= 0 ? `+${n}` : `${n}`;
 }
@@ -21,7 +27,12 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
             {game.league}
           </span>
           {game.hasConflict && (
-            <span className="badge bg-warning/20 text-warning">Conflit résolu</span>
+          <span className="badge bg-warning/20 text-warning">
+            {game.dualFade?.isDualFade ? "Dual-fade résolu" : "Conflit résolu"}
+          </span>
+        )}
+          {game.highConviction && (
+            <span className="badge bg-success/20 text-success">Haute conviction</span>
           )}
         </div>
         <div className="text-right">
@@ -43,13 +54,64 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
         <div className="font-display text-2xl font-semibold text-accent-glow">
           {game.recommendedTeam}
         </div>
-        {game.hasConflict && (
+        {(game.historicalWinRate != null || game.weeklyTrend) && (
+          <p className="text-xs text-slate-400 mt-2">
+            {game.historicalWinRate != null && (
+              <>
+                Historique: {Math.round(game.historicalWinRate * 100)}% WR
+                {game.historicalRoi != null && ` · ${game.historicalRoi.toFixed(1)}u ROI`}
+              </>
+            )}
+            {game.weeklyTrend && (
+              <>
+                {game.historicalWinRate != null && " · "}
+                Tendance 4 sem. {trendArrow(game.weeklyTrend)}
+              </>
+            )}
+          </p>
+        )}
+        {game.hasConflict && !game.dualFade?.isDualFade && (
           <p className="text-xs text-slate-400 mt-2">
             Signaux opposés sur ce match — edge net calculé à partir du ROI historique et
             des règles croisées.
           </p>
         )}
       </div>
+
+      {game.dualFade?.isDualFade && (
+        <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3">
+          <div className="text-xs text-warning uppercase tracking-wide mb-1">
+            Dynamique dual-fade
+          </div>
+          <p className="text-sm text-slate-200 leading-relaxed">
+            Book Needs fade{" "}
+            <span className="font-medium text-white">{game.dualFade.bookNeedsFadeTeam}</span>
+            {" + "}
+            Square fade{" "}
+            <span className="font-medium text-white">{game.dualFade.squareFadeTeam}</span>
+            {" → "}
+            tendance archive:{" "}
+            <span className="font-medium text-accent-glow">{game.recommendedTeam}</span>
+            {game.dualFade.archiveWinRate != null && (
+              <>
+                {" "}
+                (~{Math.round(game.dualFade.archiveWinRate * 100)}%
+                {game.dualFade.archiveSampleDays != null &&
+                  ` · ${game.dualFade.archiveSampleDays} jours co-actifs`}
+                )
+              </>
+            )}
+          </p>
+          {game.dualFade.strongerFadeColumn && (
+            <p className="text-xs text-slate-400 mt-1">
+              Colonne dominante:{" "}
+              {game.dualFade.strongerFadeColumn === "book_needs_fade"
+                ? "Book Needs (ROI tracker plus négatif)"
+                : "Square Top (ROI tracker plus négatif)"}
+            </p>
+          )}
+        </div>
+      )}
 
       {game.matchedGame && (
         <div className="bg-surface-raised rounded-lg p-3 mb-3 text-sm">

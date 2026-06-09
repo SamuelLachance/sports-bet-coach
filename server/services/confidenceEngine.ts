@@ -1,6 +1,7 @@
 import type {
   CalendarGame,
   ConfidenceBreakdownItem,
+  DualFadeInfo,
   GameConsolidatedRecommendation,
   LeagueCode,
   MatchedRecommendation,
@@ -9,6 +10,17 @@ import type {
   SignalType,
 } from "../types.js";
 import type { ConfidenceStatsCache, CrossSignalRule } from "./historicalStats.js";
+import {
+  isHighConviction,
+  kellyToConfidence,
+  lookupPickStats,
+  type FullHistoryStatsCache,
+} from "./fullHistoryStats.js";
+import {
+  findDualFadePair,
+  resolveDualFadeMatch,
+  type DualFadeStatsCache,
+} from "./dualFadeStats.js";
 import { FADE_SIGNALS, SIGNAL_LABELS_FR } from "./signalMapping.js";
 
 export interface ConfidenceInput {
@@ -16,6 +28,7 @@ export interface ConfidenceInput {
   matchedGame?: CalendarGame;
   stats: ConfidenceStatsCache;
   slatePicks: SheetPick[];
+  fullHistory?: FullHistoryStatsCache;
 }
 
 export interface ConfidenceResult {
@@ -25,6 +38,10 @@ export interface ConfidenceResult {
   opponentConfidence?: number;
   signalPolarity: SignalPolarity;
   edgeLabel: string;
+  historicalWinRate?: number;
+  historicalRoi?: number;
+  weeklyTrend?: "up" | "down" | "flat";
+  highConviction?: boolean;
 }
 
 const ULTRA_NEGATIVE_ROI = -50;
@@ -89,12 +106,17 @@ export function buildGameKey(
         p.id !== pick.id &&
         !p.line
     );
-    if (sameRow.length > 0) {
-      const teams = [team, ...sameRow.map((p) => normalizeTeamName(p.pick))].sort();
+    const linked = sameRow.filter((p) => {
+      const otherTeam = normalizeTeamName(p.pick);
+      const myOpp = pick.opponent ? normalizeTeamName(pick.opponent) : "";
+      const theirOpp = p.opponent ? normalizeTeamName(p.opponent) : "";
+      return myOpp === otherTeam || theirOpp === team;
+    });
+    if (linked.length > 0) {
+      const teams = [team, ...linked.map((p) => normalizeTeamName(p.pick))].sort();
       if (teams.length >= 2) {
         return `${league}:row-${pick.rawRow}:${teams[0]}|${teams[1]}`;
       }
-      return `${league}:row-${pick.rawRow}`;
     }
   }
 
@@ -129,6 +151,12 @@ function roiToBaseConfidence(roi: number, winRate: number, sampleSize: number): 
   const roiComponent = clamp(roi / 8, -30, 30);
   const wrComponent = (winRate - 0.5) * 40;
   return 50 + (roiComponent * 0.6 + wrComponent * 0.4) * sampleWeight;
+}
+
+function bayesianWinRate(wins: number, losses: number): number {
+  const priorW = 5;
+  const priorL = 5;
+  return (wins + priorW) / (wins + losses + priorW + priorL);
 }
 
 function isUltraNegative(stats: ConfidenceStatsCache, signal: SignalType): boolean {
@@ -204,15 +232,11 @@ function extractOpponentName(pick: SheetPick, slatePicks: SheetPick[]): string |
   );
 
   for (const other of sameRow) {
-    const otherTeam = normalizeTeamName(other.pick);
-    if (otherTeam !== team) {
+    if (other.opponent && normalizeTeamName(other.opponent) === team) {
       return other.pick.replace(/\s*[+-]?\d+\.?\d*\s*$/g, "").trim();
     }
-    if (other.opponent) {
-      const opp = normalizeTeamName(other.opponent);
-      if (opp !== team) {
-        return other.opponent.replace(/\s*[+-]?\d+\.?\d*\s*$/g, "").trim();
-      }
+    if (pick.opponent && normalizeTeamName(other.pick) === normalizeTeamName(pick.opponent)) {
+      return other.pick.replace(/\s*[+-]?\d+\.?\d*\s*$/g, "").trim();
     }
   }
 
@@ -222,35 +246,100 @@ function extractOpponentName(pick: SheetPick, slatePicks: SheetPick[]): string |
 function leagueModifier(
   stats: ConfidenceStatsCache,
   signal: SignalType,
-  league: string
+  league: string,
+  fullHistory?: FullHistoryStatsCache
 ): number {
+  if (fullHistory) {
+    const ls = fullHistory.signals[signal].byLeague[league];
+    if (ls) {
+      const roi = ls.allTimeRoi * 0.25 + ls.last4Weeks.returnUnits * 0.45 + ls.mtd.returnUnits * 0.3;
+      const trendBoost = ls.weeklyTrend === "up" ? 3 : ls.weeklyTrend === "down" ? -4 : 0;
+      return clamp(roi / 18 + trendBoost, -12, 12);
+    }
+  }
   const leagueStats = stats.signals[signal].byLeague[league];
   if (!leagueStats) return 0;
   const roi = leagueStats.allTimeReturn * 0.4 + leagueStats.recentReturn * 0.6;
   return clamp(roi / 20, -8, 8);
 }
 
+function temporalModifier(fullHistory: FullHistoryStatsCache, signal: SignalType, league: string): number {
+  const profile = fullHistory.signals[signal];
+  const ls = profile.byLeague[league];
+  const last4 = ls?.last4Weeks ?? {
+    returnUnits: profile.last4WeeksRoi,
+    winRate: profile.bayesianWinRate,
+  };
+  const recentBoost = clamp(last4.returnUnits / 15, -8, 8);
+  const trendBoost =
+    (ls?.weeklyTrend ?? profile.weeklyTrend) === "up"
+      ? 5
+      : (ls?.weeklyTrend ?? profile.weeklyTrend) === "down"
+        ? -6
+        : 0;
+  return recentBoost + trendBoost;
+}
+
+function toxicComboPenalty(fullHistory: FullHistoryStatsCache, signal: SignalType, league: string): number {
+  const toxic = fullHistory.toxicCombos.some(
+    (c) => c.signalType === signal && c.league === league && c.blendedRoi < -20
+  );
+  return toxic ? -12 : 0;
+}
+
+function profitableComboBoost(fullHistory: FullHistoryStatsCache, signal: SignalType, league: string): number {
+  const match = fullHistory.profitableCombos.find(
+    (c) => c.signalType === signal && c.league === league && c.blendedRoi > 5
+  );
+  if (!match) return 0;
+  return clamp(Math.round(match.blendedRoi / 20), 4, 10);
+}
+
 export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
-  const { pick, matchedGame, stats, slatePicks } = input;
+  const { pick, matchedGame, stats, slatePicks, fullHistory } = input;
   const signalStats = stats.signals[pick.signalType];
   const league = sportLeague(pick);
   const breakdown: ConfidenceBreakdownItem[] = [];
 
-  let confidence = roiToBaseConfidence(
-    signalStats.blendedRoi,
-    signalStats.winRate,
-    signalStats.sampleSize
-  );
+  const pickStats = fullHistory ? lookupPickStats(fullHistory, pick.signalType, league) : null;
+  const bayesianWr =
+    pickStats && "bayesianWinRate" in pickStats
+      ? pickStats.bayesianWinRate
+      : bayesianWinRate(signalStats.wins, signalStats.losses);
+  const kelly =
+    pickStats && "kellyEdge" in pickStats
+      ? pickStats.kellyEdge
+      : (bayesianWr - 0.524) * 2;
+
+  let confidence = fullHistory
+    ? kellyToConfidence(kelly, bayesianWr)
+    : roiToBaseConfidence(signalStats.blendedRoi, signalStats.winRate, signalStats.sampleSize);
 
   breakdown.push({
     key: "signal_roi",
     label: `ROI historique ${SIGNAL_LABELS_FR[pick.signalType]}`,
     value: Math.round(signalStats.blendedRoi * 10) / 10,
     impact: Math.round((confidence - 50) * 10) / 10,
-    detail: `${signalStats.wins}V-${signalStats.losses}D · ${Math.round(signalStats.winRate * 100)}%`,
+    detail: `${signalStats.wins}V-${signalStats.losses}D · ${Math.round(bayesianWr * 100)}% (Bayesian)`,
   });
 
-  const leagueMod = leagueModifier(stats, pick.signalType, league);
+  if (fullHistory && pickStats) {
+    const histRoi =
+      "blendedRoi" in pickStats ? pickStats.blendedRoi : fullHistory.signals[pick.signalType].blendedRoi;
+    const histWr =
+      "bayesianWinRate" in pickStats
+        ? pickStats.bayesianWinRate
+        : fullHistory.signals[pick.signalType].bayesianWinRate;
+    breakdown.push({
+      key: "full_history",
+      label: `Base multi-couches ${league}`,
+      value: Math.round(histRoi * 10) / 10,
+      impact: Math.round(kellyToConfidence(kelly, histWr) - confidence),
+      detail: `All-time ${Math.round(("allTimeRoi" in pickStats ? pickStats.allTimeRoi : histRoi) * 10) / 10}u · 4 sem. ${Math.round(("last4Weeks" in pickStats ? pickStats.last4Weeks.returnUnits : fullHistory.signals[pick.signalType].last4WeeksRoi) * 10) / 10}u`,
+    });
+  }
+
+  const leagueMod = leagueModifier(stats, pick.signalType, league, fullHistory);
   if (Math.abs(leagueMod) >= 1) {
     confidence += leagueMod;
     breakdown.push({
@@ -259,6 +348,44 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
       value: leagueMod,
       impact: leagueMod,
     });
+  }
+
+  if (fullHistory) {
+    const temporal = temporalModifier(fullHistory, pick.signalType, league);
+    if (Math.abs(temporal) >= 0.5) {
+      confidence += temporal;
+      const trend = fullHistory.signals[pick.signalType].byLeague[league]?.weeklyTrend ??
+        fullHistory.signals[pick.signalType].weeklyTrend;
+      breakdown.push({
+        key: "temporal",
+        label: "Tendance 4 semaines",
+        value: temporal,
+        impact: temporal,
+        detail: trend === "up" ? "↑ amélioration" : trend === "down" ? "↓ déclin" : "→ stable",
+      });
+    }
+
+    const toxic = toxicComboPenalty(fullHistory, pick.signalType, league);
+    if (toxic) {
+      confidence += toxic;
+      breakdown.push({
+        key: "toxic_combo",
+        label: "Combo historiquement toxique",
+        value: toxic,
+        impact: toxic,
+      });
+    }
+
+    const profitBoost = profitableComboBoost(fullHistory, pick.signalType, league);
+    if (profitBoost) {
+      confidence += profitBoost;
+      breakdown.push({
+        key: "profitable_combo",
+        label: "Combo profitable",
+        value: profitBoost,
+        impact: profitBoost,
+      });
+    }
   }
 
   const recencyBoost = clamp(signalStats.recentReturn / 25, -6, 6);
@@ -350,20 +477,56 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
 
   confidence = Math.round(clamp(confidence, 0, 100));
 
+  const weeklyTrend =
+    fullHistory?.signals[pick.signalType].byLeague[league]?.weeklyTrend ??
+    fullHistory?.signals[pick.signalType].weeklyTrend;
+  const historicalWinRate = bayesianWr;
+  const historicalRoi =
+    pickStats && "blendedRoi" in pickStats
+      ? pickStats.blendedRoi
+      : signalStats.blendedRoi;
+  const highConviction = fullHistory
+    ? isHighConviction(fullHistory, pick.signalType, league)
+    : false;
+
+  if (highConviction) {
+    breakdown.push({
+      key: "high_conviction",
+      label: "Haute conviction",
+      value: 1,
+      impact: 6,
+      detail: "Tendance hebdo + all-time alignés",
+    });
+    confidence = Math.round(clamp(confidence + 6, 0, 100));
+  }
+
   return {
     confidence,
     confidenceBreakdown: breakdown,
     opponentPick: inverted ? opponentPick : undefined,
     opponentConfidence: inverted ? opponentConfidence : undefined,
     signalPolarity,
-    edgeLabel,
+    edgeLabel: highConviction ? `${edgeLabel} · Haute conviction` : edgeLabel,
+    historicalWinRate,
+    historicalRoi,
+    weeklyTrend,
+    highConviction,
   };
 }
 
 export function applyConfidenceToRecommendation(
   rec: Omit<
     MatchedRecommendation,
-    "confidence" | "confidenceBreakdown" | "opponentPick" | "opponentConfidence" | "signalPolarity" | "edgeLabel"
+    | "confidence"
+    | "confidenceBreakdown"
+    | "opponentPick"
+    | "opponentConfidence"
+    | "signalPolarity"
+    | "edgeLabel"
+    | "historicalWinRate"
+    | "historicalRoi"
+    | "weeklyTrend"
+    | "highConviction"
   > & { edgeLabel?: string },
   result: ConfidenceResult
 ): MatchedRecommendation {
@@ -375,6 +538,10 @@ export function applyConfidenceToRecommendation(
     opponentConfidence: result.opponentConfidence,
     signalPolarity: result.signalPolarity,
     edgeLabel: result.edgeLabel,
+    historicalWinRate: result.historicalWinRate,
+    historicalRoi: result.historicalRoi,
+    weeklyTrend: result.weeklyTrend,
+    highConviction: result.highConviction,
   };
 }
 
@@ -567,7 +734,9 @@ function matchupLabels(
 function resolveSingleGame(
   gameKey: string,
   recs: MatchedRecommendation[],
-  stats: ConfidenceStatsCache
+  stats: ConfidenceStatsCache,
+  dualStats?: DualFadeStatsCache,
+  slatePicks?: SheetPick[]
 ): { consolidated: GameConsolidatedRecommendation; updatedRecs: MatchedRecommendation[] } {
   const contributions = recs
     .map((r) => contributionForRec(r, stats))
@@ -589,23 +758,67 @@ function resolveSingleGame(
   }
 
   const sorted = [...teamEdges.entries()].sort((a, b) => b[1].edge - a[1].edge);
-  const winnerEntry = sorted[0];
+  let winnerEntry = sorted[0];
   const runnerUp = sorted[1];
-  const winnerNorm = winnerEntry?.[0] ?? "";
-  const winnerDisplay = winnerEntry?.[1].display ?? "";
-  const winnerEdge = winnerEntry?.[1].edge ?? 0;
+  let winnerNorm = winnerEntry?.[0] ?? "";
+  let winnerDisplay = winnerEntry?.[1].display ?? "";
+  let winnerEdge = winnerEntry?.[1].edge ?? 0;
   const runnerEdge = runnerUp?.[1].edge ?? 0;
-  const margin = winnerEdge - runnerEdge;
+  let margin = winnerEdge - runnerEdge;
   const maxEdge = Math.max(winnerEdge, 1);
 
   const teamsSupported = new Set(contributions.map((c) => c.teamNorm));
   const hasConflict = recs.length > 1 && teamsSupported.size > 1;
 
-  let confidence = clamp(55 + (margin / maxEdge) * 35, 52, 88);
-  if (cross.dampenConfidence && margin / maxEdge < 0.2) {
-    confidence = clamp(confidence - 12, 50, 72);
+  let dualFadeInfo: DualFadeInfo | undefined;
+  let dualFadeReasoning = "";
+  let dualFadeConfidence: number | undefined;
+
+  if (dualStats && slatePicks?.length) {
+    const league = sportLeagueFromRec(recs[0]);
+    const rawRow = getRawRowFromRecs(recs, slatePicks);
+    const pair = findDualFadePair(slatePicks, rawRow, league);
+    const resolution = resolveDualFadeMatch(pair.book, pair.square, dualStats, league);
+
+    if (resolution?.isDualFade) {
+      winnerNorm = resolution.recommendedSideNorm;
+      winnerDisplay = resolution.recommendedSide;
+      winnerEdge = resolution.confidence;
+      margin = resolution.confidence - (runnerEdge || 0);
+      dualFadeReasoning = resolution.reasoning;
+      dualFadeConfidence = resolution.confidence;
+      dualFadeInfo = {
+        isDualFade: true,
+        bookNeedsFadeTeam: resolution.bookNeedsFadeTeam,
+        squareFadeTeam: resolution.squareFadeTeam,
+        strongerFadeColumn: resolution.strongerFadeColumn,
+        archiveWinRate: resolution.archiveWinRate,
+        archiveSampleDays: dualStats.coOccurrence.dualActiveDays,
+      };
+      for (const b of resolution.breakdown) {
+        cross.notes.push(`${b.label}: ${b.detail ?? b.value}`);
+      }
+    } else if (resolution?.isStandalone && recs.length === 1) {
+      winnerNorm = resolution.recommendedSideNorm;
+      winnerDisplay = resolution.recommendedSide;
+      winnerEdge = resolution.confidence;
+      margin = resolution.confidence;
+      dualFadeReasoning = resolution.reasoning;
+      dualFadeConfidence = resolution.confidence;
+      dualFadeInfo = {
+        isDualFade: false,
+        strongerFadeColumn: resolution.strongerFadeColumn,
+        archiveWinRate: resolution.archiveWinRate,
+      };
+    }
   }
-  if (hasConflict && margin / maxEdge < 0.08) {
+
+  let confidence = clamp(55 + (margin / maxEdge) * 35, 52, 88);
+  if (dualFadeConfidence != null) {
+    confidence = dualFadeConfidence;
+  } else if (cross.dampenConfidence && margin / maxEdge < 0.2) {
+    confidence = clamp(confidence - 12, 50, 72);
+  } else if (hasConflict && margin / maxEdge < 0.08) {
     confidence = clamp(confidence - 10, 50, 65);
   }
   confidence = Math.round(confidence);
@@ -614,12 +827,22 @@ function resolveSingleGame(
   const breakdown: ConfidenceBreakdownItem[] = [
     {
       key: "game_net_edge",
-      label: `Edge net — ${winnerDisplay}`,
+      label: dualFadeInfo?.isDualFade ? "Résolution dual-fade" : `Edge net — ${winnerDisplay}`,
       value: Math.round(winnerEdge * 10) / 10,
       impact: confidence - 50,
       detail: sorted.map(([t, v]) => `${v.display}: ${Math.round(v.edge)}`).join(" · "),
     },
   ];
+
+  if (dualFadeInfo?.isDualFade) {
+    breakdown.push({
+      key: "dual_fade_dynamic",
+      label: "Dynamique dual-fade",
+      value: dualFadeInfo.archiveWinRate ?? 0,
+      impact: confidence - 55,
+      detail: dualFadeReasoning,
+    });
+  }
 
   if (cross.notes.length > 0) {
     breakdown.push({
@@ -644,6 +867,7 @@ function resolveSingleGame(
   const reasoningParts = [
     `Match: ${awayTeam} @ ${homeTeam}`,
     `Recommandation: ${winnerDisplay} (${confidence}%)`,
+    ...(dualFadeReasoning ? [dualFadeReasoning] : []),
     ...contributions.map((c) => c.note),
     ...(cross.notes.length ? [`Règles: ${cross.notes.join("; ")}`] : []),
   ];
@@ -656,10 +880,15 @@ function resolveSingleGame(
     recommendedTeam: winnerDisplay,
     confidence,
     confidenceBreakdown: breakdown,
-    hasConflict,
+    hasConflict: hasConflict || !!dualFadeInfo?.isDualFade,
     pickIds: recs.map((r) => r.id),
     reasoning: reasoningParts.join(" · "),
     matchedGame: recs.find((r) => r.matchedGame)?.matchedGame,
+    dualFade: dualFadeInfo,
+    highConviction: recs.some((r) => r.highConviction),
+    historicalWinRate: recs.find((r) => r.highConviction)?.historicalWinRate ?? recs[0]?.historicalWinRate,
+    historicalRoi: recs.find((r) => r.highConviction)?.historicalRoi ?? recs[0]?.historicalRoi,
+    weeklyTrend: recs.find((r) => r.weeklyTrend === "up")?.weeklyTrend ?? recs[0]?.weeklyTrend,
   };
 
   const updatedRecs = recs.map((rec) => {
@@ -668,7 +897,9 @@ function resolveSingleGame(
         ? rec.opponentConfidence
         : rec.confidence;
 
-    if (!hasConflict) {
+    const conflictActive = hasConflict || dualFadeInfo?.isDualFade;
+
+    if (!conflictActive) {
       return {
         ...rec,
         gameKey,
@@ -684,7 +915,9 @@ function resolveSingleGame(
       ...rec,
       gameKey,
       gameConflict: true,
-      conflictNote: "Conflit — voir recommandation match",
+      conflictNote: dualFadeInfo?.isDualFade
+        ? "Dual-fade résolu — voir recommandation match"
+        : "Conflit — voir recommandation match",
       standaloneConfidence: standalone,
       consolidatedTeam: winnerDisplay,
       consolidatedConfidence: confidence,
@@ -693,11 +926,32 @@ function resolveSingleGame(
         rec.opponentConfidence != null
           ? Math.min(rec.opponentConfidence, alignsWithWinner ? 42 : 35)
           : rec.opponentConfidence,
-      edgeLabel: "Conflit — voir recommandation match",
+      edgeLabel: dualFadeInfo?.isDualFade
+        ? "Dual-fade résolu"
+        : "Conflit — voir recommandation match",
     };
   });
 
   return { consolidated, updatedRecs };
+}
+
+function sportLeagueFromRec(rec: MatchedRecommendation): string {
+  const map: Partial<Record<LeagueCode, string>> = {
+    MEGA_SHARPS: "MLB",
+    WHALE: "MLB",
+    MODEL: "MLB",
+    RLM: "MLB",
+  };
+  return map[rec.league] || rec.league;
+}
+
+function getRawRowFromRecs(recs: MatchedRecommendation[], slatePicks?: SheetPick[]): number {
+  if (!slatePicks?.length) return 0;
+  for (const rec of recs) {
+    const pick = slatePicks.find((p) => p.id === rec.id);
+    if (pick?.rawRow) return pick.rawRow;
+  }
+  return 0;
 }
 
 export interface GameConflictResult {
@@ -705,10 +959,17 @@ export interface GameConflictResult {
   gameRecommendations: GameConsolidatedRecommendation[];
 }
 
+export interface GameConflictOptions {
+  dualStats?: DualFadeStatsCache;
+  slatePicks?: SheetPick[];
+}
+
 export function resolveGameConflicts(
   recommendations: MatchedRecommendation[],
-  stats: ConfidenceStatsCache
+  stats: ConfidenceStatsCache,
+  options?: GameConflictOptions
 ): GameConflictResult {
+  const { dualStats, slatePicks } = options ?? {};
   const byGame = new Map<string, MatchedRecommendation[]>();
 
   for (const rec of recommendations) {
@@ -723,11 +984,50 @@ export function resolveGameConflicts(
   for (const [key, recs] of byGame) {
     if (recs.length === 1) {
       const single = recs[0];
+      const league = sportLeagueFromRec(single);
+      const rawRow = getRawRowFromRecs([single], slatePicks);
+      const pair = slatePicks ? findDualFadePair(slatePicks, rawRow, league) : {};
+      const isStandaloneFade =
+        (single.signalType === "book_needs_fade" || single.signalType === "square_fade") &&
+        !pair.book &&
+        !pair.square;
+
+      if (dualStats && slatePicks && isStandaloneFade) {
+        const pick =
+          single.signalType === "book_needs_fade"
+            ? slatePicks.find((p) => p.id === single.id)
+            : slatePicks.find((p) => p.id === single.id);
+        const resolution = resolveDualFadeMatch(
+          pick?.signalType === "book_needs_fade" ? pick : undefined,
+          pick?.signalType === "square_fade" ? pick : undefined,
+          dualStats,
+          league
+        );
+        if (resolution?.isStandalone) {
+          const { consolidated, updatedRecs } = resolveSingleGame(
+            key,
+            recs,
+            stats,
+            dualStats,
+            slatePicks
+          );
+          gameRecommendations.push(consolidated);
+          for (const rec of updatedRecs) recById.set(rec.id, rec);
+          continue;
+        }
+      }
+
       recById.set(single.id, { ...single, gameKey: key });
       continue;
     }
 
-    const { consolidated, updatedRecs } = resolveSingleGame(key, recs, stats);
+    const { consolidated, updatedRecs } = resolveSingleGame(
+      key,
+      recs,
+      stats,
+      dualStats,
+      slatePicks
+    );
     gameRecommendations.push(consolidated);
     for (const rec of updatedRecs) {
       recById.set(rec.id, rec);
@@ -738,7 +1038,9 @@ export function resolveGameConflicts(
   return { recommendations: ordered, gameRecommendations };
 }
 
-/** Static baseline for before/after comparison */
+/** Re-export dual-fade resolution for tests and API consumers */
+export { resolveDualFadeMatch, isOpposingDualFade } from "./dualFadeStats.js";
+
 export const LEGACY_SIGNAL_CONFIDENCE: Record<SignalType, number> = {
   sharp_money: 85,
   mega_sharps: 92,

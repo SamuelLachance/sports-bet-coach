@@ -14,7 +14,12 @@ export interface SheetTabConfig {
   id: string;
   name: string;
   gid: string;
-  type: "daily_picks" | "archive" | "performance_daily" | "performance_yearly";
+  type:
+    | "daily_picks"
+    | "archive"
+    | "performance_daily"
+    | "performance_yearly"
+    | "performance_history";
 }
 
 export const SHEET_TABS: SheetTabConfig[] = [
@@ -42,10 +47,20 @@ export const SHEET_TABS: SheetTabConfig[] = [
     gid: "1887286192",
     type: "performance_yearly",
   },
+  {
+    id: "performance_history",
+    name: "Performance mensuelle/hebdo",
+    gid: "1234539794",
+    type: "performance_history",
+  },
 ];
 
 export function getSheetCsvUrl(tab: SheetTabConfig): string {
-  if (tab.type === "performance_daily" || tab.type === "performance_yearly") {
+  if (
+    tab.type === "performance_daily" ||
+    tab.type === "performance_yearly" ||
+    tab.type === "performance_history"
+  ) {
     return `https://docs.google.com/spreadsheets/d/${SHEET_EDIT_ID}/export?format=csv&gid=${tab.gid}`;
   }
   return `https://docs.google.com/spreadsheets/d/e/${SHEET_PUBLISH_ID}/pub?output=csv&gid=${tab.gid}`;

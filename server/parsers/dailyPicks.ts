@@ -150,12 +150,39 @@ export function parseDailyPicksCsv(csv: string): SheetPick[] {
       for (const [colStr, type] of Object.entries(SIGNAL_BY_COLUMN)) {
         const col = Number(colStr);
         const cell = cleanCell(row[col]);
+        const mid = cleanCell(row[col + 1]);
+        const far = cleanCell(row[col + 2]);
+
+        if (cell && mid.toUpperCase() === "VS" && far) {
+          const bookPick = picks.find(
+            (p) => p.rawRow === i + 1 && p.signalType === type && p.pick === cell
+          );
+          if (bookPick && !bookPick.opponent) {
+            bookPick.opponent = far;
+          }
+
+          const squareCol = col + 2;
+          const squareType = SIGNAL_BY_COLUMN[squareCol];
+          if (squareType === "square_fade") {
+            const squarePick = picks.find(
+              (p) =>
+                p.rawRow === i + 1 &&
+                p.signalType === "square_fade" &&
+                p.pick === far
+            );
+            if (squarePick && !squarePick.opponent) {
+              squarePick.opponent = cell;
+            }
+          }
+          continue;
+        }
+
         const next = cleanCell(row[col + 1]);
-        if (cell && next && cell.toUpperCase() !== "VS") {
+        if (cell && next && cell.toUpperCase() !== "VS" && next.toUpperCase() !== "VS") {
           const existing = picks.find(
             (p) => p.rawRow === i + 1 && p.signalType === type && p.pick === cell
           );
-          if (existing && !existing.opponent && next.toUpperCase() !== "VS") {
+          if (existing && !existing.opponent) {
             existing.opponent = next;
           }
         }
