@@ -8,3 +8,5 @@ data/raw/*.csv
 *.log
 .DS_Store
 client/dist/
+
+client/public/api/*.json

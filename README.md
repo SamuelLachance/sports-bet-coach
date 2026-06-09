@@ -155,3 +155,24 @@ sports-bet-coach/
 - `GET /api/stats` — Bankroll / performance
 - `GET /api/sync/status` — Statut de sync
 - `POST /api/sync` — Forcer synchronisation
+
+## GitHub Pages
+
+Site public (snapshot des donnees au build CI) : **https://samuellachance.github.io/sports-bet-coach/**
+
+Le deploiement utilise GitHub Actions (`.github/workflows/pages.yml`) :
+
+1. Sync Google Sheets + calendriers ESPN
+2. Export JSON statique dans `client/public/api/`
+3. Build Vite avec `VITE_STATIC_API=true` et base `/sports-bet-coach/`
+
+**Limitations sur Pages :** pas d''API Express en direct � pas de sync manuelle ni refresh live entre les deploiements. Pour l''experience complete (sync, ESPN live), lancez `npm run dev` en local ou hebergez le serveur Node (`npm start`) separement.
+
+Build local du bundle Pages :
+
+```bash
+set VITE_BASE=/sports-bet-coach/
+set VITE_STATIC_API=true
+npm run build:pages
+```
+

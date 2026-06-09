@@ -1,3 +1,4 @@
+import { isStaticDeploy } from "../api";
 import type { SyncStatus } from "../types";
 
 interface SettingsViewProps {
@@ -19,7 +20,12 @@ export function SettingsView({
         <h2 className="font-display text-lg font-semibold mb-4">
           Synchronisation des données
         </h2>
-
+        {isStaticDeploy && (
+          <p className="text-sm text-slate-400 mb-4 bg-surface/50 border border-slate-700 rounded-lg p-3">
+            Deploiement GitHub Pages : snapshot des donnees au moment du build CI.
+            Lancez l&apos;app en local (<code className="text-accent">npm run dev</code>) pour sync en direct.
+          </p>
+        )}
         {error && (
           <div className="bg-danger/10 border border-danger/30 text-danger rounded-lg p-3 mb-4 text-sm">
             {error}
@@ -47,7 +53,7 @@ export function SettingsView({
 
         <button
           onClick={onSync}
-          disabled={syncing}
+          disabled={syncing || isStaticDeploy}
           className="mt-6 w-full py-3 rounded-lg bg-accent text-surface font-semibold hover:bg-accent-glow disabled:opacity-50 transition-colors"
         >
           {syncing ? "Synchronisation en cours…" : "Forcer la synchronisation"}

@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Recommandations de paris quotidiennes synchronisées avec Google Sheets et calendriers sportifs",
+  "description": "Recommandations de paris quotidiennes synchronisees avec Google Sheets et calendriers sportifs",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "npm run dev --prefix client",
     "dev:server": "tsx watch server/index.ts",
     "build": "npm run build --prefix client",
+    "build:pages": "tsx server/scripts/export-pages-data.ts && npm run build --prefix client",
     "sync": "tsx server/scripts/sync-sheets.ts",
     "test:confidence": "tsx server/scripts/test-confidence.ts",
     "start": "tsx server/index.ts"
