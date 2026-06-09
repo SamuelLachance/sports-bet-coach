@@ -2,49 +2,21 @@ import { formatInTimeZone } from "date-fns-tz";
 import { TIMEZONE } from "../config.js";
 import type {
   CalendarGame,
-  LeagueCode,
   MatchedRecommendation,
   ParsedSheets,
   SheetPick,
   SignalType,
 } from "../types.js";
+import { getConfidenceStats } from "./confidenceCache.js";
+import {
+  applyConfidenceToRecommendation,
+  computeConfidence,
+} from "./confidenceEngine.js";
+import { SIGNAL_LABELS_FR } from "./signalMapping.js";
 import { matchPickToGame, todayDisplayDate } from "./calendar.js";
 
-const SIGNAL_LABELS: Record<SignalType, string> = {
-  sharp_money: "Sharp Money",
-  book_needs_fade: "Book Needs (Fade)",
-  square_fade: "Square Top (Fade)",
-  reverse_line_movement: "Reverse Line Movement",
-  mega_sharps: "Mega Sharps (4+)",
-  whale_plays: "Whale Plays 🐳",
-  model_best_values: "Model Best Values",
-  mega_rlm: "Mega RLM (4+)",
-};
-
-const SIGNAL_CONFIDENCE: Record<SignalType, number> = {
-  sharp_money: 85,
-  mega_sharps: 92,
-  whale_plays: 88,
-  model_best_values: 80,
-  mega_rlm: 78,
-  reverse_line_movement: 75,
-  book_needs_fade: 70,
-  square_fade: 65,
-};
-
-const SIGNAL_EDGE: Record<SignalType, string> = {
-  sharp_money: "Argent intelligent",
-  book_needs_fade: "Fade bookmaker",
-  square_fade: "Fade public",
-  reverse_line_movement: "Mouvement de ligne inverse",
-  mega_sharps: "Consensus sharps",
-  whale_plays: "Gros parieur",
-  model_best_values: "Valeur modèle",
-  mega_rlm: "RLM fort",
-};
-
 function buildReasoning(pick: SheetPick, game?: CalendarGame): string {
-  const signal = SIGNAL_LABELS[pick.signalType];
+  const signal = SIGNAL_LABELS_FR[pick.signalType];
   const parts = [`Signal: ${signal}`];
 
   if (pick.opponent) {
@@ -79,51 +51,59 @@ function inferStatus(game?: CalendarGame): MatchedRecommendation["status"] {
   return "recommended";
 }
 
-const SPECIAL_TO_SPORT: Partial<Record<LeagueCode, LeagueCode>> = {
+const SPECIAL_TO_SPORT: Partial<Record<string, string>> = {
   MEGA_SHARPS: "MLB",
   WHALE: "MLB",
   MODEL: "MLB",
   RLM: "MLB",
 };
 
-function sportLeagueForPick(pick: SheetPick): LeagueCode {
+function sportLeagueForPick(pick: SheetPick): string {
   return SPECIAL_TO_SPORT[pick.league] || pick.league;
 }
 
-export function buildRecommendations(
+export async function buildRecommendations(
   sheets: ParsedSheets,
   games: CalendarGame[],
   targetDate?: string
-): MatchedRecommendation[] {
+): Promise<MatchedRecommendation[]> {
   const gameDate = targetDate || todayDisplayDate();
+  const stats = await getConfidenceStats(sheets);
 
   return sheets.dailyPicks.map((pick) => {
     const sportLeague = sportLeagueForPick(pick);
     const leagueGames = games.filter((g) => g.league === sportLeague);
     const matchedGame = matchPickToGame(pick.pick, pick.opponent, leagueGames);
 
-    return {
+    const confidenceResult = computeConfidence({
+      pick,
+      matchedGame,
+      stats,
+      slatePicks: sheets.dailyPicks,
+    });
+
+    const base = {
       id: pick.id,
       league: pick.league,
       signalType: pick.signalType,
-      signalLabel: SIGNAL_LABELS[pick.signalType],
+      signalLabel: SIGNAL_LABELS_FR[pick.signalType],
       pick: pick.pick,
       opponent: pick.opponent,
       gameTime: pick.gameTime,
       postingTime: pick.postingTime,
       line: pick.line,
-      confidence: SIGNAL_CONFIDENCE[pick.signalType],
-      edgeLabel: SIGNAL_EDGE[pick.signalType],
       reasoning: buildReasoning(pick, matchedGame),
       status: inferStatus(matchedGame),
       matchedGame,
       gameDate,
     };
+
+    return applyConfidenceToRecommendation(base, confidenceResult);
   });
 }
 
-export function getActiveLeagues(sheets: ParsedSheets): LeagueCode[] {
-  const leagues = new Set<LeagueCode>();
+export function getActiveLeagues(sheets: ParsedSheets): import("../types.js").LeagueCode[] {
+  const leagues = new Set<import("../types.js").LeagueCode>();
   for (const pick of sheets.dailyPicks) {
     if (pick.league !== "UNKNOWN") leagues.add(pick.league);
   }
@@ -132,7 +112,7 @@ export function getActiveLeagues(sheets: ParsedSheets): LeagueCode[] {
 
 export function filterByLeague(
   recs: MatchedRecommendation[],
-  league: LeagueCode | "ALL"
+  league: import("../types.js").LeagueCode | "ALL"
 ): MatchedRecommendation[] {
   if (league === "ALL") return recs;
   return recs.filter((r) => r.league === league);
@@ -151,3 +131,5 @@ export function groupBySignal(
     {} as Record<string, MatchedRecommendation[]>
   );
 }
+
+export { SIGNAL_LABELS_FR };

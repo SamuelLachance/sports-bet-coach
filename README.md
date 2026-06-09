@@ -77,12 +77,51 @@ API ESPN gratuite (aucune clé requise) :
 
 Les picks sont associés aux matchs du jour par correspondance de noms d'équipes.
 
+## Moteur de confiance dynamique
+
+Le score de confiance (0–100) remplace l'ancienne table statique `SIGNAL_CONFIDENCE`. Il est recalculé à chaque sync à partir des données historiques Google Sheets.
+
+### Sources utilisées
+
+| Source | Rôle |
+|--------|------|
+| Performance annuelle (gid 1887286192) | ROI all-time et mensuel par catégorie de signal |
+| Performance quotidienne (gid 0) | W/L, win rate et retour par ligue |
+| Archives (467+ jours) | Taille d'échantillon et contexte temporel |
+| Picks du jour | Croisement de signaux sur le même match (slate) |
+
+### Composantes du score
+
+1. **ROI historique** — retour blended (40 % all-time + 60 % récent avec decay sur 6 mois), pondéré par taille d'échantillon
+2. **Inversion fade** — signaux ultra-négatifs (Square, Book Needs, Whale) : confiance basse sur le fade, **boost sur l'adversaire** (`opponentPick`)
+3. **Croisement signaux** — confluence (Sharp + Mega Sharps) ou conflit (sharp vs fade) sur le même match
+4. **Performance ligue** — modificateur si données disponibles pour MLB, NBA, etc.
+5. **Match ESPN** — +5 si le pick est associé à un match confirmé
+
+### Polarité du signal
+
+- `positive` — ROI historique favorable
+- `negative` — ROI défavorable (confiance réduite)
+- `inverted` — fade historiquement perdant → jouer l'équipe adverse
+
+### Cache
+
+Stats pré-calculées dans `data/cache/confidence-stats.json` (régénéré au sync).
+
+### Test
+
+```bash
+npm run test:confidence
+```
+
+Affiche la comparaison legacy vs dynamique pour les picks du jour.
+
 ## Moteur de recommandations
 
 1. Parse les picks du jour depuis Google Sheets
 2. Charge le calendrier ESPN pour les ligues actives
 3. Associe chaque pick à un match (si possible)
-4. Attribue confiance et libellé d'edge selon le type de signal
+4. Calcule confiance dynamique via `confidenceEngine.ts`
 5. Affiche statut : recommandé / en attente / en cours / terminé
 
 ## Variables d'environnement
@@ -101,7 +140,7 @@ sports-bet-coach/
 ├── client/          # Vite + React + TypeScript + Tailwind
 ├── server/
 │   ├── parsers/     # CSV → modèles
-│   ├── services/    # Sheets, calendrier, recommandations
+│   ├── services/    # Sheets, calendrier, confiance, recommandations
 │   └── index.ts     # API Express
 └── data/
     ├── raw/         # CSV bruts

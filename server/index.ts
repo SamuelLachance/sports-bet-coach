@@ -98,7 +98,7 @@ app.get("/api/recommendations", async (req, res) => {
     const leagues = getActiveLeagues(sheets);
     const dateKey = todayDateKey();
     const games = await fetchAllSchedules(leagues, dateKey);
-    let recs = buildRecommendations(sheets, games);
+    let recs = await buildRecommendations(sheets, games);
 
     const league = req.query.league as LeagueCode | "ALL" | undefined;
     if (league) recs = filterByLeague(recs, league);

@@ -10,6 +10,7 @@
     "dev:server": "tsx watch server/index.ts",
     "build": "npm run build --prefix client",
     "sync": "tsx server/scripts/sync-sheets.ts",
+    "test:confidence": "tsx server/scripts/test-confidence.ts",
     "start": "tsx server/index.ts"
   },
   "dependencies": {

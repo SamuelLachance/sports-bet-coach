@@ -76,44 +76,79 @@ const MONTHS = [
   "JUL", "AUG", "SEPT", "OCT", "NOV", "DEC",
 ];
 
+const YEARLY_CATEGORIES = [
+  "Sharp Money",
+  "Sportsbook",
+  "Squares",
+  "Model Best Values",
+  "Whale 🐳",
+  "Whale",
+  "Mega sharps",
+  "RLM",
+  "RLM MS",
+  "MEGA RLM",
+  "Total",
+];
+
+function readAllTimeCell(row: string[]): number | null {
+  const col16 = (row[16] || "").trim();
+  const col17 = row[17] != null && row[17] !== "" ? num(row[17]) : null;
+  if (YEARLY_CATEGORIES.includes(col16) && col17 != null) return col17;
+  if (row[16] != null && row[16] !== "" && !YEARLY_CATEGORIES.includes(col16)) {
+    const v = num(row[16]);
+    return Number.isFinite(v) ? v : null;
+  }
+  return null;
+}
+
+/** All-time totals from header block (row 2+) before year sections */
+export function parseYearlyAllTimeSummary(csv: string): Record<string, number> {
+  const rows: string[][] = parse(csv, { relax_column_count: true, skip_empty_lines: false });
+  const summary: Record<string, number> = {};
+
+  for (const row of rows) {
+    const col16 = (row[16] || "").trim();
+    const col17 = row[17] != null && row[17] !== "" ? num(row[17]) : null;
+    if (YEARLY_CATEGORIES.includes(col16) && col17 != null) {
+      summary[col16] = col17;
+    }
+  }
+
+  return summary;
+}
+
 export function parseYearlyPerformanceCsv(csv: string): YearlyPerformanceRow[] {
   const rows: string[][] = parse(csv, { relax_column_count: true, skip_empty_lines: false });
   const results: YearlyPerformanceRow[] = [];
   let currentYear = 0;
   let currentCategory = "";
+  let categoryAllTime: number | null = null;
 
   for (const row of rows) {
     const col0 = (row[0] || "").trim();
-    const col1 = (row[1] || "").trim();
 
     const yearMatch = col0.match(/^(\d{4})$/);
     if (yearMatch) {
       currentYear = parseInt(yearMatch[1], 10);
+      categoryAllTime = null;
       continue;
     }
 
-    const categories = [
-      "Sharp Money",
-      "Sportsbook",
-      "Squares",
-      "Model Best Values",
-      "Whale 🐳",
-      "Whale",
-      "Mega sharps",
-      "RLM",
-      "RLM MS",
-      "Total",
-    ];
-
-    if (categories.includes(col0)) {
+    if (YEARLY_CATEGORIES.includes(col0)) {
       currentCategory = col0;
+      categoryAllTime = null;
       continue;
     }
 
-    if (!currentYear || !currentCategory) continue;
+    if (!currentYear || !currentCategory || currentCategory === "Total") continue;
 
     const league = col0;
     if (!league || league === "AVERAGE" || league === "ALL TIME") continue;
+
+    const inlineAllTime = readAllTimeCell(row);
+    if (inlineAllTime != null && categoryAllTime == null) {
+      categoryAllTime = inlineAllTime;
+    }
 
     const months: Record<string, number | null> = {};
     MONTHS.forEach((m, idx) => {
@@ -126,7 +161,10 @@ export function parseYearlyPerformanceCsv(csv: string): YearlyPerformanceRow[] {
     });
 
     const yearTotal = row[14] ? num(row[14]) : null;
-    const allTime = row[16] ? num(row[16]) : null;
+    const allTime =
+      league.toLowerCase().startsWith("total") && categoryAllTime != null
+        ? categoryAllTime
+        : null;
 
     results.push({
       year: currentYear,

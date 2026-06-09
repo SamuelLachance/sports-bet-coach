@@ -13,6 +13,7 @@ import {
   parseDailyPerformanceCsv,
   parseYearlyPerformanceCsv,
 } from "../parsers/performance.js";
+import { buildAndCacheConfidenceStats } from "./confidenceCache.js";
 import type { ParsedSheets } from "../types.js";
 
 async function ensureDirs() {
@@ -54,6 +55,8 @@ export async function syncAllSheets(): Promise<ParsedSheets> {
     performanceYearly: perfYearly,
     mtd: perfDaily.mtd,
   };
+
+  await buildAndCacheConfidenceStats(parsed, tabResults.performance_yearly);
 
   await fs.writeFile(
     path.join(CACHE_DIR, "sheets.json"),

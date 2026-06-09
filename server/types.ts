@@ -34,6 +34,16 @@ export interface SheetPick {
   rawRow: number;
 }
 
+export type SignalPolarity = "positive" | "negative" | "inverted";
+
+export interface ConfidenceBreakdownItem {
+  key: string;
+  label: string;
+  value: number;
+  impact: number;
+  detail?: string;
+}
+
 export interface ArchiveEntry {
   date: string;
   label: string;
@@ -93,6 +103,10 @@ export interface MatchedRecommendation {
   postingTime?: string;
   line?: string;
   confidence: number;
+  confidenceBreakdown: ConfidenceBreakdownItem[];
+  opponentPick?: string;
+  opponentConfidence?: number;
+  signalPolarity: SignalPolarity;
   edgeLabel: string;
   reasoning: string;
   status: "recommended" | "pending" | "matched" | "settled";

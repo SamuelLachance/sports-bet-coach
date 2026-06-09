@@ -20,15 +20,30 @@ const STATUS_LABELS = {
   settled: { text: "Terminé", class: "bg-slate-500/20 text-slate-300" },
 };
 
+const POLARITY_LABELS: Record<
+  MatchedRecommendation["signalPolarity"],
+  { text: string; class: string }
+> = {
+  positive: { text: "Signal positif", class: "text-success" },
+  negative: { text: "Signal négatif", class: "text-warning" },
+  inverted: { text: "Inversé — jouer l'adversaire", class: "text-accent-glow" },
+};
+
 function confidenceColor(c: number) {
   if (c >= 85) return "text-success";
   if (c >= 75) return "text-accent-glow";
+  if (c >= 50) return "text-slate-200";
   return "text-warning";
+}
+
+function impactSign(n: number) {
+  return n >= 0 ? `+${n}` : `${n}`;
 }
 
 export function PickCard({ rec }: { rec: MatchedRecommendation }) {
   const status = STATUS_LABELS[rec.status];
   const leagueColor = LEAGUE_COLORS[rec.league] || "bg-slate-500/20 text-slate-300";
+  const polarity = POLARITY_LABELS[rec.signalPolarity];
 
   return (
     <article className="card hover:border-accent/30 transition-colors">
@@ -39,6 +54,9 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
             {rec.signalLabel}
           </span>
           <span className={`badge ${status.class}`}>{status.text}</span>
+          <span className={`badge bg-surface-raised ${polarity.class} border border-surface-border`}>
+            {polarity.text}
+          </span>
         </div>
         <div className="text-right">
           <div className={`text-2xl font-bold font-display ${confidenceColor(rec.confidence)}`}>
@@ -59,6 +77,30 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
         <p className="text-slate-400 text-sm mb-2">
           vs <span className="text-slate-200">{rec.opponent}</span>
         </p>
+      )}
+
+      {rec.signalPolarity === "inverted" && rec.opponentPick && (
+        <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 mb-3">
+          <div className="text-xs text-accent-muted uppercase tracking-wide mb-1">
+            Pick inversé recommandé
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-display text-lg font-semibold text-accent-glow">
+              {rec.opponentPick}
+            </div>
+            {rec.opponentConfidence != null && (
+              <div className="text-right">
+                <div className="text-xl font-bold font-display text-success">
+                  {rec.opponentConfidence}%
+                </div>
+                <div className="text-xs text-slate-500">confiance inversée</div>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Ce signal fade perd historiquement — mise sur l&apos;adversaire.
+          </p>
+        </div>
       )}
 
       {rec.matchedGame && (
@@ -82,6 +124,34 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
         {rec.gameTime && <span>Heure: {rec.gameTime}</span>}
         {rec.postingTime && <span>Publié: {rec.postingTime}</span>}
       </div>
+
+      {rec.confidenceBreakdown?.length > 0 && (
+        <details className="mb-3 group">
+          <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
+            Détail confiance ({rec.confidenceBreakdown.length} facteurs)
+          </summary>
+          <ul className="mt-2 space-y-1.5 text-xs">
+            {rec.confidenceBreakdown.map((item) => (
+              <li
+                key={item.key}
+                className="flex flex-wrap justify-between gap-x-2 gap-y-0.5 bg-surface-raised rounded px-2 py-1.5"
+              >
+                <span className="text-slate-300">{item.label}</span>
+                <span
+                  className={
+                    item.impact >= 0 ? "text-success font-medium" : "text-warning font-medium"
+                  }
+                >
+                  {impactSign(Math.round(item.impact * 10) / 10)}
+                </span>
+                {item.detail && (
+                  <span className="w-full text-slate-500">{item.detail}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <p className="text-sm text-slate-400 leading-relaxed">{rec.reasoning}</p>
     </article>
