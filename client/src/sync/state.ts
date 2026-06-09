@@ -1,4 +1,4 @@
-import type { ClientSyncSnapshot } from "./pipeline";
+import type { ClientSyncSnapshot } from "./types";
 
 let snapshot: ClientSyncSnapshot | null = null;
 

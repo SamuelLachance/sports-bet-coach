@@ -1,5 +1,4 @@
 ﻿import type { MatchedRecommendation, StatsResponse, SyncStatus } from "./types";
-import { runClientSync } from "./sync/pipeline";
 import { getClientSnapshot, setClientSnapshot } from "./sync/state";
 
 const STATIC_API = import.meta.env.VITE_STATIC_API === "true";
@@ -100,6 +99,7 @@ export async function fetchSyncStatus() {
 
 export async function triggerSync() {
   if (CLIENT_SYNC) {
+    const { runClientSync } = await import("./sync/pipeline");
     const snapshot = await runClientSync();
     setClientSnapshot(snapshot);
     return { ok: true, status: snapshot.syncStatus };

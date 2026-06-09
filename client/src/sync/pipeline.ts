@@ -1,3 +1,4 @@
+import "./shims/buffer";
 import { parseArchiveCsv } from "@server/parsers/archive.js";
 import { parseDailyPicksCsv } from "@server/parsers/dailyPicks.js";
 import {
@@ -17,21 +18,10 @@ import {
   getActiveLeagues,
 } from "@server/services/recommendations.js";
 import type { ParsedSheets } from "@server/types.js";
-import type {
-  CalendarGame,
-  MatchedRecommendation,
-  StatsResponse,
-  SyncStatus,
-} from "../types";
+import type { MatchedRecommendation, StatsResponse, SyncStatus } from "../types";
+import type { ClientSyncSnapshot } from "./types";
 
-export interface ClientSyncSnapshot {
-  recommendations: MatchedRecommendation[];
-  gameRecommendations: import("../types").GameConsolidatedRecommendation[];
-  games: CalendarGame[];
-  date: string;
-  stats: StatsResponse;
-  syncStatus: SyncStatus;
-}
+export type { ClientSyncSnapshot } from "./types";
 
 async function fetchTabCsv(tab: SheetTabConfig): Promise<string> {
   const url = getSheetCsvUrl(tab);

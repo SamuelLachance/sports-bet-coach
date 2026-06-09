@@ -14,6 +14,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      buffer: "buffer",
       "@server": path.resolve(__dirname, "../server"),
       "node:fs/promises": path.resolve(__dirname, "src/sync/stubs/fs.ts"),
       "node:fs": path.resolve(__dirname, "src/sync/stubs/fs.ts"),
