@@ -4,11 +4,10 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
-  # Sync Google Sheets + rebuild 3×/jour (America/Toronto) — voir DEPLOY.md
-  # Cron UTC: 16:00, 20:00, 22:00 = 12h, 16h, 18h EDT (été, UTC-4)
-  # En EST (hiver, UTC-5): ajuster à 17:00, 21:00, 23:00 UTC si besoin
+  # Daily rebuild after Sports Odds algo (3:00 Toronto) — voir DEPLOY.md
+  # Cron UTC 08:00 = 4:00 EDT (1h after algo); en EST utiliser 09:00 UTC pour 4:00 local
   schedule:
-    - cron: "0 16,20,22 * * *"
+    - cron: "0 8 * * *"
 
 permissions:
   contents: read
