@@ -22,6 +22,21 @@ export type SignalType =
   | "model_best_values"
   | "mega_rlm";
 
+export type BetType = "spread" | "moneyline" | "total";
+
+export type TotalDirection = "over" | "under";
+
+export interface ParsedBet {
+  betType: BetType;
+  team?: string;
+  rawText: string;
+  spread?: number;
+  odds?: number;
+  totalDirection?: TotalDirection;
+  totalLine?: number;
+  displayText: string;
+}
+
 export interface SheetPick {
   id: string;
   league: LeagueCode;
@@ -31,6 +46,7 @@ export interface SheetPick {
   gameTime?: string;
   postingTime?: string;
   line?: string;
+  parsedBet?: ParsedBet;
   rawRow: number;
   /** VS-group or orphan bucket within a multi-game sheet row */
   gameSlot?: number;
@@ -122,7 +138,10 @@ export interface GameConsolidatedRecommendation {
   league: LeagueCode;
   awayTeam: string;
   homeTeam: string;
+  /** Full bet text for display (team + line/spread/odds or over/under) */
   recommendedTeam: string;
+  recommendedBet?: ParsedBet;
+  betType?: BetType;
   confidence: number;
   /** True when signals cancel out (e.g. opposing Book Needs + Square Top) */
   noBet?: boolean;
@@ -150,6 +169,9 @@ export interface MatchedRecommendation {
   gameTime?: string;
   postingTime?: string;
   line?: string;
+  parsedBet?: ParsedBet;
+  recommendedBet?: ParsedBet;
+  opponentBet?: ParsedBet;
   confidence: number;
   confidenceBreakdown: ConfidenceBreakdownItem[];
   opponentPick?: string;

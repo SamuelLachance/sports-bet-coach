@@ -14,6 +14,7 @@
     "test:confidence": "tsx server/scripts/test-confidence.ts",
     "test:game-association": "tsx server/tests/gameAssociation.test.ts",
     "test:recommendation-rules": "tsx server/tests/recommendationRules.test.ts",
+    "test:pick-parser": "tsx server/tests/pickBetParser.test.ts",
     "test:tracking": "tsx server/tests/tracking.test.ts",
     "start": "tsx server/index.ts"
   },

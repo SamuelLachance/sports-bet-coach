@@ -229,6 +229,17 @@ function RollupChart({ rollups }: { rollups: PeriodRollup[] }) {
   );
 }
 
+function betTypeLabel(bet: TrackedBet): string {
+  if (bet.betType === "spread" && bet.spread != null) {
+    return `Spread ${bet.spread > 0 ? "+" : ""}${bet.spread}`;
+  }
+  if (bet.betType === "total" && bet.totalDirection && bet.totalLine != null) {
+    return `${bet.totalDirection === "over" ? "Over" : "Under"} ${bet.totalLine}`;
+  }
+  if (bet.betType === "moneyline") return "Moneyline";
+  return "—";
+}
+
 function BetLogRow({ bet }: { bet: TrackedBet }) {
   const matchup = `${bet.awayTeam} @ ${bet.homeTeam}`;
 
@@ -250,6 +261,29 @@ function BetLogRow({ bet }: { bet: TrackedBet }) {
             {bet.confidence}% conf
           </div>
           <div className="text-xs text-slate-500">{bet.date}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs">
+        <div>
+          <span className="text-slate-500">Bet type</span>
+          <div className="text-slate-200 font-medium">{betTypeLabel(bet)}</div>
+        </div>
+        <div>
+          <span className="text-slate-500">Line</span>
+          <div className="text-slate-200 font-medium">
+            {bet.spread != null
+              ? `${bet.spread > 0 ? "+" : ""}${bet.spread}`
+              : bet.totalLine != null
+                ? String(bet.totalLine)
+                : bet.odds != null
+                  ? `${bet.odds > 0 ? "+" : ""}${bet.odds}`
+                  : "—"}
+          </div>
+        </div>
+        <div>
+          <span className="text-slate-500">Result</span>
+          <div className="text-slate-200 font-medium capitalize">{bet.status}</div>
         </div>
       </div>
 

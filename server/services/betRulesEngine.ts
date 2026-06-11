@@ -4,6 +4,12 @@
  */
 import { formatInTimeZone } from "date-fns-tz";
 import { TIMEZONE } from "../config.js";
+import {
+  betKey,
+  fadeParsedBet,
+  parsePickBet,
+  resolveBetDisplay,
+} from "../parsers/pickBetParser.js";
 import type {
   CalendarGame,
   ConfidenceBreakdownItem,
@@ -11,6 +17,7 @@ import type {
   GameConsolidatedRecommendation,
   LeagueCode,
   MatchedRecommendation,
+  ParsedBet,
   SheetPick,
   SignalPolarity,
   SignalType,
@@ -59,7 +66,25 @@ function displayTeamName(text: string): string {
 }
 
 function isTotalPick(pick: SheetPick): boolean {
+  if (pick.parsedBet?.betType === "total") return true;
   return /\b(OVER|UNDER)\b/i.test(pick.pick) || !!pick.line;
+}
+
+function parsedBetForPick(pick: SheetPick): ParsedBet {
+  if (pick.parsedBet) return pick.parsedBet;
+  return (
+    parsePickBet(pick.pick, pick.line) ?? {
+      betType: "moneyline",
+      team: displayTeamName(pick.pick),
+      rawText: pick.pick,
+      displayText: displayTeamName(pick.pick),
+    }
+  );
+}
+
+function teamResolver(game?: CalendarGame): (name: string) => string | undefined {
+  return (name: string) =>
+    game != null ? resolveGameTeamDisplay(name, game) ?? displayTeamName(name) : displayTeamName(name);
 }
 
 function invertTotalSide(text: string): string | undefined {
@@ -94,7 +119,9 @@ export function extractOpponentName(
   matchedGame?: CalendarGame
 ): string | undefined {
   if (isTotalPick(pick)) {
-    return invertTotalSide(pick.pick);
+    const bet = parsedBetForPick(pick);
+    const faded = fadeParsedBet(bet);
+    return faded ? resolveBetDisplay(faded) : invertTotalSide(pick.pick);
   }
 
   if (pick.opponent) {
@@ -179,6 +206,8 @@ export interface PickRulesResult {
   confidence: number;
   confidenceBreakdown: ConfidenceBreakdownItem[];
   opponentPick?: string;
+  opponentBet?: ParsedBet;
+  recommendedBet?: ParsedBet;
   opponentConfidence?: number;
   signalPolarity: SignalPolarity;
   edgeLabel: string;
@@ -191,43 +220,49 @@ export function computePickRules(input: {
 }): PickRulesResult {
   const { pick, matchedGame, slatePicks } = input;
   const breakdown: ConfidenceBreakdownItem[] = [];
+  const listedBet = parsedBetForPick(pick);
+  const resolveTeam = teamResolver(matchedGame);
+  const listedDisplay = resolveBetDisplay(listedBet, resolveTeam);
 
   if (SHARP_BET_SIGNALS.has(pick.signalType)) {
     const confidence =
       pick.signalType === "mega_sharps" ? RULE_CONFIDENCE.megaSharps : RULE_CONFIDENCE.sharp;
     const signalLabel = SIGNAL_LABELS[pick.signalType];
-    const team = `${displayTeamName(pick.pick)}${pick.line ? ` ${pick.line}` : ""}`;
     breakdown.push(
-      breakdownItem("sharp_rule", signalLabel, `${signalLabel} → ${team}`, confidence)
+      breakdownItem("sharp_rule", signalLabel, `${signalLabel} → ${listedDisplay}`, confidence)
     );
     return {
       confidence,
       confidenceBreakdown: breakdown,
+      recommendedBet: listedBet,
       signalPolarity: "positive",
       edgeLabel: `${SIGNAL_LABELS[pick.signalType]} — bet listed side`,
     };
   }
 
   if (FADE_SIGNALS.has(pick.signalType)) {
-    const opponentPick = extractOpponentName(pick, slatePicks, matchedGame);
+    const opponentName = extractOpponentName(pick, slatePicks, matchedGame);
+    const fadedBet = fadeParsedBet(listedBet, opponentName, resolveTeam);
     const confidence = RULE_CONFIDENCE.singleFade;
-    if (opponentPick) {
+    if (fadedBet) {
+      const fadedDisplay = resolveBetDisplay(fadedBet, resolveTeam);
       const signalLabel = SIGNAL_LABELS[pick.signalType];
       breakdown.push(
         breakdownItem(
           "fade_rule",
           signalLabel,
-          `${signalLabel} → ${displayTeamName(opponentPick)}`,
+          `${signalLabel} → ${fadedDisplay}`,
           confidence
         )
       );
       return {
         confidence,
         confidenceBreakdown: breakdown,
-        opponentPick,
+        opponentPick: fadedDisplay,
+        opponentBet: fadedBet,
         opponentConfidence: confidence,
         signalPolarity: "inverted",
-        edgeLabel: `${signalLabel} — bet opponent`,
+        edgeLabel: `${signalLabel} — fade listed side`,
       };
     }
 
@@ -247,13 +282,14 @@ export function computePickRules(input: {
     breakdownItem(
       "secondary_signal",
       signalLabel,
-      `${signalLabel} → ${displayTeamName(pick.pick)}`,
+      `${signalLabel} → ${listedDisplay}`,
       RULE_CONFIDENCE.secondary
     )
   );
   return {
     confidence: RULE_CONFIDENCE.secondary,
     confidenceBreakdown: breakdown,
+    recommendedBet: listedBet,
     signalPolarity: "positive",
     edgeLabel: `${SIGNAL_LABELS[pick.signalType]} — bet listed side`,
   };
@@ -347,16 +383,25 @@ function fadeTargetsForRecs(
   };
 
   for (const rec of recs) {
-    if (rec.line) continue;
-    if (FADE_SIGNALS.has(rec.signalType)) addTarget(rec.pick);
+    if (FADE_SIGNALS.has(rec.signalType)) {
+      const bet = rec.parsedBet ?? parsePickBet(rec.pick, rec.line);
+      if (bet?.betType === "total" && bet.team) addTarget(bet.team);
+      else if (bet?.team) addTarget(bet.team);
+      else addTarget(rec.pick);
+    }
   }
 
   if (matchedGame) {
     const league = sportLeagueFromRec(recs[0]);
     for (const p of slatePicks) {
-      if (!FADE_SIGNALS.has(p.signalType) || p.line) continue;
+      if (!FADE_SIGNALS.has(p.signalType)) continue;
       if (p.league !== league && p.league !== "UNKNOWN") continue;
-      if (pickBelongsToGame(p.pick, p.opponent, matchedGame)) addTarget(p.pick);
+      if (pickBelongsToGame(p.pick, p.opponent, matchedGame)) {
+        const bet = parsedBetForPick(p);
+        if (bet.betType === "total" && bet.team) addTarget(bet.team);
+        else if (bet.team) addTarget(bet.team);
+        else addTarget(p.pick);
+      }
     }
   }
 
@@ -413,6 +458,8 @@ export interface ImpliedBetEntry {
   label: string;
   impliedSide: string;
   impliedNorm: string;
+  impliedBet: ParsedBet;
+  betKey: string;
   detail: string;
   fadeTarget?: string;
 }
@@ -428,45 +475,51 @@ function impliedBetFromRec(
   slatePicks: SheetPick[],
   matchedGame?: CalendarGame
 ): ImpliedBetEntry | null {
-  if (rec.line) return null;
-
   const pick = sheetPickFromRec(rec, slatePicks);
   const label = SIGNAL_LABELS[rec.signalType];
+  const resolveTeam = teamResolver(matchedGame);
+  const listedBet = parsedBetForPick(pick);
 
   if (SHARP_BET_SIGNALS.has(rec.signalType)) {
-    const side = matchedGame ? displayGameTeam(rec.pick, matchedGame) : displayTeamName(rec.pick);
+    const display = resolveBetDisplay(listedBet, resolveTeam);
     return {
       signalType: rec.signalType,
       label,
-      impliedSide: side,
-      impliedNorm: impliedSideNorm(side, matchedGame),
-      detail: `${label} → ${side}`,
+      impliedSide: display,
+      impliedNorm: betKey(listedBet),
+      impliedBet: listedBet,
+      betKey: betKey(listedBet),
+      detail: `${label} → ${display}`,
     };
   }
 
   if (FADE_SIGNALS.has(rec.signalType)) {
     const opponent = extractOpponentName(pick, slatePicks, matchedGame) ?? rec.opponentPick;
-    if (!opponent) return null;
-    const side = matchedGame ? displayGameTeam(opponent, matchedGame) : displayTeamName(opponent);
-    const fadeTarget =
-      matchedGame ? displayGameTeam(rec.pick, matchedGame) : displayTeamName(rec.pick);
+    const fadedBet = fadeParsedBet(listedBet, opponent, resolveTeam);
+    if (!fadedBet) return null;
+    const display = resolveBetDisplay(fadedBet, resolveTeam);
+    const fadeTarget = resolveBetDisplay(listedBet, resolveTeam);
     return {
       signalType: rec.signalType,
       label,
-      impliedSide: side,
-      impliedNorm: impliedSideNorm(side, matchedGame),
+      impliedSide: display,
+      impliedNorm: betKey(fadedBet),
+      impliedBet: fadedBet,
+      betKey: betKey(fadedBet),
       fadeTarget,
-      detail: `${label} → ${side}`,
+      detail: `${label} → ${display}`,
     };
   }
 
-  const side = matchedGame ? displayGameTeam(rec.pick, matchedGame) : displayTeamName(rec.pick);
+  const display = resolveBetDisplay(listedBet, resolveTeam);
   return {
     signalType: rec.signalType,
     label,
-    impliedSide: side,
-    impliedNorm: impliedSideNorm(side, matchedGame),
-    detail: `${label} → ${side}`,
+    impliedSide: display,
+    impliedNorm: betKey(listedBet),
+    impliedBet: listedBet,
+    betKey: betKey(listedBet),
+    detail: `${label} → ${display}`,
   };
 }
 
@@ -491,6 +544,7 @@ function confidenceForAgreeingSignals(entries: ImpliedBetEntry[]): number {
 
 export interface ResolveImpliedBetsResult {
   side: string | null;
+  impliedBet?: ParsedBet;
   confidence: number;
   breakdown: ConfidenceBreakdownItem[];
   noBetReason?: string;
@@ -516,17 +570,17 @@ export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBe
     };
   }
 
-  const uniqueByNorm = new Map<string, string>();
+  const uniqueByKey = new Map<string, { side: string; bet: ParsedBet }>();
   for (const entry of entries) {
-    if (!uniqueByNorm.has(entry.impliedNorm)) {
-      uniqueByNorm.set(entry.impliedNorm, entry.impliedSide);
+    if (!uniqueByKey.has(entry.betKey)) {
+      uniqueByKey.set(entry.betKey, { side: entry.impliedSide, bet: entry.impliedBet });
     }
   }
 
-  const uniqueSides = [...uniqueByNorm.values()];
+  const uniqueSides = [...uniqueByKey.values()];
 
   if (uniqueSides.length === 1) {
-    const side = uniqueSides[0]!;
+    const { side, bet } = uniqueSides[0]!;
     const confidence = confidenceForAgreeingSignals(entries);
     const fadeEntries = entries.filter((e) => FADE_SIGNALS.has(e.signalType));
     const fadeTargets = [...new Set(fadeEntries.map((e) => e.fadeTarget).filter(Boolean))];
@@ -543,6 +597,7 @@ export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBe
     return {
       side,
       confidence,
+      impliedBet: bet,
       breakdown: [
         ...breakdown,
         breakdownItem("result", "Result", `Result: ${side} (${confidence}%)`, confidence),
@@ -551,7 +606,7 @@ export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBe
     };
   }
 
-  const conflictingSides = uniqueSides.slice(0, 2);
+  const conflictingSides = uniqueSides.map((u) => u.side).slice(0, 2);
   const conflictLabel = conflictingSides.join(" vs ");
   const conflictSignals = entries.map((e) => `${e.label} → ${e.impliedSide}`).join(" vs ");
   const fadeEntries = entries.filter((e) => FADE_SIGNALS.has(e.signalType));
@@ -628,6 +683,7 @@ function buildBetCard(
   gameKey: string,
   recs: MatchedRecommendation[],
   recommendedTeam: string,
+  recommendedBet: ParsedBet | undefined,
   confidence: number,
   breakdown: ConfidenceBreakdownItem[],
   reasoning: string,
@@ -642,6 +698,8 @@ function buildBetCard(
     awayTeam,
     homeTeam,
     recommendedTeam,
+    recommendedBet,
+    betType: recommendedBet?.betType,
     confidence,
     confidenceBreakdown: breakdown,
     hasConflict: false,
@@ -687,7 +745,13 @@ function resolveGameGroup(
   }
 
   const team = resolved.side;
-  if (matchedGame && !validateRecommendedTeam(team, matchedGame)) {
+  const recommendedBet = resolved.impliedBet;
+  if (
+    matchedGame &&
+    recommendedBet?.betType !== "total" &&
+    recommendedBet?.team &&
+    !validateRecommendedTeam(recommendedBet.team, matchedGame)
+  ) {
     return buildNoBetCard(
       gameKey,
       recs,
@@ -702,6 +766,7 @@ function resolveGameGroup(
     gameKey,
     recs,
     team,
+    recommendedBet,
     resolved.confidence,
     resolved.breakdown,
     `Result: ${team} (${resolved.confidence}%)`,
@@ -736,7 +801,6 @@ export function resolveGameConflicts(
     const needsCard =
       recs.length > 1 ||
       (recs.length === 1 &&
-        !recs[0].line &&
         recs[0].matchedGame &&
         (FADE_SIGNALS.has(recs[0].signalType) || SHARP_BET_SIGNALS.has(recs[0].signalType)));
 
@@ -780,6 +844,9 @@ export function runBetRulesEngine(input: {
       gameTime: pick.gameTime,
       postingTime: pick.postingTime,
       line: pick.line,
+      parsedBet: pick.parsedBet ?? parsedBetForPick(pick),
+      recommendedBet: rules.recommendedBet,
+      opponentBet: rules.opponentBet,
       confidence: rules.confidence,
       confidenceBreakdown: rules.confidenceBreakdown,
       opponentPick: rules.opponentPick,

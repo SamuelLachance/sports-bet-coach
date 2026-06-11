@@ -89,7 +89,7 @@ function finalResult(winner: "home" | "away"): GameResult {
   assert.equal(store.bets.length, 0);
 }
 
-// Grade win / loss
+// Grade win / loss (moneyline)
 {
   const bet = emptyStore().bets[0] ?? {
     id: "2026-06-11:mlb:test",
@@ -99,6 +99,13 @@ function finalResult(winner: "home" | "away"): GameResult {
     awayTeam: "New York Yankees",
     homeTeam: "Boston Red Sox",
     recommendedTeam: "New York Yankees",
+    betType: "moneyline" as const,
+    recommendedBet: {
+      betType: "moneyline" as const,
+      team: "New York Yankees",
+      rawText: "Yankees",
+      displayText: "New York Yankees",
+    },
     confidence: 72,
     signalTypes: ["sharp_money" as const],
     signalLabels: ["Sharp Money"],
@@ -115,6 +122,104 @@ function finalResult(winner: "home" | "away"): GameResult {
   const loss = gradeBet(bet, finalResult("home"));
   assert.equal(loss.status, "loss");
   assert.equal(loss.units, -1);
+}
+
+// Grade spread cover
+{
+  const spreadBet = {
+    id: "spread-test",
+    date: "2026-06-11",
+    gameKey: "nba:spread",
+    league: "NBA" as const,
+    awayTeam: "Dallas Wings",
+    homeTeam: "Portland Fire",
+    recommendedTeam: "Dallas Wings -6",
+    betType: "spread" as const,
+    spread: -6,
+    recommendedBet: {
+      betType: "spread" as const,
+      team: "Dallas Wings",
+      rawText: "DALLAS -6",
+      spread: -6,
+      displayText: "Dallas Wings -6",
+    },
+    confidence: 75,
+    signalTypes: ["sharp_money" as const],
+    signalLabels: ["Sharp Money"],
+    status: "pending" as const,
+    units: 0,
+    stakeUnits: 1,
+    recordedAt: new Date().toISOString(),
+  };
+
+  const coverWin: GameResult = {
+    id: "espn-spread",
+    league: "NBA",
+    awayTeam: "Dallas Wings",
+    homeTeam: "Portland Fire",
+    awayAbbr: "DAL",
+    homeAbbr: "POR",
+    startTime: "2026-06-11T23:00:00Z",
+    status: "Final",
+    isFinal: true,
+    awayScore: 100,
+    homeScore: 90,
+    winnerTeam: "Dallas Wings",
+  };
+  assert.equal(gradeBet(spreadBet, coverWin).status, "win");
+
+  const coverLoss: GameResult = { ...coverWin, awayScore: 95, homeScore: 90 };
+  assert.equal(gradeBet(spreadBet, coverLoss).status, "loss");
+}
+
+// Grade over/under
+{
+  const underBet = {
+    id: "total-test",
+    date: "2026-06-11",
+    gameKey: "nba:total",
+    league: "NBA" as const,
+    awayTeam: "Toronto Raptors",
+    homeTeam: "Boston Celtics",
+    recommendedTeam: "Under 167.5",
+    betType: "total" as const,
+    totalLine: 167.5,
+    totalDirection: "under" as const,
+    recommendedBet: {
+      betType: "total" as const,
+      team: "Toronto",
+      rawText: "TORONTO OVER 167.5",
+      totalDirection: "under" as const,
+      totalLine: 167.5,
+      displayText: "Toronto Under 167.5",
+    },
+    confidence: 75,
+    signalTypes: ["book_needs_fade" as const],
+    signalLabels: ["Book Needs (Fade)"],
+    status: "pending" as const,
+    units: 0,
+    stakeUnits: 1,
+    recordedAt: new Date().toISOString(),
+  };
+
+  const underHit: GameResult = {
+    id: "espn-total",
+    league: "NBA",
+    awayTeam: "Toronto Raptors",
+    homeTeam: "Boston Celtics",
+    awayAbbr: "TOR",
+    homeAbbr: "BOS",
+    startTime: "2026-06-11T23:00:00Z",
+    status: "Final",
+    isFinal: true,
+    awayScore: 80,
+    homeScore: 82,
+    winnerTeam: "Boston Celtics",
+  };
+  assert.equal(gradeBet(underBet, underHit).status, "win");
+
+  const underMiss: GameResult = { ...underHit, awayScore: 90, homeScore: 85 };
+  assert.equal(gradeBet(underBet, underMiss).status, "loss");
 }
 
 // Summary rollup

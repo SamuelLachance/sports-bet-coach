@@ -4,15 +4,19 @@ import { endOfWeek, parseISO, startOfWeek } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { CACHE_DIR, TIMEZONE } from "../config.js";
 import type {
+  BetType,
   GameConsolidatedRecommendation,
   LeagueCode,
   MatchedRecommendation,
+  ParsedBet,
   SignalType,
+  TotalDirection,
 } from "../types.js";
 import {
   displayDateToEspnKey,
   fetchResultsForDate,
   pickTeamInGame,
+  resolveGameTeamDisplay,
   type GameResult,
 } from "./calendar.js";
 import { SIGNAL_LABELS } from "./signalMapping.js";
@@ -26,7 +30,14 @@ export interface TrackedBet {
   league: LeagueCode;
   awayTeam: string;
   homeTeam: string;
+  /** Full bet display text */
   recommendedTeam: string;
+  recommendedBet?: ParsedBet;
+  betType?: BetType;
+  spread?: number;
+  odds?: number;
+  totalLine?: number;
+  totalDirection?: TotalDirection;
   confidence: number;
   signalTypes: SignalType[];
   signalLabels: string[];
@@ -139,10 +150,17 @@ export function recordRecommendations(
       existing.signalLabels = signalLabels;
       existing.highConviction = rec.highConviction;
       existing.recommendedTeam = rec.recommendedTeam;
+      existing.recommendedBet = rec.recommendedBet;
+      existing.betType = rec.recommendedBet?.betType ?? rec.betType;
+      existing.spread = rec.recommendedBet?.spread;
+      existing.odds = rec.recommendedBet?.odds;
+      existing.totalLine = rec.recommendedBet?.totalLine;
+      existing.totalDirection = rec.recommendedBet?.totalDirection;
       if (rec.matchedGame?.id) existing.espnGameId = rec.matchedGame.id;
       continue;
     }
 
+    const betMeta = rec.recommendedBet;
     const bet: TrackedBet = {
       id: key,
       date,
@@ -151,6 +169,12 @@ export function recordRecommendations(
       awayTeam: rec.awayTeam,
       homeTeam: rec.homeTeam,
       recommendedTeam: rec.recommendedTeam,
+      recommendedBet: betMeta,
+      betType: betMeta?.betType ?? rec.betType,
+      spread: betMeta?.spread,
+      odds: betMeta?.odds,
+      totalLine: betMeta?.totalLine,
+      totalDirection: betMeta?.totalDirection,
       confidence: rec.confidence,
       signalTypes,
       signalLabels,
@@ -181,6 +205,51 @@ function findMatchingResult(bet: TrackedBet, results: GameResult[]): GameResult 
   );
 }
 
+function teamScoreForBet(bet: TrackedBet, result: GameResult): {
+  teamScore: number;
+  opponentScore: number;
+} | null {
+  const teamName = bet.recommendedBet?.team ?? bet.recommendedTeam;
+  if (!teamName || result.homeScore == null || result.awayScore == null) return null;
+
+  const resolved = resolveGameTeamDisplay(teamName, result);
+  if (resolved === result.homeTeam) {
+    return { teamScore: result.homeScore, opponentScore: result.awayScore };
+  }
+  if (resolved === result.awayTeam) {
+    return { teamScore: result.awayScore, opponentScore: result.homeScore };
+  }
+  if (pickTeamInGame(teamName, result)) {
+    return { teamScore: result.homeScore, opponentScore: result.awayScore };
+  }
+  return null;
+}
+
+function gradeSpreadBet(
+  bet: TrackedBet,
+  result: GameResult
+): BetResult | null {
+  if (bet.spread == null) return null;
+  const scores = teamScoreForBet(bet, result);
+  if (!scores) return null;
+
+  const adjusted = scores.teamScore + bet.spread;
+  if (adjusted === scores.opponentScore) return "push";
+  return adjusted > scores.opponentScore ? "win" : "loss";
+}
+
+function gradeTotalBet(bet: TrackedBet, result: GameResult): BetResult | null {
+  if (bet.totalLine == null || !bet.totalDirection) return null;
+  if (result.homeScore == null || result.awayScore == null) return null;
+
+  const gameTotal = result.homeScore + result.awayScore;
+  if (gameTotal === bet.totalLine) return "push";
+  if (bet.totalDirection === "over") {
+    return gameTotal > bet.totalLine ? "win" : "loss";
+  }
+  return gameTotal < bet.totalLine ? "win" : "loss";
+}
+
 function recommendedSideWon(recommendedTeam: string, result: GameResult): boolean {
   if (!result.winnerTeam) return false;
   const winnerOnly: GameResult = {
@@ -195,29 +264,32 @@ function recommendedSideWon(recommendedTeam: string, result: GameResult): boolea
 
 export function gradeBet(bet: TrackedBet, result: GameResult): TrackedBet {
   if (!result.isFinal) return bet;
+  if (result.homeScore == null || result.awayScore == null) return bet;
 
   const stake = bet.stakeUnits;
   let status: BetResult = "pending";
   let units = 0;
+  const betType = bet.betType ?? "moneyline";
 
-  if (
-    result.homeScore != null &&
-    result.awayScore != null &&
-    result.homeScore === result.awayScore
-  ) {
+  if (betType === "spread") {
+    const spreadResult = gradeSpreadBet(bet, result);
+    if (spreadResult == null) return bet;
+    status = spreadResult;
+  } else if (betType === "total") {
+    const totalResult = gradeTotalBet(bet, result);
+    if (totalResult == null) return bet;
+    status = totalResult;
+  } else if (result.homeScore === result.awayScore) {
     status = "push";
-    units = 0;
   } else if (result.winnerTeam) {
-    if (recommendedSideWon(bet.recommendedTeam, result)) {
-      status = "win";
-      units = stake;
-    } else {
-      status = "loss";
-      units = -stake;
-    }
+    const teamName = bet.recommendedBet?.team ?? bet.recommendedTeam;
+    status = recommendedSideWon(teamName, result) ? "win" : "loss";
   } else {
     return bet;
   }
+
+  if (status === "win") units = stake;
+  else if (status === "loss") units = -stake;
 
   return {
     ...bet,
@@ -225,10 +297,7 @@ export function gradeBet(bet: TrackedBet, result: GameResult): TrackedBet {
     units,
     gradedAt: new Date().toISOString(),
     espnGameId: result.id,
-    finalScore:
-      result.homeScore != null && result.awayScore != null
-        ? `${result.awayTeam} ${result.awayScore} – ${result.homeTeam} ${result.homeScore}`
-        : bet.finalScore,
+    finalScore: `${result.awayTeam} ${result.awayScore} – ${result.homeTeam} ${result.homeScore}`,
   };
 }
 

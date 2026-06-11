@@ -83,11 +83,20 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
 
       <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 mb-3">
         <div className="text-xs text-accent-muted uppercase tracking-wide mb-1">
-          Recommended side
+          Recommended bet
         </div>
         <div className="font-display text-2xl font-semibold text-accent-glow">
           {game.recommendedTeam}
         </div>
+        {game.betType && (
+          <div className="text-sm text-slate-400 mt-1 capitalize">
+            {game.betType === "total"
+              ? `${game.recommendedBet?.totalDirection ?? ""} ${game.recommendedBet?.totalLine ?? ""}`.trim()
+              : game.betType === "spread" && game.recommendedBet?.spread != null
+                ? `Spread ${game.recommendedBet.spread > 0 ? "+" : ""}${game.recommendedBet.spread}`
+                : game.betType}
+          </div>
+        )}
       </div>
 
       {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (

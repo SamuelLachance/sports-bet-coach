@@ -750,7 +750,14 @@ function main() {
       signalType: "sharp_money",
       label: "Sharp Money",
       impliedSide: "Carolina Hurricanes",
-      impliedNorm: "CAROLINA HURRICANES",
+      impliedNorm: "ml:CAROLINA HURRICANES",
+      impliedBet: {
+        betType: "moneyline",
+        team: "Carolina Hurricanes",
+        rawText: "CAROLINA",
+        displayText: "Carolina Hurricanes",
+      },
+      betKey: "ml:CAROLINA HURRICANES",
       detail: "Sharp Money → Carolina Hurricanes",
     },
   ];
@@ -766,7 +773,14 @@ function main() {
       signalType: "square_fade",
       label: "Square Top (Fade)",
       impliedSide: "Vegas Golden Knights",
-      impliedNorm: "VEGAS GOLDEN KNIGHTS",
+      impliedNorm: "ml:VEGAS GOLDEN KNIGHTS",
+      impliedBet: {
+        betType: "moneyline",
+        team: "Vegas Golden Knights",
+        rawText: "CAROLINA",
+        displayText: "Vegas Golden Knights",
+      },
+      betKey: "ml:VEGAS GOLDEN KNIGHTS",
       fadeTarget: "Carolina Hurricanes",
       detail: "Square Top (Fade) → Vegas Golden Knights",
     },
@@ -867,6 +881,28 @@ function main() {
     carolinaCard!.noBetReason?.includes("no bet"),
     "No bet reason should explain signal cancellation"
   );
+
+  // Fade OVER → recommend UNDER
+  const torontoOverPick: SheetPick = {
+    id: "fade-over",
+    league: "NBA",
+    signalType: "book_needs_fade",
+    pick: "TORONTO OVER 167.5",
+    opponent: "BOSTON",
+    rawRow: 70,
+    gameSlot: 1,
+    signalCol: 4,
+  };
+  const overFadeRules = computePickRules({
+    pick: torontoOverPick,
+    slatePicks: [torontoOverPick],
+  });
+  assert.equal(overFadeRules.signalPolarity, "inverted");
+  assert.ok(
+    overFadeRules.opponentPick?.toUpperCase().includes("UNDER"),
+    "Fade TORONTO OVER → UNDER"
+  );
+  assert.ok(overFadeRules.opponentPick?.includes("167.5"), "Same total line preserved");
 
   console.log("✓ All recommendation rule tests passed");
 }
