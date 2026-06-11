@@ -97,8 +97,22 @@ declare module "@server/services/dratingsTrends.js" {
   }
 }
 
+declare module "@server/services/sportsOddsAlgo.js" {
+  export interface SportsOddsGamePrediction {
+    eventId: string;
+    league: string;
+    awayTeam: string;
+    homeTeam: string;
+    model: {
+      favoriteSide: "away" | "home";
+      winProbability: number;
+    };
+  }
+}
+
 declare module "@server/services/recommendations.js" {
   import type { DratingsGameTrend } from "@server/services/dratingsTrends.js";
+  import type { SportsOddsGamePrediction } from "@server/services/sportsOddsAlgo.js";
   import type {
     CalendarGame,
     GameConsolidatedRecommendation,
@@ -110,7 +124,12 @@ declare module "@server/services/recommendations.js" {
     sheets: ParsedSheets,
     games: CalendarGame[],
     targetDate?: string,
-    options?: { dratingsTrends?: DratingsGameTrend[]; skipDratingsFetch?: boolean }
+    options?: {
+      dratingsTrends?: DratingsGameTrend[];
+      skipDratingsFetch?: boolean;
+      sportsOddsPredictions?: SportsOddsGamePrediction[];
+      skipSportsOddsFetch?: boolean;
+    }
   ): Promise<{
     recommendations: MatchedRecommendation[];
     gameRecommendations: GameConsolidatedRecommendation[];
