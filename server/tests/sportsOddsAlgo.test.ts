@@ -128,7 +128,7 @@ assert.equal(disagreed.dualAlgoConfirmed, false);
 const highEdgeTopPick = {
   side: "home" as const,
   teamName: "San Antonio Spurs",
-  edge: 25,
+  edge: 55,
   marketOdds: -170,
   modelProjection: -195,
 };
