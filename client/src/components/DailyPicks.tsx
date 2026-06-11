@@ -20,6 +20,10 @@ const SIGNAL_FILTERS = [
   { id: "model_best_values", label: "Model" },
 ];
 
+function isActionableGameRec(g: GameConsolidatedRecommendation): boolean {
+  return !g.noBet && Boolean(g.recommendedTeam?.trim());
+}
+
 export function DailyPicks({ recommendations, gameRecommendations = [], leagues }: DailyPicksProps) {
   const [leagueFilter, setLeagueFilter] = useState("ALL");
   const [signalFilter, setSignalFilter] = useState("all");
@@ -35,19 +39,35 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
   const matched = filtered.filter((r) => r.matchedGame).length;
   const conflicts = filtered.filter((r) => r.gameConflict).length;
 
+  const noBetPickIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of gameRecommendations) {
+      if (!isActionableGameRec(g)) {
+        for (const id of g.pickIds) ids.add(id);
+      }
+    }
+    return ids;
+  }, [gameRecommendations]);
+
   const visibleGameRecs = useMemo(() => {
     if (!gameRecommendations.length) return [];
     const filteredIds = new Set(filtered.map((r) => r.id));
-    return gameRecommendations.filter((g) =>
-      g.pickIds.some((id) => filteredIds.has(id))
+    return gameRecommendations.filter(
+      (g) =>
+        isActionableGameRec(g) && g.pickIds.some((id) => filteredIds.has(id))
     );
   }, [gameRecommendations, filtered]);
+
+  const visiblePicks = useMemo(
+    () => filtered.filter((r) => !noBetPickIds.has(r.id)),
+    [filtered, noBetPickIds]
+  );
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatBox label="Total picks" value={recommendations.length} />
-        <StatBox label="Shown" value={filtered.length} accent />
+        <StatBox label="Shown" value={visiblePicks.length} accent />
         <StatBox label="Matched games" value={matched} />
         <StatBox label="Conflicts resolved" value={conflicts || visibleGameRecs.length} />
       </div>
@@ -82,12 +102,16 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
         <div className="card text-center py-12 text-slate-400">
           No picks match these filters. Try syncing data.
         </div>
+      ) : visibleGameRecs.length === 0 && visiblePicks.length === 0 ? (
+        <div className="card text-center py-12 text-slate-400">
+          No actionable bets for these filters — conflicting signals were resolved to no bet.
+        </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {visibleGameRecs.map((game) => (
             <GameRecommendationCard key={game.gameKey} game={game} />
           ))}
-          {filtered.map((rec) => (
+          {visiblePicks.map((rec) => (
             <PickCard key={rec.id} rec={rec} />
           ))}
         </div>
