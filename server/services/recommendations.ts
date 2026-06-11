@@ -461,9 +461,20 @@ function isActionableGameRecommendation(
 
 function isActionablePickRecommendation(rec: MatchedRecommendation): boolean {
   if (!rec.matchedGame || rec.confidence <= 0) return false;
+  if (rec.sportsOddsBlocked || rec.dratingsBlocked) return false;
   const bet = impliedBetForRec(rec);
   if (!bet || bet.betType === "total") return false;
   return teamSideForBet(bet, rec.matchedGame) != null;
+}
+
+function pickCountsForEventConflict(
+  rec: MatchedRecommendation,
+  actionableGameRecsByEvent: Map<string, GameConsolidatedRecommendation[]>
+): boolean {
+  if (!isActionablePickRecommendation(rec) || !rec.matchedGame) return false;
+  const key = eventKeyForGame(rec.matchedGame);
+  const gameRecs = actionableGameRecsByEvent.get(key) ?? [];
+  return !gameRecs.some((gameRec) => gameRec.pickIds.includes(rec.id));
 }
 
 function toEventConflictNoBet(
@@ -559,11 +570,11 @@ export function applyEventTeamConflictFilter(result: {
   }
 
   for (const rec of result.recommendations) {
-    if (!isActionablePickRecommendation(rec) || !rec.matchedGame) continue;
+    if (!pickCountsForEventConflict(rec, actionableGameRecsByEvent)) continue;
     const bet = impliedBetForRec(rec)!;
-    const side = teamSideForBet(bet, rec.matchedGame);
-    if (side) noteSide(rec.matchedGame, side);
-    notePick(rec.matchedGame, rec.id);
+    const side = teamSideForBet(bet, rec.matchedGame!);
+    if (side) noteSide(rec.matchedGame!, side);
+    notePick(rec.matchedGame!, rec.id);
   }
 
   const conflictedEvents = new Set<string>();

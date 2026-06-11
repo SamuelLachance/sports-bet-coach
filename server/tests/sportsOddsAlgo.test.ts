@@ -303,4 +303,44 @@ assert.equal(skyFeverConflict[0]?.noBet, true);
 assert.ok(skyFeverConflict[0]?.pickIds.includes("fever-pick"));
 assert.ok(skyFeverConflict[0]?.pickIds.includes("sky-pick"));
 
+const forcedWithBlockedCoachPick = applyEventTeamConflictFilter(
+  applySportsOddsFilter(
+    {
+      recommendations: [
+        {
+          ...({
+            id: "pick-knicks",
+            league: "NBA",
+            signalType: "sharp_money",
+            signalLabel: "Sharp Money",
+            pick: "Knicks",
+            confidence: 85,
+            confidenceBreakdown: [],
+            signalPolarity: "positive",
+            edgeLabel: "Sharp",
+            reasoning: "test",
+            status: "matched",
+            gameDate: "2026-06-14",
+            matchedGame: KNICKS_GAME,
+            recommendedBet: knicksMlBet,
+            sportsOddsBlocked: true,
+          } as const),
+        },
+      ],
+      gameRecommendations: [
+        {
+          ...baseGameRec,
+          recommendedTeam: "Knicks ML",
+          recommendedBet: knicksMlBet,
+        },
+      ],
+    },
+    [highValuePrediction],
+    [KNICKS_GAME]
+  )
+).gameRecommendations[0];
+
+assert.ok(!forcedWithBlockedCoachPick.noBet);
+assert.equal(forcedWithBlockedCoachPick.sportsOddsForced, true);
+
 console.log("sportsOddsAlgo.test.ts: all tests passed");
