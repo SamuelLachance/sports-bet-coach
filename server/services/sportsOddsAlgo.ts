@@ -8,10 +8,12 @@ import path from "node:path";
 import {
   CACHE_DIR,
   SPORTS_ODDS_BASE_URL,
+  SPORTS_ODDS_SPREAD_LEAGUES,
   SPORTS_ODDS_SUPPORTED_LEAGUES,
   isSportsOddsEnabled,
   sportsOddsForceMinEdge,
 } from "../config.js";
+import { resolveBetDisplay } from "../parsers/pickBetParser.js";
 import type { CalendarGame, LeagueCode, ParsedBet } from "../types.js";
 import { resolveGameTeamDisplay } from "./calendar.js";
 
@@ -34,12 +36,19 @@ export interface SportsOddsTopPick {
   reason?: string;
 }
 
+export interface SportsOddsMarketLines {
+  spread?: number;
+  awayMoneyline?: number;
+  homeMoneyline?: number;
+}
+
 export interface SportsOddsGamePrediction {
   eventId: string;
   league: LeagueCode;
   awayTeam: string;
   homeTeam: string;
   model: SportsOddsModelPrediction;
+  market?: SportsOddsMarketLines;
   /** Best value side vs the book (from Sports Odds top_pick). */
   topPick?: SportsOddsTopPick;
 }
@@ -73,6 +82,11 @@ interface RemoteSlateGame {
     model_projection?: number;
     strategy?: string;
     reason?: string;
+  };
+  market?: {
+    spread?: number;
+    away_moneyline?: number;
+    home_moneyline?: number;
   };
 }
 
@@ -161,7 +175,81 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
       homeProjection: raw.model?.home_projection,
     },
     topPick: mapRemoteTopPick(raw),
+    market: raw.market
+      ? {
+          spread:
+            raw.market.spread == null ? undefined : Number(raw.market.spread),
+          awayMoneyline: raw.market.away_moneyline,
+          homeMoneyline: raw.market.home_moneyline,
+        }
+      : undefined,
   };
+}
+
+export function sportsOddsUsesSpread(league: LeagueCode): boolean {
+  return SPORTS_ODDS_SPREAD_LEAGUES.includes(
+    league as (typeof SPORTS_ODDS_SPREAD_LEAGUES)[number]
+  );
+}
+
+export function sportsOddsSpreadLineForSide(
+  homeSpread: number,
+  side: "away" | "home"
+): number {
+  return side === "home" ? homeSpread : -homeSpread;
+}
+
+export function buildSportsOddsSpreadBet(
+  side: "away" | "home",
+  game: CalendarGame,
+  homeSpread: number
+): ParsedBet {
+  const team =
+    side === "home"
+      ? game.homeAbbr || game.homeTeam
+      : game.awayAbbr || game.awayTeam;
+  const spread = sportsOddsSpreadLineForSide(homeSpread, side);
+  const bet: ParsedBet = {
+    betType: "spread",
+    team,
+    rawText: `${team} ${spread}`,
+    spread,
+    displayText: "",
+  };
+  bet.displayText = resolveBetDisplay(bet);
+  return bet;
+}
+
+function buildSportsOddsMoneylineBet(
+  side: "away" | "home",
+  game: CalendarGame
+): ParsedBet {
+  const team =
+    side === "home"
+      ? game.homeAbbr || game.homeTeam
+      : game.awayAbbr || game.awayTeam;
+  return {
+    betType: "moneyline",
+    team,
+    rawText: team,
+    displayText: team,
+  };
+}
+
+function buildSportsOddsSideBet(
+  side: "away" | "home",
+  game: CalendarGame,
+  prediction: SportsOddsGamePrediction
+): ParsedBet {
+  const homeSpread = prediction.market?.spread;
+  if (
+    sportsOddsUsesSpread(prediction.league) &&
+    homeSpread != null &&
+    Number.isFinite(homeSpread)
+  ) {
+    return buildSportsOddsSpreadBet(side, game, homeSpread);
+  }
+  return buildSportsOddsMoneylineBet(side, game);
 }
 
 function cachePathForDate(displayDate: string): string {
@@ -287,16 +375,7 @@ export function sportsOddsFavoriteBet(
   prediction: SportsOddsGamePrediction,
   game: CalendarGame
 ): ParsedBet {
-  const team =
-    prediction.model.favoriteSide === "home"
-      ? game.homeAbbr || game.homeTeam
-      : game.awayAbbr || game.awayTeam;
-  return {
-    betType: "moneyline",
-    team,
-    rawText: team,
-    displayText: team,
-  };
+  return buildSportsOddsSideBet(prediction.model.favoriteSide, game, prediction);
 }
 
 export function sportsOddsValueBet(
@@ -304,16 +383,25 @@ export function sportsOddsValueBet(
   game: CalendarGame
 ): ParsedBet {
   const side = prediction.topPick?.side ?? prediction.model.favoriteSide;
-  const team =
-    side === "home"
-      ? game.homeAbbr || game.homeTeam
-      : game.awayAbbr || game.awayTeam;
-  return {
-    betType: "moneyline",
-    team,
-    rawText: team,
-    displayText: team,
-  };
+  return buildSportsOddsSideBet(side, game, prediction);
+}
+
+export function sportsOddsPreferredBetForCoach(
+  coachBet: ParsedBet,
+  game: CalendarGame,
+  prediction: SportsOddsGamePrediction
+): ParsedBet {
+  if (!sportsOddsUsesSpread(game.league) || coachBet.betType === "spread") {
+    return coachBet;
+  }
+  if (coachBet.betType === "total") return coachBet;
+
+  const side = recommendedSideForBet(coachBet, game);
+  const homeSpread = prediction.market?.spread;
+  if (side == null || homeSpread == null || !Number.isFinite(homeSpread)) {
+    return coachBet;
+  }
+  return buildSportsOddsSpreadBet(side, game, homeSpread);
 }
 
 export function sportsOddsValueTrendLabel(

@@ -24,6 +24,7 @@ import {
   sportsOddsBreakdownDetail,
   sportsOddsForceBreakdownDetail,
   sportsOddsForceConfidence,
+  sportsOddsPreferredBetForCoach,
   sportsOddsStatusForBet,
   sportsOddsTrendLabel,
   sportsOddsValueBet,
@@ -105,7 +106,7 @@ function buildForcedSportsOddsGameRec(
 ): GameConsolidatedRecommendation {
   const game = base.matchedGame!;
   const bet = sportsOddsValueBet(prediction, game);
-  const teamLabel = `${bet.displayText} ML`;
+  const teamLabel = bet.displayText;
   const forceDetail = sportsOddsForceBreakdownDetail(prediction);
   const valueLabel = sportsOddsValueTrendLabel(prediction);
   const coachNote = base.noBet
@@ -124,7 +125,7 @@ function buildForcedSportsOddsGameRec(
     ...base,
     recommendedTeam: teamLabel,
     recommendedBet: bet,
-    betType: "moneyline",
+    betType: bet.betType,
     confidence: sportsOddsForceConfidence(prediction),
     noBet: false,
     noBetReason: undefined,
@@ -188,8 +189,16 @@ function applySportsOddsToGameRec(
   );
 
   if (status === "agrees" && prediction) {
+    const preferredBet = sportsOddsPreferredBetForCoach(
+      rec.recommendedBet,
+      rec.matchedGame,
+      prediction
+    );
     return withDualAlgoFlag({
       ...rec,
+      recommendedBet: preferredBet,
+      betType: preferredBet.betType,
+      recommendedTeam: preferredBet.displayText,
       sportsOddsConfirmed: true,
       sportsOddsStatus: status,
       sportsOddsTrendLabel: sportsOddsTrendLabel(prediction),

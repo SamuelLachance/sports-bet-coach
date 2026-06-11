@@ -36,6 +36,7 @@ const spursPrediction: SportsOddsGamePrediction = {
     favoriteSide: "home",
     winProbability: 64.48,
   },
+  market: { spread: -5.5 },
 };
 
 const spursMlBet: ParsedBet = {
@@ -103,6 +104,8 @@ const agreed = applySportsOddsFilter(
 assert.equal(agreed.noBet, undefined);
 assert.equal(agreed.sportsOddsConfirmed, true);
 assert.equal(agreed.dualAlgoConfirmed, true);
+assert.equal(agreed.recommendedBet?.betType, "spread");
+assert.equal(agreed.recommendedBet?.spread, -5.5);
 
 const disagreed = applySportsOddsFilter(
   {
@@ -168,6 +171,8 @@ assert.equal(forcedDisagree.sportsOddsForced, true);
 assert.equal(forcedDisagree.sportsOddsConfirmed, true);
 assert.equal(forcedDisagree.dualAlgoConfirmed, false);
 assert.equal(forcedDisagree.recommendedBet?.team, "SA");
+assert.equal(forcedDisagree.recommendedBet?.betType, "spread");
+assert.equal(forcedDisagree.recommendedBet?.spread, -5.5);
 
 const noBetRec: GameConsolidatedRecommendation = {
   gameKey: "nba-no-bet",
@@ -193,7 +198,7 @@ const forcedNoBet = applySportsOddsFilter(
 
 assert.ok(!forcedNoBet.noBet);
 assert.equal(forcedNoBet.sportsOddsForced, true);
-assert.equal(forcedNoBet.recommendedTeam, "SA ML");
+assert.ok(forcedNoBet.recommendedTeam.includes("Sa -5.5"));
 
 const injected = applySportsOddsFilter(
   { recommendations: [], gameRecommendations: [] },
@@ -202,7 +207,7 @@ const injected = applySportsOddsFilter(
 ).gameRecommendations[0];
 
 assert.equal(injected.sportsOddsForced, true);
-assert.equal(injected.recommendedTeam, "SA ML");
+assert.ok(injected.recommendedTeam.includes("Sa -5.5"));
 assert.equal(injected.pickIds.length, 0);
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");

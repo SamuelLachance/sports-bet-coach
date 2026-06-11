@@ -106,6 +106,15 @@ export const SPORTS_ODDS_SUPPORTED_LEAGUES = [
   "CFB",
 ] as const;
 
+/** Basketball and American football — recommend spread instead of moneyline. */
+export const SPORTS_ODDS_SPREAD_LEAGUES = [
+  "NBA",
+  "WNBA",
+  "CBB",
+  "NFL",
+  "CFB",
+] as const;
+
 /** Dual-algo gate: coach rules + Sports Odds Algo V2 must agree. Default: enabled. */
 export function isSportsOddsEnabled(): boolean {
   const v = process.env.SPORTS_ODDS_ENABLED;
