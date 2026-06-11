@@ -12,11 +12,11 @@ interface LayoutProps {
 }
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "picks", label: "Picks du jour" },
-  { id: "calendar", label: "Calendrier" },
-  { id: "leagues", label: "Ligues" },
+  { id: "picks", label: "Today's Picks" },
+  { id: "calendar", label: "Calendar" },
+  { id: "leagues", label: "Leagues" },
   { id: "stats", label: "Trends" },
-  { id: "settings", label: "Paramètres" },
+  { id: "settings", label: "Settings" },
 ];
 
 export function Layout({
@@ -33,10 +33,10 @@ export function Layout({
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight">
-              Sports <span className="text-accent">Bet Coach</span>
+              Sharp Sheet <span className="text-accent">Tips</span>
             </h1>
             <p className="text-sm text-slate-400 mt-0.5">
-              Recommandations quotidiennes · {date} · Fuseau: America/Toronto
+              Daily recommendations · {date} · Timezone: America/Toronto
             </p>
           </div>
           <button
@@ -44,7 +44,7 @@ export function Layout({
             disabled={syncing}
             className="px-4 py-2 rounded-lg bg-accent/20 text-accent-glow border border-accent/40 hover:bg-accent/30 disabled:opacity-50 text-sm font-medium transition-colors"
           >
-            {syncing ? "Synchronisation…" : "↻ Synchroniser"}
+            {syncing ? "Syncing…" : "↻ Sync"}
           </button>
         </div>
         <nav className="max-w-7xl mx-auto px-4 pb-3 flex gap-1 overflow-x-auto">
@@ -63,7 +63,7 @@ export function Layout({
       </header>
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">{children}</main>
       <footer className="border-t border-surface-border py-4 text-center text-xs text-slate-500">
-        Données synchronisées depuis Google Sheets · Calendriers ESPN
+        Data synced from Google Sheets · ESPN schedules
       </footer>
     </div>
   );

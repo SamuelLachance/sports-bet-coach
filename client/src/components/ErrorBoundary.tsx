@@ -16,7 +16,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Sports Bet Coach render error:", error, info);
+    console.error("Sharp Sheet Tips render error:", error, info);
   }
 
   render() {
@@ -25,7 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="min-h-screen flex items-center justify-center p-6">
           <div className="card max-w-lg w-full text-center">
             <h1 className="font-display text-xl font-bold text-danger mb-2">
-              Erreur de chargement
+              Loading error
             </h1>
             <p className="text-slate-400 text-sm mb-4">
               {this.state.error.message}
@@ -35,7 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
               onClick={() => window.location.reload()}
               className="px-4 py-2 rounded-lg bg-accent/20 text-accent-glow border border-accent/40 hover:bg-accent/30 text-sm font-medium"
             >
-              Recharger la page
+              Reload page
             </button>
           </div>
         </div>

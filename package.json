@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Recommandations de paris quotidiennes synchronisees avec Google Sheets et calendriers sportifs",
+  "description": "Sharp Sheet Tips — daily sports betting recommendations synced with Google Sheets and ESPN schedules",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "npm run dev --prefix client",

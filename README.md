@@ -1,6 +1,6 @@
-# Sports Bet Coach
+# Sharp Sheet Tips
 
-Application de recommandations de paris sportifs quotidiennes, synchronisée avec Google Sheets et les calendriers ESPN (MLB, NBA, NHL, NFL, WNBA, CBB, CFB).
+Daily sports betting recommendations synced with Google Sheets and ESPN schedules (MLB, NBA, NHL, NFL, WNBA, CBB, CFB).
 
 Interface en français · Fuseau horaire America/Toronto (Québec).
 
