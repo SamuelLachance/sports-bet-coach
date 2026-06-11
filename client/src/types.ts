@@ -109,6 +109,10 @@ export interface GameConsolidatedRecommendation {
   sportsOddsStatus?: "agrees" | "disagrees" | "unavailable";
   sportsOddsTrendLabel?: string;
   dualAlgoConfirmed?: boolean;
+  bookProvider?: string;
+  consensusOdds?: number;
+  consensusSpread?: number;
+  consensusLabel?: string;
 }
 
 export interface MatchedRecommendation {

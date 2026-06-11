@@ -12,6 +12,7 @@ import {
   isSportsOddsForcePick,
   matchPredictionToCalendarGame,
   sportsOddsAgreesWithBet,
+  sportsOddsConsensusForBet,
   sportsOddsStatusForBet,
   teamSideForBet,
   type SportsOddsGamePrediction,
@@ -342,5 +343,73 @@ const forcedWithBlockedCoachPick = applyEventTeamConflictFilter(
 
 assert.ok(!forcedWithBlockedCoachPick.noBet);
 assert.equal(forcedWithBlockedCoachPick.sportsOddsForced, true);
+
+const whiteSoxGame: CalendarGame = {
+  id: "401815716",
+  league: "MLB",
+  homeTeam: "Chicago White Sox",
+  awayTeam: "Atlanta Braves",
+  homeAbbr: "CHW",
+  awayAbbr: "ATL",
+  startTime: "2026-06-11T23:40:00Z",
+  status: "Scheduled",
+};
+
+const whiteSoxMlBet: ParsedBet = {
+  betType: "moneyline",
+  team: "CHW",
+  rawText: "CHW",
+  displayText: "CHW",
+};
+
+const whiteSoxPrediction: SportsOddsGamePrediction = {
+  eventId: "401815716",
+  league: "MLB",
+  awayTeam: "Atlanta Braves",
+  homeTeam: "Chicago White Sox",
+  model: { favoriteSide: "home", winProbability: 55.18 },
+  market: {
+    provider: "DraftKings",
+    spread: 1.5,
+    homeMoneyline: 103,
+    awayMoneyline: -123,
+  },
+};
+
+const whiteSoxConsensus = sportsOddsConsensusForBet(
+  whiteSoxMlBet,
+  whiteSoxGame,
+  whiteSoxPrediction
+);
+assert.equal(whiteSoxConsensus?.label, "+103");
+assert.equal(whiteSoxConsensus?.provider, "DraftKings");
+
+const whiteSoxAgreed = applySportsOddsFilter(
+  {
+    recommendations: [],
+    gameRecommendations: [
+      {
+        gameKey: "mlb-chw",
+        league: "MLB",
+        awayTeam: whiteSoxGame.awayTeam,
+        homeTeam: whiteSoxGame.homeTeam,
+        recommendedTeam: "CHW",
+        recommendedBet: whiteSoxMlBet,
+        betType: "moneyline",
+        confidence: 85,
+        confidenceBreakdown: [],
+        hasConflict: false,
+        pickIds: ["chw-pick"],
+        reasoning: "test",
+        matchedGame: whiteSoxGame,
+      },
+    ],
+  },
+  [whiteSoxPrediction],
+  [whiteSoxGame]
+).gameRecommendations[0];
+
+assert.equal(whiteSoxAgreed.consensusLabel, "+103");
+assert.equal(whiteSoxAgreed.bookProvider, "DraftKings");
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");

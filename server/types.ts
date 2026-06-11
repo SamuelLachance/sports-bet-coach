@@ -169,6 +169,11 @@ export interface GameConsolidatedRecommendation {
   sportsOddsTrendLabel?: string;
   /** Coach + Sports Odds both agree */
   dualAlgoConfirmed?: boolean;
+  /** Sportsbook consensus line for the recommended side */
+  bookProvider?: string;
+  consensusOdds?: number;
+  consensusSpread?: number;
+  consensusLabel?: string;
 }
 
 export interface MatchedRecommendation {

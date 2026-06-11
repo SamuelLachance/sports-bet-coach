@@ -13,7 +13,11 @@ import {
   isSportsOddsEnabled,
   sportsOddsForceMinEdge,
 } from "../config.js";
-import { parsePickBet, resolveBetDisplay } from "../parsers/pickBetParser.js";
+import {
+  DEFAULT_JUICE,
+  parsePickBet,
+  resolveBetDisplay,
+} from "../parsers/pickBetParser.js";
 import type { CalendarGame, LeagueCode, ParsedBet } from "../types.js";
 import { resolveGameTeamDisplay } from "./calendar.js";
 
@@ -37,9 +41,19 @@ export interface SportsOddsTopPick {
 }
 
 export interface SportsOddsMarketLines {
+  provider?: string;
   spread?: number;
   awayMoneyline?: number;
   homeMoneyline?: number;
+  overUnder?: number;
+}
+
+export interface BookConsensus {
+  provider?: string;
+  moneyline?: number;
+  spread?: number;
+  total?: number;
+  label: string;
 }
 
 export interface SportsOddsGamePrediction {
@@ -84,9 +98,11 @@ interface RemoteSlateGame {
     reason?: string;
   };
   market?: {
+    provider?: string;
     spread?: number;
     away_moneyline?: number;
     home_moneyline?: number;
+    over_under?: number;
   };
 }
 
@@ -177,12 +193,75 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
     topPick: mapRemoteTopPick(raw),
     market: raw.market
       ? {
+          provider: raw.market.provider ?? undefined,
           spread:
             raw.market.spread == null ? undefined : Number(raw.market.spread),
           awayMoneyline: raw.market.away_moneyline,
           homeMoneyline: raw.market.home_moneyline,
+          overUnder:
+            raw.market.over_under == null
+              ? undefined
+              : Number(raw.market.over_under),
         }
       : undefined,
+  };
+}
+
+export function formatAmericanOdds(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
+export function sportsOddsConsensusForBet(
+  bet: ParsedBet,
+  game: CalendarGame,
+  prediction: SportsOddsGamePrediction
+): BookConsensus | undefined {
+  const market = prediction.market;
+  if (!market) return undefined;
+
+  const side = teamSideForBet(bet, game);
+  if (!side) return undefined;
+
+  const provider = market.provider?.trim() || "Consensus";
+  const moneyline =
+    side === "home" ? market.homeMoneyline : market.awayMoneyline;
+
+  if (bet.betType === "spread" && market.spread != null) {
+    const line = sportsOddsSpreadLineForSide(market.spread, side);
+    const juice = bet.odds ?? DEFAULT_JUICE;
+    return {
+      provider,
+      moneyline,
+      spread: line,
+      label: `${formatAmericanOdds(line)} (${formatAmericanOdds(juice)})`,
+    };
+  }
+
+  if (
+    bet.betType === "total" &&
+    market.overUnder != null &&
+    bet.totalLine != null
+  ) {
+    const direction = bet.totalDirection === "over" ? "Over" : "Under";
+    const juice = bet.odds ?? DEFAULT_JUICE;
+    return {
+      provider,
+      total: market.overUnder,
+      label: `${direction} ${bet.totalLine} (${formatAmericanOdds(juice)}) · O/U ${market.overUnder}`,
+    };
+  }
+
+  const bookMl =
+    moneyline ??
+    (prediction.topPick?.side === side ? prediction.topPick.marketOdds : undefined) ??
+    bet.odds;
+
+  if (bookMl == null || !Number.isFinite(bookMl)) return undefined;
+
+  return {
+    provider,
+    moneyline: bookMl,
+    label: formatAmericanOdds(bookMl),
   };
 }
 

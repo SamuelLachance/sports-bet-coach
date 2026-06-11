@@ -123,6 +123,21 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
                 : game.betType}
           </div>
         )}
+        {game.consensusLabel && (
+          <div className="mt-3 pt-3 border-t border-accent/20">
+            <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+              Consensus odds{game.bookProvider ? ` · ${game.bookProvider}` : ""}
+            </div>
+            <div className="font-display text-xl font-semibold text-white">
+              {game.consensusLabel}
+            </div>
+            {game.betType === "moneyline" && game.consensusOdds != null && (
+              <div className="text-xs text-slate-500 mt-1">
+                Book moneyline for this side
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (

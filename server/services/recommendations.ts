@@ -30,6 +30,8 @@ import {
   sportsOddsValueBet,
   sportsOddsValueTrendLabel,
   canonicalEventKeyForGame,
+  formatAmericanOdds,
+  sportsOddsConsensusForBet,
   teamSideForBet,
   type SportsOddsGamePrediction,
 } from "./sportsOddsAlgo.js";
@@ -102,6 +104,38 @@ function blockGameRec(
   return blocked;
 }
 
+function withBookConsensus(
+  rec: GameConsolidatedRecommendation,
+  prediction?: SportsOddsGamePrediction
+): GameConsolidatedRecommendation {
+  if (rec.noBet || !rec.recommendedBet || !rec.matchedGame) return rec;
+
+  const fromMarket =
+    prediction &&
+    sportsOddsConsensusForBet(rec.recommendedBet, rec.matchedGame, prediction);
+
+  if (fromMarket) {
+    return {
+      ...rec,
+      bookProvider: fromMarket.provider,
+      consensusOdds: fromMarket.moneyline,
+      consensusSpread: fromMarket.spread,
+      consensusLabel: fromMarket.label,
+    };
+  }
+
+  const sheetOdds = rec.recommendedBet.odds;
+  if (sheetOdds != null && Number.isFinite(sheetOdds)) {
+    return {
+      ...rec,
+      consensusOdds: sheetOdds,
+      consensusLabel: formatAmericanOdds(sheetOdds),
+    };
+  }
+
+  return rec;
+}
+
 function buildForcedSportsOddsGameRec(
   base: GameConsolidatedRecommendation,
   prediction: SportsOddsGamePrediction
@@ -123,30 +157,33 @@ function buildForcedSportsOddsGameRec(
         `Coach favored ${base.recommendedTeam} — overridden by high book edge`
       );
 
-  return withDualAlgoFlag({
-    ...base,
-    recommendedTeam: teamLabel,
-    recommendedBet: bet,
-    betType: bet.betType,
-    confidence: sportsOddsForceConfidence(prediction),
-    noBet: false,
-    noBetReason: undefined,
-    hasConflict: base.hasConflict,
-    sportsOddsConfirmed: true,
-    sportsOddsForced: true,
-    sportsOddsStatus: "agrees",
-    sportsOddsTrendLabel: valueLabel,
-    dualAlgoConfirmed: false,
-    confidenceBreakdown: [
-      ...base.confidenceBreakdown.filter(
-        (b) => b.key !== "sportsOdds" && b.key !== "result" && b.key !== "coach"
-      ),
-      coachNote,
-      breakdownItem("sportsOdds", "Sports Odds", forceDetail),
-      breakdownItem("result", "Result", `Result: Force pick — ${teamLabel}`),
-    ],
-    reasoning: `Sports Odds force pick — ${valueLabel} overrides coach${base.noBet ? " no-bet" : " disagreement"}.`,
-  });
+  return withBookConsensus(
+    withDualAlgoFlag({
+      ...base,
+      recommendedTeam: teamLabel,
+      recommendedBet: bet,
+      betType: bet.betType,
+      confidence: sportsOddsForceConfidence(prediction),
+      noBet: false,
+      noBetReason: undefined,
+      hasConflict: base.hasConflict,
+      sportsOddsConfirmed: true,
+      sportsOddsForced: true,
+      sportsOddsStatus: "agrees",
+      sportsOddsTrendLabel: valueLabel,
+      dualAlgoConfirmed: false,
+      confidenceBreakdown: [
+        ...base.confidenceBreakdown.filter(
+          (b) => b.key !== "sportsOdds" && b.key !== "result" && b.key !== "coach"
+        ),
+        coachNote,
+        breakdownItem("sportsOdds", "Sports Odds", forceDetail),
+        breakdownItem("result", "Result", `Result: Force pick — ${teamLabel}`),
+      ],
+      reasoning: `Sports Odds force pick — ${valueLabel} overrides coach${base.noBet ? " no-bet" : " disagreement"}.`,
+    }),
+    prediction
+  );
 }
 
 function shouldForceSportsOddsOverride(
@@ -196,19 +233,22 @@ function applySportsOddsToGameRec(
       rec.matchedGame,
       prediction
     );
-    return withDualAlgoFlag({
-      ...rec,
-      recommendedBet: preferredBet,
-      betType: preferredBet.betType,
-      recommendedTeam: preferredBet.displayText,
-      sportsOddsConfirmed: true,
-      sportsOddsStatus: status,
-      sportsOddsTrendLabel: sportsOddsTrendLabel(prediction),
-      confidenceBreakdown: [
-        ...rec.confidenceBreakdown.filter((b) => b.key !== "sportsOdds"),
-        breakdownItem("sportsOdds", "Sports Odds", detail),
-      ],
-    });
+    return withBookConsensus(
+      withDualAlgoFlag({
+        ...rec,
+        recommendedBet: preferredBet,
+        betType: preferredBet.betType,
+        recommendedTeam: preferredBet.displayText,
+        sportsOddsConfirmed: true,
+        sportsOddsStatus: status,
+        sportsOddsTrendLabel: sportsOddsTrendLabel(prediction),
+        confidenceBreakdown: [
+          ...rec.confidenceBreakdown.filter((b) => b.key !== "sportsOdds"),
+          breakdownItem("sportsOdds", "Sports Odds", detail),
+        ],
+      }),
+      prediction
+    );
   }
 
   const reason =
@@ -332,6 +372,12 @@ export function applySportsOddsFilter(
     ...injectForcedSportsOddsPicks(gameRecommendations, predictions, games)
   );
 
+  const enrichedGameRecommendations = gameRecommendations.map((rec) => {
+    if (rec.consensusLabel || rec.noBet || !rec.matchedGame) return rec;
+    const prediction = matchPredictionToCalendarGame(rec.matchedGame, predictions);
+    return withBookConsensus(rec, prediction);
+  });
+
   const recommendations = result.recommendations.map((rec) => {
     const prediction = rec.matchedGame
       ? matchPredictionToCalendarGame(rec.matchedGame, predictions)
@@ -339,7 +385,7 @@ export function applySportsOddsFilter(
     return applySportsOddsToPickRec(rec, prediction);
   });
 
-  return { recommendations, gameRecommendations };
+  return { recommendations, gameRecommendations: enrichedGameRecommendations };
 }
 
 function applyDratingsToGameRec(
