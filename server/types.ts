@@ -163,6 +163,8 @@ export interface GameConsolidatedRecommendation {
   dratingsTrendLabel?: string;
   /** Sports Odds Algo V2 agrees with coach recommendation */
   sportsOddsConfirmed?: boolean;
+  /** High Sports Odds value overrides coach disagreement or no-bet */
+  sportsOddsForced?: boolean;
   sportsOddsStatus?: "agrees" | "disagrees" | "unavailable";
   sportsOddsTrendLabel?: string;
   /** Coach + Sports Odds both agree */

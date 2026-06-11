@@ -76,7 +76,15 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
               Dual algo ✓
             </span>
           )}
-          {game.sportsOddsConfirmed && !game.dualAlgoConfirmed && (
+          {game.sportsOddsForced && (
+            <span
+              className="badge bg-warning/20 text-warning"
+              title={game.sportsOddsTrendLabel || "High book edge overrides coach"}
+            >
+              Odds force ✓
+            </span>
+          )}
+          {game.sportsOddsConfirmed && !game.dualAlgoConfirmed && !game.sportsOddsForced && (
             <span className="badge bg-accent/20 text-accent-glow" title={game.sportsOddsTrendLabel}>
               Odds algo ✓
             </span>

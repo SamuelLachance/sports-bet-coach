@@ -105,6 +105,7 @@ export interface GameConsolidatedRecommendation {
   dratingsStatus?: "agrees" | "disagrees" | "unavailable";
   dratingsTrendLabel?: string;
   sportsOddsConfirmed?: boolean;
+  sportsOddsForced?: boolean;
   sportsOddsStatus?: "agrees" | "disagrees" | "unavailable";
   sportsOddsTrendLabel?: string;
   dualAlgoConfirmed?: boolean;

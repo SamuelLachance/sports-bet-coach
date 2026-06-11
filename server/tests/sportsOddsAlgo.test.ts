@@ -8,6 +8,7 @@ import {
 } from "../services/recommendations.js";
 import {
   buildSportsOddsGameKey,
+  isSportsOddsForcePick,
   matchPredictionToCalendarGame,
   sportsOddsAgreesWithBet,
   sportsOddsStatusForBet,
@@ -120,5 +121,88 @@ const disagreed = applySportsOddsFilter(
 assert.equal(disagreed.noBet, true);
 assert.equal(disagreed.sportsOddsConfirmed, false);
 assert.equal(disagreed.dualAlgoConfirmed, false);
+
+const highEdgeTopPick = {
+  side: "home" as const,
+  teamName: "San Antonio Spurs",
+  edge: 25,
+  marketOdds: -170,
+  modelProjection: -195,
+};
+
+const highValuePrediction: SportsOddsGamePrediction = {
+  ...spursPrediction,
+  model: {
+    favoriteSide: "home",
+    winProbability: 64.48,
+  },
+  topPick: highEdgeTopPick,
+};
+
+const lowEdgePrediction: SportsOddsGamePrediction = {
+  ...spursPrediction,
+  topPick: { ...highEdgeTopPick, edge: 8 },
+};
+
+assert.equal(isSportsOddsForcePick(highValuePrediction), true);
+assert.equal(isSportsOddsForcePick(lowEdgePrediction), false);
+assert.equal(isSportsOddsForcePick(spursPrediction), false);
+
+const forcedDisagree = applySportsOddsFilter(
+  {
+    recommendations: [],
+    gameRecommendations: [
+      {
+        ...baseGameRec,
+        recommendedTeam: "Knicks ML",
+        recommendedBet: knicksMlBet,
+      },
+    ],
+  },
+  [highValuePrediction],
+  [KNICKS_GAME]
+).gameRecommendations[0];
+
+assert.ok(!forcedDisagree.noBet);
+assert.equal(forcedDisagree.sportsOddsForced, true);
+assert.equal(forcedDisagree.sportsOddsConfirmed, true);
+assert.equal(forcedDisagree.dualAlgoConfirmed, false);
+assert.equal(forcedDisagree.recommendedBet?.team, "SA");
+
+const noBetRec: GameConsolidatedRecommendation = {
+  gameKey: "nba-no-bet",
+  league: "NBA",
+  awayTeam: KNICKS_GAME.awayTeam,
+  homeTeam: KNICKS_GAME.homeTeam,
+  recommendedTeam: "",
+  confidence: 0,
+  noBet: true,
+  noBetReason: "Conflicting signals",
+  confidenceBreakdown: [],
+  hasConflict: true,
+  pickIds: ["pick-a", "pick-b"],
+  reasoning: "No bet",
+  matchedGame: KNICKS_GAME,
+};
+
+const forcedNoBet = applySportsOddsFilter(
+  { recommendations: [], gameRecommendations: [noBetRec] },
+  [highValuePrediction],
+  [KNICKS_GAME]
+).gameRecommendations[0];
+
+assert.ok(!forcedNoBet.noBet);
+assert.equal(forcedNoBet.sportsOddsForced, true);
+assert.equal(forcedNoBet.recommendedTeam, "SA ML");
+
+const injected = applySportsOddsFilter(
+  { recommendations: [], gameRecommendations: [] },
+  [highValuePrediction],
+  [KNICKS_GAME]
+).gameRecommendations[0];
+
+assert.equal(injected.sportsOddsForced, true);
+assert.equal(injected.recommendedTeam, "SA ML");
+assert.equal(injected.pickIds.length, 0);
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");

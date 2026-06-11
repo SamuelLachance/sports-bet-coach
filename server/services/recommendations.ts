@@ -16,12 +16,18 @@ import {
   type DratingsGameTrend,
 } from "./dratingsTrends.js";
 import {
+  buildSportsOddsGameKey,
   fetchSportsOddsSlate,
+  isSportsOddsForcePick,
   matchPredictionToCalendarGame,
   sportsOddsAppliesToLeague,
   sportsOddsBreakdownDetail,
+  sportsOddsForceBreakdownDetail,
+  sportsOddsForceConfidence,
   sportsOddsStatusForBet,
   sportsOddsTrendLabel,
+  sportsOddsValueBet,
+  sportsOddsValueTrendLabel,
   type SportsOddsGamePrediction,
 } from "./sportsOddsAlgo.js";
 import { SIGNAL_LABELS } from "./signalMapping.js";
@@ -42,8 +48,10 @@ function impliedBetForRec(rec: MatchedRecommendation) {
 
 function isDualAlgoConfirmed(rec: {
   sportsOddsConfirmed?: boolean;
+  sportsOddsForced?: boolean;
   dratingsConfirmed?: boolean;
 }): boolean {
+  if (rec.sportsOddsForced) return false;
   if (!rec.sportsOddsConfirmed) return false;
   if (!isDratingsEnabled()) return true;
   return Boolean(rec.dratingsConfirmed);
@@ -91,12 +99,81 @@ function blockGameRec(
   return blocked;
 }
 
+function buildForcedSportsOddsGameRec(
+  base: GameConsolidatedRecommendation,
+  prediction: SportsOddsGamePrediction
+): GameConsolidatedRecommendation {
+  const game = base.matchedGame!;
+  const bet = sportsOddsValueBet(prediction, game);
+  const teamLabel = `${bet.displayText} ML`;
+  const forceDetail = sportsOddsForceBreakdownDetail(prediction);
+  const valueLabel = sportsOddsValueTrendLabel(prediction);
+  const coachNote = base.noBet
+    ? breakdownItem(
+        "coach",
+        "Coach",
+        `Coach: no bet${base.noBetReason ? ` — ${base.noBetReason}` : ""}`
+      )
+    : breakdownItem(
+        "coach",
+        "Coach",
+        `Coach favored ${base.recommendedTeam} — overridden by high book edge`
+      );
+
+  return withDualAlgoFlag({
+    ...base,
+    recommendedTeam: teamLabel,
+    recommendedBet: bet,
+    betType: "moneyline",
+    confidence: sportsOddsForceConfidence(prediction),
+    noBet: false,
+    noBetReason: undefined,
+    hasConflict: base.hasConflict,
+    sportsOddsConfirmed: true,
+    sportsOddsForced: true,
+    sportsOddsStatus: "agrees",
+    sportsOddsTrendLabel: valueLabel,
+    dualAlgoConfirmed: false,
+    confidenceBreakdown: [
+      ...base.confidenceBreakdown.filter(
+        (b) => b.key !== "sportsOdds" && b.key !== "result" && b.key !== "coach"
+      ),
+      coachNote,
+      breakdownItem("sportsOdds", "Sports Odds", forceDetail),
+      breakdownItem("result", "Result", `Result: Force pick — ${teamLabel}`),
+    ],
+    reasoning: `Sports Odds force pick — ${valueLabel} overrides coach${base.noBet ? " no-bet" : " disagreement"}.`,
+  });
+}
+
+function shouldForceSportsOddsOverride(
+  rec: GameConsolidatedRecommendation,
+  prediction: SportsOddsGamePrediction | undefined
+): boolean {
+  if (!prediction || !rec.matchedGame || !isSportsOddsForcePick(prediction)) {
+    return false;
+  }
+  if (rec.noBet) return true;
+  if (!rec.recommendedBet) return false;
+  return (
+    sportsOddsStatusForBet(rec.recommendedBet, rec.matchedGame, prediction) ===
+    "disagrees"
+  );
+}
+
 function applySportsOddsToGameRec(
   rec: GameConsolidatedRecommendation,
   prediction: SportsOddsGamePrediction | undefined
 ): GameConsolidatedRecommendation {
-  if (rec.noBet || !rec.recommendedBet || !rec.matchedGame) return rec;
-  if (!sportsOddsAppliesToLeague(rec.matchedGame.league)) return rec;
+  if (!rec.matchedGame || !sportsOddsAppliesToLeague(rec.matchedGame.league)) {
+    return rec;
+  }
+
+  if (shouldForceSportsOddsOverride(rec, prediction)) {
+    return buildForcedSportsOddsGameRec(rec, prediction!);
+  }
+
+  if (rec.noBet || !rec.recommendedBet) return rec;
 
   const status = sportsOddsStatusForBet(
     rec.recommendedBet,
@@ -131,6 +208,58 @@ function applySportsOddsToGameRec(
         : "Sports Odds prediction unavailable — dual algo requires agreement";
 
   return blockGameRec(rec, reason, "sportsOdds", status, detail);
+}
+
+function gameRecMatchesPrediction(
+  rec: GameConsolidatedRecommendation,
+  prediction: SportsOddsGamePrediction
+): boolean {
+  if (!rec.matchedGame) return false;
+  return matchPredictionToCalendarGame(rec.matchedGame, [prediction]) != null;
+}
+
+function injectForcedSportsOddsPicks(
+  gameRecs: GameConsolidatedRecommendation[],
+  predictions: SportsOddsGamePrediction[],
+  games: CalendarGame[]
+): GameConsolidatedRecommendation[] {
+  const added: GameConsolidatedRecommendation[] = [];
+
+  for (const prediction of predictions) {
+    if (!isSportsOddsForcePick(prediction)) continue;
+    if (!sportsOddsAppliesToLeague(prediction.league)) continue;
+    if (gameRecs.some((rec) => gameRecMatchesPrediction(rec, prediction))) continue;
+
+    const game = games.find(
+      (candidate) => matchPredictionToCalendarGame(candidate, [prediction]) != null
+    );
+    if (!game) continue;
+
+    const gameKey = game.id
+      ? `${game.league}:espn-${game.id}`
+      : buildSportsOddsGameKey(game.league, game.awayTeam, game.homeTeam);
+
+    added.push(
+      buildForcedSportsOddsGameRec(
+        {
+          gameKey,
+          league: game.league,
+          awayTeam: game.awayTeam,
+          homeTeam: game.homeTeam,
+          recommendedTeam: "",
+          confidence: 0,
+          confidenceBreakdown: [],
+          hasConflict: false,
+          pickIds: [],
+          reasoning: "",
+          matchedGame: game,
+        },
+        prediction
+      )
+    );
+  }
+
+  return added;
 }
 
 function applySportsOddsToPickRec(
@@ -173,7 +302,8 @@ export function applySportsOddsFilter(
     recommendations: MatchedRecommendation[];
     gameRecommendations: GameConsolidatedRecommendation[];
   },
-  predictions: SportsOddsGamePrediction[]
+  predictions: SportsOddsGamePrediction[],
+  games: CalendarGame[] = []
 ): {
   recommendations: MatchedRecommendation[];
   gameRecommendations: GameConsolidatedRecommendation[];
@@ -186,6 +316,10 @@ export function applySportsOddsFilter(
       : undefined;
     return applySportsOddsToGameRec(rec, prediction);
   });
+
+  gameRecommendations.push(
+    ...injectForcedSportsOddsPicks(gameRecommendations, predictions, games)
+  );
 
   const recommendations = result.recommendations.map((rec) => {
     const prediction = rec.matchedGame
@@ -331,7 +465,7 @@ export async function buildRecommendations(
       (options?.skipSportsOddsFetch
         ? []
         : (await fetchSportsOddsSlate(gameDate)).games);
-    result = applySportsOddsFilter(result, predictions);
+    result = applySportsOddsFilter(result, predictions, games);
   }
 
   if (!isDratingsEnabled()) return result;
@@ -356,6 +490,7 @@ export function countSportsOddsFilterStats(result: {
   picksConfirmed: number;
   gamesNoBet: number;
   gamesConfirmed: number;
+  gamesForced: number;
   dualAlgoGames: number;
 } {
   return {
@@ -365,6 +500,7 @@ export function countSportsOddsFilterStats(result: {
       (g) => g.noBet && g.sportsOddsStatus && g.sportsOddsStatus !== "agrees"
     ).length,
     gamesConfirmed: result.gameRecommendations.filter((g) => g.sportsOddsConfirmed).length,
+    gamesForced: result.gameRecommendations.filter((g) => g.sportsOddsForced).length,
     dualAlgoGames: result.gameRecommendations.filter((g) => g.dualAlgoConfirmed).length,
   };
 }

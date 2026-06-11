@@ -75,7 +75,7 @@ async function main() {
   if (sportsOddsEnabled) {
     const stats = countSportsOddsFilterStats(built);
     console.log(
-      `Sports Odds filter: ${stats.gamesConfirmed} games confirmed, ${stats.gamesNoBet} games → no bet, ${stats.dualAlgoGames} dual-algo games`
+      `Sports Odds filter: ${stats.gamesConfirmed} games confirmed, ${stats.gamesForced} force picks, ${stats.gamesNoBet} games → no bet, ${stats.dualAlgoGames} dual-algo games`
     );
   }
 

@@ -59,7 +59,8 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
     return gameRecommendations
       .filter(
         (g) =>
-          isActionableGameRec(g) && g.pickIds.some((id) => filteredIds.has(id))
+          isActionableGameRec(g) &&
+          (g.sportsOddsForced || g.pickIds.some((id) => filteredIds.has(id)))
       )
       .sort((a, b) => b.confidence - a.confidence);
   }, [gameRecommendations, filtered]);

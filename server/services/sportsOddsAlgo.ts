@@ -10,6 +10,7 @@ import {
   SPORTS_ODDS_BASE_URL,
   SPORTS_ODDS_SUPPORTED_LEAGUES,
   isSportsOddsEnabled,
+  sportsOddsForceMinEdge,
 } from "../config.js";
 import type { CalendarGame, LeagueCode, ParsedBet } from "../types.js";
 import { resolveGameTeamDisplay } from "./calendar.js";
@@ -23,12 +24,24 @@ export interface SportsOddsModelPrediction {
   homeProjection?: number;
 }
 
+export interface SportsOddsTopPick {
+  side: "away" | "home";
+  teamName: string;
+  edge: number;
+  marketOdds: number;
+  modelProjection: number;
+  strategy?: string;
+  reason?: string;
+}
+
 export interface SportsOddsGamePrediction {
   eventId: string;
   league: LeagueCode;
   awayTeam: string;
   homeTeam: string;
   model: SportsOddsModelPrediction;
+  /** Best value side vs the book (from Sports Odds top_pick). */
+  topPick?: SportsOddsTopPick;
 }
 
 export interface SportsOddsSlate {
@@ -51,6 +64,15 @@ interface RemoteSlateGame {
     win_probability?: number;
     away_projection?: number;
     home_projection?: number;
+  };
+  top_pick?: {
+    side?: "away" | "home";
+    team_name?: string;
+    edge?: number;
+    market_odds?: number;
+    model_projection?: number;
+    strategy?: string;
+    reason?: string;
   };
 }
 
@@ -102,6 +124,24 @@ function coachLeagueFromRemote(league?: string): LeagueCode | null {
   return null;
 }
 
+function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
+  const pick = raw.top_pick;
+  const side = pick?.side;
+  const teamName = pick?.team_name;
+  const edge = Number(pick?.edge ?? 0);
+  if (!side || !teamName || edge <= 0) return undefined;
+
+  return {
+    side,
+    teamName,
+    edge,
+    marketOdds: Number(pick?.market_odds ?? 0),
+    modelProjection: Number(pick?.model_projection ?? 0),
+    strategy: pick?.strategy,
+    reason: pick?.reason,
+  };
+}
+
 function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
   const league = coachLeagueFromRemote(raw.league);
   const awayTeam = raw.matchup?.away?.name;
@@ -120,6 +160,7 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
       awayProjection: raw.model?.away_projection,
       homeProjection: raw.model?.home_projection,
     },
+    topPick: mapRemoteTopPick(raw),
   };
 }
 
@@ -232,6 +273,94 @@ export function sportsOddsTrendLabel(prediction: SportsOddsGamePrediction): stri
       ? prediction.homeTeam
       : prediction.awayTeam;
   return `${favorite} (${prediction.model.winProbability.toFixed(1)}%)`;
+}
+
+export function sportsOddsFavoriteTeamName(
+  prediction: SportsOddsGamePrediction
+): string {
+  return prediction.model.favoriteSide === "home"
+    ? prediction.homeTeam
+    : prediction.awayTeam;
+}
+
+export function sportsOddsFavoriteBet(
+  prediction: SportsOddsGamePrediction,
+  game: CalendarGame
+): ParsedBet {
+  const team =
+    prediction.model.favoriteSide === "home"
+      ? game.homeAbbr || game.homeTeam
+      : game.awayAbbr || game.awayTeam;
+  return {
+    betType: "moneyline",
+    team,
+    rawText: team,
+    displayText: team,
+  };
+}
+
+export function sportsOddsValueBet(
+  prediction: SportsOddsGamePrediction,
+  game: CalendarGame
+): ParsedBet {
+  const side = prediction.topPick?.side ?? prediction.model.favoriteSide;
+  const team =
+    side === "home"
+      ? game.homeAbbr || game.homeTeam
+      : game.awayAbbr || game.awayTeam;
+  return {
+    betType: "moneyline",
+    team,
+    rawText: team,
+    displayText: team,
+  };
+}
+
+export function sportsOddsValueTrendLabel(
+  prediction: SportsOddsGamePrediction
+): string {
+  const pick = prediction.topPick;
+  if (!pick) return sportsOddsTrendLabel(prediction);
+
+  const odds =
+    pick.marketOdds > 0 ? `+${pick.marketOdds}` : `${pick.marketOdds}`;
+  const model =
+    pick.modelProjection > 0
+      ? `+${pick.modelProjection}`
+      : `${pick.modelProjection}`;
+  return `${pick.teamName} (+${pick.edge.toFixed(0)} edge, book ${odds} vs model ${model})`;
+}
+
+export function sportsOddsForceConfidence(
+  prediction: SportsOddsGamePrediction
+): number {
+  const edge = prediction.topPick?.edge ?? 0;
+  return Math.min(92, Math.round(75 + edge / 10));
+}
+
+export function isSportsOddsForcePick(
+  prediction: SportsOddsGamePrediction | undefined
+): boolean {
+  if (!prediction || !isSportsOddsEnabled()) return false;
+  const edge = prediction.topPick?.edge ?? 0;
+  return edge >= sportsOddsForceMinEdge();
+}
+
+export function sportsOddsForceBreakdownDetail(
+  prediction: SportsOddsGamePrediction
+): string {
+  const threshold = sportsOddsForceMinEdge();
+  const pick = prediction.topPick;
+  if (!pick) {
+    return `Sports Odds: force pick unavailable — no book edge data`;
+  }
+  const odds =
+    pick.marketOdds > 0 ? `+${pick.marketOdds}` : `${pick.marketOdds}`;
+  const model =
+    pick.modelProjection > 0
+      ? `+${pick.modelProjection}`
+      : `${pick.modelProjection}`;
+  return `Sports Odds: force pick — ${pick.teamName} +${pick.edge.toFixed(0)} edge (book ${odds} vs model ${model}) exceeds +${threshold} threshold`;
 }
 
 export async function fetchSportsOddsSlate(
