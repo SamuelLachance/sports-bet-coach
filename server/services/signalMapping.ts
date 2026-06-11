@@ -26,11 +26,18 @@ export const SIGNAL_TO_CATEGORY: Record<SignalType, string> = {
   mega_rlm: "RLM MS",
 };
 
-/** Fade-style signals: sheet lists the public/book side → always bet the opponent */
+/** Fade-style signals: sheet lists the public side → always bet the opponent / inverse */
 export const FADE_SIGNALS = new Set<SignalType>([
   "book_needs_fade",
   "square_fade",
+  "reverse_line_movement",
+  "mega_rlm",
+  "whale_plays",
+  "model_best_values",
 ]);
+
+/** Negative EV signals — same set as fade (bet against listed side) */
+export const NEGATIVE_EV_SIGNALS = FADE_SIGNALS;
 
 /** Sharp signals: sheet lists the side to bet directly */
 export const SHARP_BET_SIGNALS = new Set<SignalType>([
@@ -42,11 +49,11 @@ export const SIGNAL_LABELS: Record<SignalType, string> = {
   sharp_money: "Sharp Money",
   book_needs_fade: "Book Needs (Fade)",
   square_fade: "Square Top (Fade)",
-  reverse_line_movement: "Reverse Line Movement",
+  reverse_line_movement: "Reverse Line Movement (Fade)",
   mega_sharps: "Mega Sharps (4+)",
-  whale_plays: "Whale Plays 🐳",
-  model_best_values: "Model Best Values",
-  mega_rlm: "Mega RLM (4+)",
+  whale_plays: "Whale Plays (Fade)",
+  model_best_values: "Model Best Values (Fade)",
+  mega_rlm: "Mega RLM (Fade)",
 };
 
 /** @deprecated alias — use SIGNAL_LABELS */

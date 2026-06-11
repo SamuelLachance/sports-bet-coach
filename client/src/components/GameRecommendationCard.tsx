@@ -45,9 +45,10 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
         {game.dualFade?.isOpposingNoBet && game.dualFade.bookNeedsFadeTeam && game.dualFade.squareFadeTeam && (
           <div className="bg-surface-raised border border-surface-border rounded-lg p-3 mb-3">
             <p className="text-sm text-slate-300">
-              Book Needs: <span className="text-white">{game.dualFade.bookNeedsFadeTeam}</span>
-              {" · "}
-              Square Top: <span className="text-white">{game.dualFade.squareFadeTeam}</span>
+              Fade targets:{" "}
+              <span className="text-white">{game.dualFade.bookNeedsFadeTeam}</span>
+              {" vs "}
+              <span className="text-white">{game.dualFade.squareFadeTeam}</span>
             </p>
           </div>
         )}
@@ -104,10 +105,10 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
       {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (
         <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3">
           <div className="text-xs text-warning uppercase tracking-wide mb-1">
-            Same-side dual fade
+            Same-side multi-fade
           </div>
           <p className="text-sm text-slate-200 leading-relaxed">
-            Book Needs + Square Top both fade{" "}
+            Multiple fade signals target{" "}
             <span className="font-medium text-white">{game.dualFade.bookNeedsFadeTeam}</span>
             {" → bet "}
             <span className="font-medium text-accent-glow">{game.recommendedTeam}</span>

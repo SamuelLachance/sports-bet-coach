@@ -20,7 +20,7 @@ import {
   resolveGameTeamDisplay,
   validateRecommendedTeam,
 } from "./calendar.js";
-import { findDualFadePair, isOpposingDualFade } from "./dualFadeStats.js";
+import { isOpposingDualFade } from "./dualFadeStats.js";
 import { FADE_SIGNALS, SHARP_BET_SIGNALS, SIGNAL_LABELS } from "./signalMapping.js";
 
 /** Fixed confidence — never derived from historical ROI */
@@ -206,13 +206,10 @@ export function computePickRules(input: {
     const opponentPick = extractOpponentName(pick, slatePicks, matchedGame);
     const confidence = RULE_CONFIDENCE.singleFade;
     if (opponentPick) {
-      const label =
-        pick.signalType === "book_needs_fade"
-          ? "Book Needs → bet opponent"
-          : "Square Top → bet opponent";
+      const signalLabel = SIGNAL_LABELS[pick.signalType];
       breakdown.push({
         key: "fade_rule",
-        label: "Fade rule",
+        label: signalLabel,
         value: confidence,
         impact: confidence - 50,
         detail: `Fade ${displayTeamName(pick.pick)} → bet ${displayTeamName(opponentPick)}`,
@@ -223,7 +220,7 @@ export function computePickRules(input: {
         opponentPick,
         opponentConfidence: confidence,
         signalPolarity: "inverted",
-        edgeLabel: label,
+        edgeLabel: `${signalLabel} — bet opponent`,
       };
     }
 
@@ -361,7 +358,7 @@ function fadeTargetsForRecs(
   return targets;
 }
 
-/** Teams listed in Book Needs / Square Top — never recommend these */
+/** Teams listed in fade signals — never recommend these */
 export function collectFadeTargetsForGame(
   recs: MatchedRecommendation[],
   slatePicks?: SheetPick[],
@@ -418,60 +415,85 @@ function matchupLabels(recs: MatchedRecommendation[]): { awayTeam: string; homeT
   return { awayTeam: list[0] ?? "Team A", homeTeam: list[1] ?? "Team B" };
 }
 
-function findFadePairForGame(
+function fadeTargetNorm(pick: SheetPick, matchedGame?: CalendarGame): string {
+  const stripped = displayTeamName(pick.pick);
+  const resolved =
+    matchedGame != null ? resolveGameTeamDisplay(stripped, matchedGame) ?? stripped : stripped;
+  return normalizeTeamName(resolved);
+}
+
+function collectFadePicksForGame(
   recs: MatchedRecommendation[],
   slatePicks: SheetPick[],
   matchedGame?: CalendarGame
-): { book?: SheetPick; square?: SheetPick } {
-  const books = recs
-    .filter((r) => r.signalType === "book_needs_fade" && !r.line)
-    .map((r) => sheetPickFromRec(r, slatePicks));
-  const squares = recs
-    .filter((r) => r.signalType === "square_fade" && !r.line)
-    .map((r) => sheetPickFromRec(r, slatePicks));
+): SheetPick[] {
+  const picks: SheetPick[] = [];
+  const seen = new Set<string>();
 
-  if (books.length && squares.length) {
-    return { book: books[0], square: squares[0] };
+  for (const rec of recs) {
+    if (!FADE_SIGNALS.has(rec.signalType) || rec.line) continue;
+    const pick = sheetPickFromRec(rec, slatePicks);
+    if (seen.has(pick.id)) continue;
+    seen.add(pick.id);
+    picks.push(pick);
   }
 
-  if (matchedGame) {
+  if (matchedGame && recs.length > 0) {
     const league = sportLeagueFromRec(recs[0]);
-    return findDualFadePair(slatePicks, league, {
-      homeTeam: matchedGame.homeTeam,
-      awayTeam: matchedGame.awayTeam,
-    });
+    for (const p of slatePicks) {
+      if (!FADE_SIGNALS.has(p.signalType) || p.line) continue;
+      if (p.league !== league && p.league !== "UNKNOWN") continue;
+      if (!pickBelongsToGame(p.pick, p.opponent, matchedGame)) continue;
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      picks.push(p);
+    }
   }
 
-  return {};
+  return picks;
 }
 
-/** Book fades A, Square fades B on same game (A ≠ B) → opposing dual-fade */
-function isOpposingFadeOnGame(
-  book: SheetPick,
-  square: SheetPick,
+/** Two fade picks target different sides of the same game → opposing fades */
+function isOpposingFadePick(
+  a: SheetPick,
+  b: SheetPick,
   matchedGame?: CalendarGame
 ): boolean {
-  const bookFade = normalizeTeamName(book.pick);
-  const squareFade = normalizeTeamName(square.pick);
-  if (bookFade === squareFade) return false;
-  if (isOpposingDualFade(book, square)) return true;
-
+  if (fadeTargetNorm(a, matchedGame) === fadeTargetNorm(b, matchedGame)) return false;
+  if (isOpposingDualFade(a, b)) return true;
   if (!matchedGame) return false;
 
-  const bookInGame = pickBelongsToGame(book.pick, book.opponent, matchedGame);
-  const squareInGame = pickBelongsToGame(square.pick, square.opponent, matchedGame);
-  if (!bookInGame || !squareInGame) return false;
+  const aInGame = pickBelongsToGame(a.pick, a.opponent, matchedGame);
+  const bInGame = pickBelongsToGame(b.pick, b.opponent, matchedGame);
+  if (!aInGame || !bInGame) return false;
 
-  // Same VS slot on sheet (even split across rows) with different fade targets
-  if (
-    book.gameSlot != null &&
-    square.gameSlot != null &&
-    book.gameSlot === square.gameSlot
-  ) {
-    return true;
-  }
+  if (a.gameSlot != null && b.gameSlot != null && a.gameSlot === b.gameSlot) return true;
 
   return true;
+}
+
+function findOpposingFadePair(
+  fadePicks: SheetPick[],
+  matchedGame?: CalendarGame
+): { a: SheetPick; b: SheetPick } | undefined {
+  for (let i = 0; i < fadePicks.length; i++) {
+    for (let j = i + 1; j < fadePicks.length; j++) {
+      if (isOpposingFadePick(fadePicks[i], fadePicks[j], matchedGame)) {
+        return { a: fadePicks[i], b: fadePicks[j] };
+      }
+    }
+  }
+  return undefined;
+}
+
+function findSameSideFadeCluster(
+  fadePicks: SheetPick[],
+  matchedGame?: CalendarGame
+): SheetPick[] | undefined {
+  if (fadePicks.length < 2) return undefined;
+  const target = fadeTargetNorm(fadePicks[0], matchedGame);
+  const cluster = fadePicks.filter((p) => fadeTargetNorm(p, matchedGame) === target);
+  return cluster.length >= 2 ? cluster : undefined;
 }
 
 function buildNoBetCard(
@@ -589,46 +611,50 @@ function resolveGameGroup(
   recs = filterRecsForGame(recs);
   const matchedGame = recs.find((r) => r.matchedGame)?.matchedGame;
   const fadeTargets = fadeTargetsForRecs(recs, slatePicks, matchedGame);
-  const { book, square } = findFadePairForGame(recs, slatePicks, matchedGame);
+  const fadePicks = collectFadePicksForGame(recs, slatePicks, matchedGame);
 
   const sharpRecs = recs.filter((r) => SHARP_BET_SIGNALS.has(r.signalType) && !r.line);
 
-  // Rule 4: opposing dual-fade → no bet
-  if (book && square && isOpposingFadeOnGame(book, square, matchedGame)) {
-    const bookFadeTeam = displayTeamName(book.pick);
-    const squareFadeTeam = displayTeamName(square.pick);
-    const bookInverse = book.opponent ? displayTeamName(book.opponent) : squareFadeTeam;
-    const squareInverse = square.opponent ? displayTeamName(square.opponent) : bookFadeTeam;
+  // Opposing fades on same game → no bet
+  const opposingPair = findOpposingFadePair(fadePicks, matchedGame);
+  if (opposingPair) {
+    const { a, b } = opposingPair;
+    const fadeATeam = displayTeamName(a.pick);
+    const fadeBTeam = displayTeamName(b.pick);
+    const inverseA = a.opponent ? displayTeamName(a.opponent) : fadeBTeam;
+    const inverseB = b.opponent ? displayTeamName(b.opponent) : fadeATeam;
+    const labelA = SIGNAL_LABELS[a.signalType];
+    const labelB = SIGNAL_LABELS[b.signalType];
     const reason =
-      `Book Needs lists ${bookFadeTeam} (→ ${bookInverse}) and Square Top lists ${squareFadeTeam} (→ ${squareInverse}). ` +
+      `${labelA} lists ${fadeATeam} (→ ${inverseA}) and ${labelB} lists ${fadeBTeam} (→ ${inverseB}). ` +
       `Both teams on opposite sides — conflicting signals, no bet.`;
 
     return buildNoBetCard(gameKey, recs, reason, {
       isDualFade: true,
       isOpposingNoBet: true,
-      bookNeedsFadeTeam: bookFadeTeam,
-      squareFadeTeam: squareFadeTeam,
+      bookNeedsFadeTeam: fadeATeam,
+      squareFadeTeam: fadeBTeam,
     }, matchedGame, [
       {
         key: "no_bet_dual_fade",
         label: "No bet",
         value: 0,
         impact: 0,
-        detail: `${bookFadeTeam} vs ${squareFadeTeam} — opposing fades cancel`,
+        detail: `${fadeATeam} vs ${fadeBTeam} — opposing fades cancel`,
       },
       {
-        key: "book_fade",
-        label: "Book Needs fade",
+        key: "fade_a",
+        label: labelA,
         value: RULE_CONFIDENCE.singleFade,
         impact: 0,
-        detail: `Fade ${bookFadeTeam} → would bet ${bookInverse}`,
+        detail: `Fade ${fadeATeam} → would bet ${inverseA}`,
       },
       {
-        key: "square_fade",
-        label: "Square Top fade",
+        key: "fade_b",
+        label: labelB,
         value: RULE_CONFIDENCE.singleFade,
         impact: 0,
-        detail: `Fade ${squareFadeTeam} → would bet ${squareInverse}`,
+        detail: `Fade ${fadeBTeam} → would bet ${inverseB}`,
       },
     ]);
   }
@@ -671,15 +697,22 @@ function resolveGameGroup(
     );
   }
 
-  // Rule 5: same-side dual-fade → bet opponent
-  if (book && square && normalizeTeamName(book.pick) === normalizeTeamName(square.pick)) {
-    const fadeTarget = displayTeamName(book.pick);
+  // Same-side multi-fade → bet opponent
+  const sameSideCluster = findSameSideFadeCluster(fadePicks, matchedGame);
+  if (sameSideCluster) {
+    const anchor = sameSideCluster[0];
+    const fadeTarget = displayTeamName(anchor.pick);
     const opponent =
-      extractOpponentName(book, slatePicks, matchedGame) ??
-      extractOpponentName(square, slatePicks, matchedGame);
+      extractOpponentName(anchor, slatePicks, matchedGame) ??
+      sameSideCluster
+        .map((p) => extractOpponentName(p, slatePicks, matchedGame))
+        .find(Boolean);
     if (opponent) {
       let team = opponent;
       if (matchedGame) team = displayGameTeam(opponent, matchedGame);
+      const signalSummary = [...new Set(sameSideCluster.map((p) => SIGNAL_LABELS[p.signalType]))].join(
+        " + "
+      );
       return buildBetCard(
         gameKey,
         recs,
@@ -687,14 +720,14 @@ function resolveGameGroup(
         RULE_CONFIDENCE.sameSideDualFade,
         [
           {
-            key: "same_side_dual_fade",
-            label: "Same-side dual fade",
+            key: "same_side_multi_fade",
+            label: "Same-side multi-fade",
             value: RULE_CONFIDENCE.sameSideDualFade,
             impact: RULE_CONFIDENCE.sameSideDualFade - 50,
-            detail: `Book + Square both fade ${fadeTarget} → bet ${team}`,
+            detail: `${signalSummary} fade ${fadeTarget} → bet ${team}`,
           },
         ],
-        `Book + Square both fade ${fadeTarget} → ${team} (${RULE_CONFIDENCE.sameSideDualFade}%)`,
+        `${signalSummary} fade ${fadeTarget} → ${team} (${RULE_CONFIDENCE.sameSideDualFade}%)`,
         matchedGame,
         {
           isDualFade: true,

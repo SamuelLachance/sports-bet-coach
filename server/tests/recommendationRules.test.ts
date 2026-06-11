@@ -158,6 +158,39 @@ const modelOnFadedTeam: SheetPick = {
   signalCol: 8,
 };
 
+const rlmPick: SheetPick = {
+  id: "rlm-ws",
+  league: "MLB",
+  signalType: "reverse_line_movement",
+  pick: "WHITE SOX",
+  opponent: "ATLANTA",
+  rawRow: 24,
+  gameSlot: 1,
+  signalCol: 8,
+};
+
+const whalePick: SheetPick = {
+  id: "whale-ws",
+  league: "MLB",
+  signalType: "whale_plays",
+  pick: "WHITE SOX",
+  opponent: "ATLANTA",
+  rawRow: 26,
+  gameSlot: 1,
+  signalCol: 4,
+};
+
+const rlmAtlantaPick: SheetPick = {
+  id: "rlm-atl",
+  league: "MLB",
+  signalType: "reverse_line_movement",
+  pick: "ATLANTA",
+  opponent: "WHITE SOX",
+  rawRow: 27,
+  gameSlot: 1,
+  signalCol: 8,
+};
+
 const pittsburghBookPick: SheetPick = {
   id: "book-pit",
   league: "MLB",
@@ -380,6 +413,42 @@ function main() {
   assert.equal(sharpConf.confidence, RULE_CONFIDENCE.sharp);
   assert.ok(!sharpConf.opponentPick, "Sharp Money does not invert");
 
+  const rlmConf = computePickRules({
+    pick: rlmPick,
+    matchedGame: WHITE_SOX_GAME,
+    slatePicks: [rlmPick],
+  });
+  assert.equal(rlmConf.signalPolarity, "inverted");
+  assert.ok(
+    rlmConf.opponentPick?.toUpperCase().includes("ATLANTA"),
+    "RLM fade WHITE SOX → bet ATLANTA"
+  );
+  assert.equal(rlmConf.confidence, RULE_CONFIDENCE.singleFade);
+
+  const whaleConf = computePickRules({
+    pick: whalePick,
+    matchedGame: WHITE_SOX_GAME,
+    slatePicks: [whalePick],
+  });
+  assert.equal(whaleConf.signalPolarity, "inverted");
+  assert.ok(
+    whaleConf.opponentPick?.toUpperCase().includes("ATLANTA"),
+    "Whale fade WHITE SOX → bet ATLANTA"
+  );
+  assert.equal(whaleConf.confidence, RULE_CONFIDENCE.singleFade);
+
+  const modelConf = computePickRules({
+    pick: modelOnFadedTeam,
+    matchedGame: WHITE_SOX_GAME,
+    slatePicks: [modelOnFadedTeam],
+  });
+  assert.equal(modelConf.signalPolarity, "inverted");
+  assert.ok(
+    modelConf.opponentPick?.toUpperCase().includes("ATLANTA"),
+    "Model fade WHITE SOX → bet ATLANTA"
+  );
+  assert.equal(modelConf.confidence, RULE_CONFIDENCE.singleFade);
+
   const dualResolution = resolveDualFadeMatch(
     bookPick,
     squarePick,
@@ -501,8 +570,27 @@ function main() {
   );
   assert.ok(
     modelVsFadeCard!.recommendedTeam.toUpperCase().includes("ATLANTA"),
-    "Book fade must beat model picking faded team"
+    "Book + model both fade WHITE SOX → bet ATLANTA"
   );
+  assert.equal(
+    modelVsFadeCard!.confidence,
+    RULE_CONFIDENCE.sameSideDualFade,
+    "Same-side book + model fade uses multi-fade confidence"
+  );
+
+  const bookRlmSlate = [bookOnlyPick, rlmAtlantaPick];
+  const { gameRecommendations: bookRlmCards } = resolveGameConflicts(
+    [
+      makeRec(bookOnlyPick, WHITE_SOX_GAME, bookRlmSlate),
+      makeRec(rlmAtlantaPick, WHITE_SOX_GAME, bookRlmSlate),
+    ],
+    stats,
+    { slatePicks: bookRlmSlate, dualStats: emptyDualStats }
+  );
+  const bookRlmCard = bookRlmCards.find((g) => g.matchedGame?.id === WHITE_SOX_GAME.id);
+  assert.ok(bookRlmCard?.noBet, "Book fades WS + RLM fades ATL → opposing fades, no bet");
+  assert.equal(bookRlmCard!.recommendedTeam, "");
+  assert.equal(bookRlmCard!.confidence, 0);
 
   const fadeTargets = collectFadeTargetsForGame(
     [makeRec(bookOnlyPick, WHITE_SOX_GAME, [bookOnlyPick])],
@@ -580,7 +668,12 @@ function main() {
   assertNeverRecommendsFadeTarget(pitModelCard!, "PIRATES", "Model vs Pittsburgh book fade");
   assert.ok(
     pitModelCard!.recommendedTeam.toUpperCase().includes("DODGER"),
-    "Book fade must beat model picking Pirates (odds in pick text)"
+    "Book + model both fade Pirates → bet Dodgers"
+  );
+  assert.equal(
+    pitModelCard!.confidence,
+    RULE_CONFIDENCE.sameSideDualFade,
+    "Same-side book + model fade uses multi-fade confidence"
   );
 
   console.log("✓ All recommendation rule tests passed");

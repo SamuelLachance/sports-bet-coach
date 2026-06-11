@@ -20,10 +20,10 @@ export const LEGACY_SIGNAL_CONFIDENCE: Record<
 > = {
   sharp_money: 85,
   mega_sharps: 85,
-  whale_plays: 70,
-  model_best_values: 70,
-  mega_rlm: 70,
-  reverse_line_movement: 70,
+  whale_plays: 75,
+  model_best_values: 75,
+  mega_rlm: 75,
+  reverse_line_movement: 75,
   book_needs_fade: 75,
   square_fade: 75,
 };
