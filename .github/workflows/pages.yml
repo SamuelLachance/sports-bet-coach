@@ -4,6 +4,9 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+  # Rebuild quotidien pour rafraîchir les données (voir DEPLOY.md)
+  schedule:
+    - cron: "0 12 * * *"
 
 permissions:
   contents: read
@@ -38,6 +41,7 @@ jobs:
 
       - name: Build static snapshot and client
         env:
+          # GitHub Pages (URL /sports-bet-coach/) — pour un domaine custom, mettre VITE_BASE: /
           VITE_BASE: /sports-bet-coach/
           VITE_STATIC_API: "true"
           VITE_CLIENT_SYNC: "true"
