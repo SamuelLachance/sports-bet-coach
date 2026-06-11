@@ -33,13 +33,13 @@ async function main() {
   const syncStatus = {
     lastSync: sheets.syncedAt,
     tabs: [
-      { id: "daily_picks", name: "Picks du jour", ok: true },
+      { id: "daily_picks", name: "Daily picks", ok: true },
       { id: "archive", name: "Archives", ok: true },
-      { id: "performance_daily", name: "Performance quotidienne", ok: true },
-      { id: "performance_yearly", name: "Performance annuelle", ok: true },
+      { id: "performance_daily", name: "Daily performance", ok: true },
+      { id: "performance_yearly", name: "Yearly performance", ok: true },
       {
         id: "performance_history",
-        name: "Performance mensuelle/hebdo",
+        name: "Monthly/weekly performance",
         ok: true,
       },
     ],

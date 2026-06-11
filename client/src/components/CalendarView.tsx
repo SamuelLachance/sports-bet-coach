@@ -28,16 +28,16 @@ export function CalendarView({ games, date }: CalendarViewProps) {
     <div className="space-y-6">
       <div className="card">
         <h2 className="font-display text-lg font-semibold mb-1">
-          Calendrier du {date}
+          Schedule for {date}
         </h2>
         <p className="text-sm text-slate-400">
-          {games.length} matchs programmés · Fuseau America/Toronto
+          {games.length} games scheduled · America/Toronto timezone
         </p>
       </div>
 
       {games.length === 0 ? (
         <div className="card text-center py-12 text-slate-400">
-          Aucun match trouvé pour aujourd'hui dans les ligues actives.
+          No games found for today in active leagues.
         </div>
       ) : (
         Object.entries(byLeague).map(([league, leagueGames]) => (
@@ -59,7 +59,7 @@ export function CalendarView({ games, date }: CalendarViewProps) {
 
 function GameCard({ game, league }: { game: CalendarGame; league: string }) {
   const border = LEAGUE_COLORS[league] || "border-surface-border";
-  const time = new Date(game.startTime).toLocaleString("fr-CA", {
+  const time = new Date(game.startTime).toLocaleString("en-US", {
     timeZone: "America/Toronto",
     hour: "2-digit",
     minute: "2-digit",
@@ -67,7 +67,7 @@ function GameCard({ game, league }: { game: CalendarGame; league: string }) {
 
   return (
     <div className={`card border-l-4 ${border}`}>
-      <div className="text-xs text-slate-500 mb-2">{time} HE</div>
+      <div className="text-xs text-slate-500 mb-2">{time} ET</div>
       <div className="font-medium">
         <span className="text-slate-300">{game.awayAbbr || game.awayTeam}</span>
         <span className="text-slate-500 mx-2">@</span>

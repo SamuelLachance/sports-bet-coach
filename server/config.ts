@@ -25,7 +25,7 @@ export interface SheetTabConfig {
 export const SHEET_TABS: SheetTabConfig[] = [
   {
     id: "daily_picks",
-    name: "Picks du jour",
+    name: "Daily picks",
     gid: "0",
     type: "daily_picks",
   },
@@ -37,19 +37,19 @@ export const SHEET_TABS: SheetTabConfig[] = [
   },
   {
     id: "performance_daily",
-    name: "Performance quotidienne",
+    name: "Daily performance",
     gid: "0",
     type: "performance_daily",
   },
   {
     id: "performance_yearly",
-    name: "Performance annuelle",
+    name: "Yearly performance",
     gid: "1887286192",
     type: "performance_yearly",
   },
   {
     id: "performance_history",
-    name: "Performance mensuelle/hebdo",
+    name: "Monthly/weekly performance",
     gid: "1234539794",
     type: "performance_history",
   },
@@ -78,7 +78,7 @@ export const ESPN_LEAGUES: Record<
   CBB: {
     sport: "basketball",
     league: "mens-college-basketball",
-    label: "Basket universitaire",
+    label: "College basketball",
   },
-  CFB: { sport: "football", league: "college-football", label: "Football universitaire" },
+  CFB: { sport: "football", league: "college-football", label: "College football" },
 };

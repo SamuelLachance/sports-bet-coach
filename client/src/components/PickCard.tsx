@@ -14,19 +14,19 @@ const LEAGUE_COLORS: Record<string, string> = {
 };
 
 const STATUS_LABELS = {
-  recommended: { text: "Recommandé", class: "bg-success/20 text-success" },
-  pending: { text: "En attente", class: "bg-warning/20 text-warning" },
-  matched: { text: "En cours", class: "bg-accent/20 text-accent-glow" },
-  settled: { text: "Terminé", class: "bg-slate-500/20 text-slate-300" },
+  recommended: { text: "Recommended", class: "bg-success/20 text-success" },
+  pending: { text: "Pending", class: "bg-warning/20 text-warning" },
+  matched: { text: "In progress", class: "bg-accent/20 text-accent-glow" },
+  settled: { text: "Settled", class: "bg-slate-500/20 text-slate-300" },
 };
 
 const POLARITY_LABELS: Record<
   MatchedRecommendation["signalPolarity"],
   { text: string; class: string }
 > = {
-  positive: { text: "Signal positif", class: "text-success" },
-  negative: { text: "Signal négatif", class: "text-warning" },
-  inverted: { text: "Inversé — jouer l'adversaire", class: "text-accent-glow" },
+  positive: { text: "Positive signal", class: "text-success" },
+  negative: { text: "Negative signal", class: "text-warning" },
+  inverted: { text: "Inverted — bet opponent", class: "text-accent-glow" },
 };
 
 function confidenceColor(c: number) {
@@ -43,8 +43,8 @@ function trendArrow(t?: "up" | "down" | "flat") {
 }
 
 function trendLabel(t?: "up" | "down" | "flat") {
-  if (t === "up") return "amélioration";
-  if (t === "down") return "déclin";
+  if (t === "up") return "improving";
+  if (t === "down") return "declining";
   return "stable";
 }
 
@@ -70,17 +70,17 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
             {polarity.text}
           </span>
           {rec.gameConflict && (
-            <span className="badge bg-warning/20 text-warning">Conflit match</span>
+            <span className="badge bg-warning/20 text-warning">Game conflict</span>
           )}
           {rec.highConviction && (
-            <span className="badge bg-success/20 text-success">Haute conviction</span>
+            <span className="badge bg-success/20 text-success">High conviction</span>
           )}
         </div>
         <div className="text-right">
           <div className={`text-2xl font-bold font-display ${confidenceColor(rec.confidence)}`}>
             {rec.confidence}%
           </div>
-          <div className="text-xs text-slate-500">confiance</div>
+          <div className="text-xs text-slate-500">confidence</div>
         </div>
       </div>
 
@@ -100,10 +100,10 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
       {rec.gameConflict && rec.consolidatedTeam && (
         <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3 text-sm">
           <div className="text-xs text-warning uppercase tracking-wide mb-1">
-            {rec.conflictNote ?? "Conflit — voir recommandation match"}
+            {rec.conflictNote ?? "Conflict — see game recommendation"}
           </div>
           <p className="text-slate-300">
-            Décision match:{" "}
+            Game decision:{" "}
             <span className="font-semibold text-accent-glow">{rec.consolidatedTeam}</span>
             {rec.consolidatedConfidence != null && (
               <span className="text-slate-400"> ({rec.consolidatedConfidence}%)</span>
@@ -111,7 +111,7 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
           </p>
           {rec.standaloneConfidence != null && (
             <p className="text-xs text-slate-500 mt-1">
-              Confiance standalone (avant résolution): {rec.standaloneConfidence}%
+              Standalone confidence (before resolution): {rec.standaloneConfidence}%
             </p>
           )}
         </div>
@@ -120,7 +120,7 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
       {rec.signalPolarity === "inverted" && rec.opponentPick && (
         <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 mb-3">
           <div className="text-xs text-accent-muted uppercase tracking-wide mb-1">
-            Pick inversé recommandé
+            Recommended inverted pick
           </div>
           <div className="flex items-center justify-between gap-2">
             <div className="font-display text-lg font-semibold text-accent-glow">
@@ -131,12 +131,12 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
                 <div className="text-xl font-bold font-display text-success">
                   {rec.opponentConfidence}%
                 </div>
-                <div className="text-xs text-slate-500">confiance inversée</div>
+                <div className="text-xs text-slate-500">inverted confidence</div>
               </div>
             )}
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Ce signal fade perd historiquement — mise sur l&apos;adversaire.
+            This fade signal loses historically — bet the opponent.
           </p>
         </div>
       )}
@@ -147,7 +147,7 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
             {rec.matchedGame.awayTeam} @ {rec.matchedGame.homeTeam}
           </div>
           <div className="text-slate-400 mt-1">
-            {new Date(rec.matchedGame.startTime).toLocaleString("fr-CA", {
+            {new Date(rec.matchedGame.startTime).toLocaleString("en-US", {
               timeZone: "America/Toronto",
               dateStyle: "medium",
               timeStyle: "short",
@@ -166,18 +166,18 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
           </span>
         )}
         {rec.weeklyTrend && (
-          <span title={`Tendance 4 semaines: ${trendLabel(rec.weeklyTrend)}`}>
+          <span title={`4-week trend: ${trendLabel(rec.weeklyTrend)}`}>
             {trendArrow(rec.weeklyTrend)} {trendLabel(rec.weeklyTrend)}
           </span>
         )}
-        {rec.gameTime && <span>Heure: {rec.gameTime}</span>}
-        {rec.postingTime && <span>Publié: {rec.postingTime}</span>}
+        {rec.gameTime && <span>Time: {rec.gameTime}</span>}
+        {rec.postingTime && <span>Posted: {rec.postingTime}</span>}
       </div>
 
       {rec.confidenceBreakdown?.length > 0 && (
         <details className="mb-3 group">
           <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
-            Détail confiance ({rec.confidenceBreakdown.length} facteurs)
+            Confidence breakdown ({rec.confidenceBreakdown.length} factors)
           </summary>
           <ul className="mt-2 space-y-1.5 text-xs">
             {rec.confidenceBreakdown.map((item) => (

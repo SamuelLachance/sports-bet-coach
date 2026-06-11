@@ -8,7 +8,7 @@ export function StatsView({ stats }: StatsViewProps) {
   if (!stats) {
     return (
       <div className="card text-center py-12 text-slate-400">
-        Chargement des statistiques…
+        Loading statistics…
       </div>
     );
   }
@@ -21,10 +21,10 @@ export function StatsView({ stats }: StatsViewProps) {
     <div className="space-y-6">
       {stats.mtd && (
         <div className="grid grid-cols-3 gap-3">
-          <MtdCard label="Victoires MTD" value={stats.mtd.wins} positive />
-          <MtdCard label="Défaites MTD" value={stats.mtd.losses} />
+          <MtdCard label="MTD wins" value={stats.mtd.wins} positive />
+          <MtdCard label="MTD losses" value={stats.mtd.losses} />
           <MtdCard
-            label="Retour MTD (unités)"
+            label="MTD return (units)"
             value={stats.mtd.returnUnits}
             positive={stats.mtd.returnUnits > 0}
             format="decimal"
@@ -40,10 +40,10 @@ export function StatsView({ stats }: StatsViewProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-500 text-left border-b border-surface-border">
-                <th className="pb-2 pr-4">Ligue</th>
-                <th className="pb-2 pr-4">V</th>
-                <th className="pb-2 pr-4">D</th>
-                <th className="pb-2">Retour</th>
+                <th className="pb-2 pr-4">League</th>
+                <th className="pb-2 pr-4">W</th>
+                <th className="pb-2 pr-4">L</th>
+                <th className="pb-2">Return</th>
               </tr>
             </thead>
             <tbody>
@@ -79,15 +79,15 @@ export function StatsView({ stats }: StatsViewProps) {
       {sharpBlock && (
         <section className="card">
           <h3 className="font-display font-semibold text-lg mb-4">
-            Performance annuelle — Sharp Money (aperçu)
+            Yearly performance — Sharp Money (preview)
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-slate-500 text-left">
-                  <th className="pb-2 pr-3">Année</th>
-                  <th className="pb-2 pr-3">Ligue</th>
-                  <th className="pb-2 pr-3">Total année</th>
+                  <th className="pb-2 pr-3">Year</th>
+                  <th className="pb-2 pr-3">League</th>
+                  <th className="pb-2 pr-3">Year total</th>
                   <th className="pb-2">All-time</th>
                 </tr>
               </thead>
@@ -119,7 +119,7 @@ export function StatsView({ stats }: StatsViewProps) {
       )}
 
       <p className="text-xs text-slate-500 text-center">
-        {stats.archiveCount} journées archivées disponibles
+        {stats.archiveCount} archived days available
       </p>
     </div>
   );

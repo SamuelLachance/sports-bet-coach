@@ -18,18 +18,18 @@ export function SettingsView({
     <div className="space-y-6 max-w-2xl">
       <div className="card">
         <h2 className="font-display text-lg font-semibold mb-4">
-          Synchronisation des données
+          Data sync
         </h2>
         {isStaticDeploy && isClientSyncEnabled && (
           <p className="text-sm text-slate-400 mb-4 bg-surface/50 border border-slate-700 rounded-lg p-3">
-            GitHub Pages : donnees initiales du dernier deploiement CI. Utilisez le bouton
-            ci-dessous pour rafraichir en direct depuis Google Sheets et ESPN.
+            GitHub Pages: initial data from the latest CI deployment. Use the button
+            below to refresh live from Google Sheets and ESPN.
           </p>
         )}
         {isStaticDeploy && !isClientSyncEnabled && (
           <p className="text-sm text-slate-400 mb-4 bg-surface/50 border border-slate-700 rounded-lg p-3">
-            Deploiement GitHub Pages : snapshot des donnees au moment du build CI.
-            Lancez l&apos;app en local (<code className="text-accent">npm run dev</code>) pour sync en direct.
+            GitHub Pages deployment: data snapshot from CI build time.
+            Run the app locally (<code className="text-accent">npm run dev</code>) for live sync.
           </p>
         )}
         {error && (
@@ -40,19 +40,19 @@ export function SettingsView({
 
         <dl className="space-y-3 text-sm">
           <Row
-            label="Dernière sync"
+            label="Last sync"
             value={
               syncStatus?.lastSync
-                ? new Date(syncStatus.lastSync).toLocaleString("fr-CA", {
+                ? new Date(syncStatus.lastSync).toLocaleString("en-US", {
                     timeZone: "America/Toronto",
                   })
-                : "Jamais"
+                : "Never"
             }
           />
-          <Row label="Picks chargés" value={String(syncStatus?.pickCount ?? 0)} />
-          <Row label="Matchs du jour" value={String(syncStatus?.gameCount ?? 0)} />
+          <Row label="Picks loaded" value={String(syncStatus?.pickCount ?? 0)} />
+          <Row label="Games today" value={String(syncStatus?.gameCount ?? 0)} />
           <Row
-            label="Ligues"
+            label="Leagues"
             value={syncStatus?.leagues.join(", ") || "—"}
           />
         </dl>
@@ -62,12 +62,12 @@ export function SettingsView({
           disabled={syncing || (isStaticDeploy && !isClientSyncEnabled)}
           className="mt-6 w-full py-3 rounded-lg bg-accent text-surface font-semibold hover:bg-accent-glow disabled:opacity-50 transition-colors"
         >
-          {syncing ? "Synchronisation en cours…" : "Forcer la synchronisation"}
+          {syncing ? "Syncing…" : "Force sync"}
         </button>
       </div>
 
       <div className="card">
-        <h3 className="font-display font-semibold mb-3">Sources Google Sheets</h3>
+        <h3 className="font-display font-semibold mb-3">Google Sheets sources</h3>
         <ul className="space-y-2 text-sm text-slate-400">
           {syncStatus?.tabs.map((tab) => (
             <li key={tab.id} className="flex items-center gap-2">
@@ -81,28 +81,28 @@ export function SettingsView({
             </li>
           )) || (
             <>
-              <li>· Picks du jour (gid=0)</li>
-              <li>· Archives (gid=1883403692)</li>
-              <li>· Performance quotidienne (gid=0)</li>
-              <li>· Performance annuelle (gid=1887286192)</li>
+              <li>· Daily picks (gid=0)</li>
+              <li>· Archive (gid=1883403692)</li>
+              <li>· Daily performance (gid=0)</li>
+              <li>· Yearly performance (gid=1887286192)</li>
             </>
           )}
         </ul>
       </div>
 
       <div className="card">
-        <h3 className="font-display font-semibold mb-3">APIs calendrier</h3>
+        <h3 className="font-display font-semibold mb-3">Schedule APIs</h3>
         <p className="text-sm text-slate-400 leading-relaxed">
-          Calendriers via ESPN (MLB, NBA, NHL, NFL, WNBA, CBB, CFB). Aucune clé
-          API requise. Fuseau horaire: America/Toronto (Québec).
+          Schedules via ESPN (MLB, NBA, NHL, NFL, WNBA, CBB, CFB). No API
+          key required. Timezone: America/Toronto (Eastern).
         </p>
       </div>
 
       <div className="card">
-        <h3 className="font-display font-semibold mb-3">Variables d'environnement</h3>
+        <h3 className="font-display font-semibold mb-3">Environment variables</h3>
         <pre className="text-xs bg-surface-raised p-3 rounded-lg text-slate-400 overflow-x-auto">
-{`PORT=3001          # Port API backend
-TZ=America/Toronto # Fuseau horaire`}
+{`PORT=3001          # Backend API port
+TZ=America/Toronto # Timezone`}
         </pre>
       </div>
     </div>

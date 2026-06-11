@@ -361,11 +361,11 @@ export function buildDualFadeHistoricalSample(
 
 export function formatHistoricalSampleLabel(sample: DualFadeHistoricalSample): string {
   const parts: string[] = [];
-  if (sample.weeks > 0) parts.push(`${sample.weeks} semaines`);
-  if (sample.months > 0) parts.push(`${sample.months} mois`);
+  if (sample.weeks > 0) parts.push(`${sample.weeks} weeks`);
+  if (sample.months > 0) parts.push(`${sample.months} months`);
   if (sample.totalPicksTracked > 0) parts.push(`${sample.totalPicksTracked} picks`);
-  if (parts.length === 0) return "historique limité";
-  return `Basé sur ${parts.join(" / ")} d'historique`;
+  if (parts.length === 0) return "limited history";
+  return `Based on ${parts.join(" / ")} of history`;
 }
 
 function buildLeagueStats(
@@ -455,8 +455,8 @@ function deriveArchiveTrend(
   const sampleLabel = formatHistoricalSampleLabel(historicalSample);
   const rule =
     preferred === "book_needs_fade"
-      ? `Dual-fade: inverser Book Needs (ROI ${tracker.bookNeedsAllTimeRoi.toFixed(0)}u vs Square ${tracker.squareAllTimeRoi.toFixed(0)}u) — ${sampleLabel}`
-      : `Dual-fade: inverser Square (ROI ${tracker.squareAllTimeRoi.toFixed(0)}u vs Book ${tracker.bookNeedsAllTimeRoi.toFixed(0)}u) — ${sampleLabel}`;
+      ? `Dual-fade: invert Book Needs (ROI ${tracker.bookNeedsAllTimeRoi.toFixed(0)}u vs Square ${tracker.squareAllTimeRoi.toFixed(0)}u) — ${sampleLabel}`
+      : `Dual-fade: invert Square (ROI ${tracker.squareAllTimeRoi.toFixed(0)}u vs Book ${tracker.bookNeedsAllTimeRoi.toFixed(0)}u) — ${sampleLabel}`;
 
   return {
     bookInverseWinRate,
@@ -527,8 +527,8 @@ export function buildDualFadeStats(
       ...partial.archiveTrend,
       resolutionRule:
         df.preferredInverse === "book_needs_fade"
-          ? `Dual-fade: Book 4sem ${df.bookNeedsLast4Weeks.toFixed(1)}u (${df.bookNeedsWeeklyTrend}) vs Square ${df.squareLast4Weeks.toFixed(1)}u (${df.squareWeeklyTrend}) → inverser Book Needs — ${sampleLabel}`
-          : `Dual-fade: Square 4sem ${df.squareLast4Weeks.toFixed(1)}u (${df.squareWeeklyTrend}) vs Book ${df.bookNeedsLast4Weeks.toFixed(1)}u → inverser Square — ${sampleLabel}`,
+          ? `Dual-fade: Book 4wk ${df.bookNeedsLast4Weeks.toFixed(1)}u (${df.bookNeedsWeeklyTrend}) vs Square ${df.squareLast4Weeks.toFixed(1)}u (${df.squareWeeklyTrend}) → invert Book Needs — ${sampleLabel}`
+          : `Dual-fade: Square 4wk ${df.squareLast4Weeks.toFixed(1)}u (${df.squareWeeklyTrend}) vs Book ${df.bookNeedsLast4Weeks.toFixed(1)}u → invert Square — ${sampleLabel}`,
       sampleSize: historicalSample.totalDataPoints,
     };
     if (df.bookNeedsWeeklyTrend === "up" && df.preferredInverse === "book_needs_fade") {
@@ -640,14 +640,14 @@ export function resolveDualFadeMatch(
       : bookFadeTeam;
 
     const reasoning =
-      `Book Needs liste ${bookFadeTeam} (→ ${bookNeedsInverse}) et Square Top liste ${squareFadeTeam} (→ ${squareInverse}). ` +
-      `Les deux équipes apparaissent sur des côtés opposés — signaux contradictoires, pas de pari.`;
+      `Book Needs lists ${bookFadeTeam} (→ ${bookNeedsInverse}) and Square Top lists ${squareFadeTeam} (→ ${squareInverse}). ` +
+      `Both teams appear on opposite sides — conflicting signals, no bet.`;
 
     breakdown.push({
       key: "dual_fade_no_bet",
-      label: "Dual-fade opposé",
+      label: "Opposing dual-fade",
       value: 0,
-      detail: `${bookFadeTeam} vs ${squareFadeTeam} — annulation`,
+      detail: `${bookFadeTeam} vs ${squareFadeTeam} — cancelled`,
     });
 
     return {
@@ -685,7 +685,7 @@ export function resolveDualFadeMatch(
       recommendedSide: `(fade) ${fadeTeam}`,
       recommendedSideNorm: normalizeTeam(fadeTeam),
       confidence: 28,
-      reasoning: `Fade ${fadeTeam} seul — adversaire non identifié sur la feuille (confiance faible, fade-only).`,
+      reasoning: `Fade ${fadeTeam} alone — opponent not identified on sheet (low confidence, fade-only).`,
       strongerFadeColumn: column,
       bookNeedsFadeTeam: column === "book_needs_fade" ? fadeTeam : "",
       squareFadeTeam: column === "square_fade" ? fadeTeam : "",
@@ -695,7 +695,7 @@ export function resolveDualFadeMatch(
       breakdown: [
         {
           key: "standalone_no_opp",
-          label: "Fade sans VS",
+          label: "Fade without matchup",
           value: 0,
           detail: categoryForSignal(column),
         },
@@ -717,8 +717,8 @@ export function resolveDualFadeMatch(
     recommendedSideNorm: normalizeTeam(inverse),
     confidence,
     reasoning:
-      `Fade ${fadeTeam} (${column === "book_needs_fade" ? "Book Needs" : "Square Top"}) → jouer ${inverse}. ` +
-      `ROI fade ${roi.toFixed(0)}u · inverse historique ~${Math.round(archiveWinRate * 100)}%.`,
+      `Fade ${fadeTeam} (${column === "book_needs_fade" ? "Book Needs" : "Square Top"}) → bet ${inverse}. ` +
+      `Fade ROI ${roi.toFixed(0)}u · historical inverse ~${Math.round(archiveWinRate * 100)}%.`,
     strongerFadeColumn: column,
     bookNeedsFadeTeam: column === "book_needs_fade" ? fadeTeam : "",
     squareFadeTeam: column === "square_fade" ? fadeTeam : "",
@@ -728,7 +728,7 @@ export function resolveDualFadeMatch(
     breakdown: [
       {
         key: "standalone_fade",
-        label: "Fade inversé",
+        label: "Inverted fade",
         value: roi,
         detail: `${fadeTeam} → ${inverse}`,
       },

@@ -17,7 +17,7 @@ function resolveUrl(pathWithQuery: string): string {
   const [path, query = ""] = pathWithQuery.split("?");
   if (STATIC_API && !getClientSnapshot()) {
     const file = STATIC_ROUTES[path];
-    if (!file) throw new Error(`Endpoint statique inconnu: ${path}`);
+    if (!file) throw new Error(`Unknown static endpoint: ${path}`);
     return `${BASE}api/${file}${query ? `?${query}` : ""}`;
   }
   return `/api${pathWithQuery}`;
@@ -25,7 +25,7 @@ function resolveUrl(pathWithQuery: string): string {
 
 function snapshotRecData(league?: string) {
   const snap = getClientSnapshot();
-  if (!snap) throw new Error("Aucune donnée synchronisée");
+  if (!snap) throw new Error("No synced data available");
   let recommendations = snap.recommendations;
   if (league && league !== "ALL") {
     recommendations = recommendations.filter((r) => r.league === league);
@@ -46,7 +46,7 @@ export async function fetchRecommendations(league?: string) {
   }
   const params = league && league !== "ALL" ? `?league=${league}` : "";
   const res = await fetch(resolveUrl(`/recommendations${params}`));
-  if (!res.ok) throw new Error("Impossible de charger les recommandations");
+  if (!res.ok) throw new Error("Failed to load recommendations");
   const data = (await res.json()) as {
     date: string;
     timezone: string;
@@ -75,7 +75,7 @@ export async function fetchCalendar(date?: string) {
   }
   const params = date ? `?date=${date}` : "";
   const res = await fetch(resolveUrl(`/calendar${params}`));
-  if (!res.ok) throw new Error("Impossible de charger le calendrier");
+  if (!res.ok) throw new Error("Failed to load calendar");
   return res.json();
 }
 
@@ -84,7 +84,7 @@ export async function fetchStats() {
     return getClientSnapshot()!.stats;
   }
   const res = await fetch(resolveUrl("/stats"));
-  if (!res.ok) throw new Error("Impossible de charger les statistiques");
+  if (!res.ok) throw new Error("Failed to load statistics");
   return res.json() as Promise<StatsResponse>;
 }
 
@@ -93,7 +93,7 @@ export async function fetchSyncStatus() {
     return getClientSnapshot()!.syncStatus;
   }
   const res = await fetch(resolveUrl("/sync/status"));
-  if (!res.ok) throw new Error("Impossible de charger le statut");
+  if (!res.ok) throw new Error("Failed to load sync status");
   return res.json() as Promise<SyncStatus>;
 }
 
@@ -105,7 +105,7 @@ export async function triggerSync() {
     return { ok: true, status: snapshot.syncStatus };
   }
   const res = await fetch("/api/sync", { method: "POST" });
-  if (!res.ok) throw new Error("Échec de la synchronisation");
+  if (!res.ok) throw new Error("Sync failed");
   return res.json();
 }
 

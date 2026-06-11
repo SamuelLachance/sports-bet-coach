@@ -52,7 +52,7 @@ function App() {
       setStats(statsData);
       setSyncStatus(statusData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur de chargement");
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ function App() {
       await triggerSync();
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Échec sync");
+      setError(err instanceof Error ? err.message : "Sync failed");
     } finally {
       setSyncing(false);
     }
@@ -82,7 +82,7 @@ function App() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400">Chargement des recommandations…</p>
+          <p className="text-slate-400">Loading recommendations…</p>
         </div>
       </div>
     );
@@ -99,7 +99,7 @@ function App() {
       {error && tab !== "settings" && (
         <div className="bg-danger/10 border border-danger/30 text-danger rounded-lg p-3 mb-4 text-sm">
           {error}
-          {!isStaticDeploy && " — Vérifiez que le serveur API tourne sur le port 3001."}
+          {!isStaticDeploy && " — Make sure the API server is running on port 3001."}
         </div>
       )}
 

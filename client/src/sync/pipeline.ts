@@ -27,7 +27,7 @@ async function fetchTabCsv(tab: SheetTabConfig): Promise<string> {
   const url = getSheetCsvUrl(tab);
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Échec fetch ${tab.name} (${res.status})`);
+    throw new Error(`Fetch failed for ${tab.name} (${res.status})`);
   }
   return res.text();
 }

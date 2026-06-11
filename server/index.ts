@@ -52,11 +52,11 @@ app.post("/api/sync", async (_req, res) => {
     lastSyncStatus = {
       lastSync: sheets.syncedAt,
       tabs: [
-        { id: "daily_picks", name: "Picks du jour", ok: true },
+        { id: "daily_picks", name: "Daily picks", ok: true },
         { id: "archive", name: "Archives", ok: true },
-        { id: "performance_daily", name: "Performance quotidienne", ok: true },
-        { id: "performance_yearly", name: "Performance annuelle", ok: true },
-        { id: "performance_history", name: "Performance mensuelle/hebdo", ok: true },
+        { id: "performance_daily", name: "Daily performance", ok: true },
+        { id: "performance_yearly", name: "Yearly performance", ok: true },
+        { id: "performance_history", name: "Monthly/weekly performance", ok: true },
       ],
       leagues,
       pickCount: sheets.dailyPicks.length,
@@ -65,7 +65,7 @@ app.post("/api/sync", async (_req, res) => {
 
     res.json({ ok: true, status: lastSyncStatus, sheets });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
+    const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ ok: false, error: message });
   }
 });
@@ -75,7 +75,7 @@ app.get("/api/sheets", async (_req, res) => {
     const sheets = await getSheets();
     res.json(sheets);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
+    const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 });
@@ -88,7 +88,7 @@ app.get("/api/calendar", async (req, res) => {
     const games = await fetchAllSchedules(leagues, date);
     res.json({ date, timezone: TIMEZONE, games });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
+    const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 });
@@ -118,7 +118,7 @@ app.get("/api/recommendations", async (req, res) => {
       games,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
+    const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 });
@@ -133,7 +133,7 @@ app.get("/api/stats", async (_req, res) => {
       archiveCount: sheets.archive.length,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur inconnue";
+    const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 });
@@ -146,11 +146,11 @@ async function bootstrap() {
     lastSyncStatus = {
       lastSync: sheets.syncedAt,
       tabs: [
-        { id: "daily_picks", name: "Picks du jour", ok: true },
+        { id: "daily_picks", name: "Daily picks", ok: true },
         { id: "archive", name: "Archives", ok: true },
-        { id: "performance_daily", name: "Performance quotidienne", ok: true },
-        { id: "performance_yearly", name: "Performance annuelle", ok: true },
-        { id: "performance_history", name: "Performance mensuelle/hebdo", ok: true },
+        { id: "performance_daily", name: "Daily performance", ok: true },
+        { id: "performance_yearly", name: "Yearly performance", ok: true },
+        { id: "performance_history", name: "Monthly/weekly performance", ok: true },
       ],
       leagues,
       pickCount: sheets.dailyPicks.length,

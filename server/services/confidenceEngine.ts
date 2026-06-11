@@ -201,7 +201,7 @@ function findCrossSignalAdjustments(
         notes.push(`${rule.label} (${rule.boost >= 0 ? "+" : ""}${rule.boost})`);
       } else if (rule.sameSide) {
         delta -= Math.abs(rule.boost) * 0.5;
-        notes.push(`Conflit ${rule.label}`);
+        notes.push(`Conflict ${rule.label}`);
       }
     }
 
@@ -216,7 +216,7 @@ function findCrossSignalAdjustments(
         other.signalType === "mega_sharps";
       if (bothPositive) {
         delta += 8;
-        notes.push("Confluence sharps (+8)");
+        notes.push("Sharp confluence (+8)");
       }
     }
   }
@@ -324,10 +324,10 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
 
   breakdown.push({
     key: "signal_roi",
-    label: `ROI historique ${SIGNAL_LABELS[pick.signalType]}`,
+    label: `Historical ROI ${SIGNAL_LABELS[pick.signalType]}`,
     value: Math.round(signalStats.blendedRoi * 10) / 10,
     impact: Math.round((confidence - 50) * 10) / 10,
-    detail: `${signalStats.wins}V-${signalStats.losses}D · ${Math.round(bayesianWr * 100)}% (Bayesian)`,
+    detail: `${signalStats.wins}W-${signalStats.losses}L · ${Math.round(bayesianWr * 100)}% (Bayesian)`,
   });
 
   if (fullHistory && pickStats) {
@@ -339,10 +339,10 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
         : fullHistory.signals[pick.signalType].bayesianWinRate;
     breakdown.push({
       key: "full_history",
-      label: `Base multi-couches ${league}`,
+      label: `Multi-layer base ${league}`,
       value: Math.round(histRoi * 10) / 10,
       impact: Math.round(kellyToConfidence(kelly, histWr) - confidence),
-      detail: `All-time ${Math.round(("allTimeRoi" in pickStats ? pickStats.allTimeRoi : histRoi) * 10) / 10}u · 4 sem. ${Math.round(("last4Weeks" in pickStats ? pickStats.last4Weeks.returnUnits : fullHistory.signals[pick.signalType].last4WeeksRoi) * 10) / 10}u`,
+      detail: `All-time ${Math.round(("allTimeRoi" in pickStats ? pickStats.allTimeRoi : histRoi) * 10) / 10}u · 4 wk ${Math.round(("last4Weeks" in pickStats ? pickStats.last4Weeks.returnUnits : fullHistory.signals[pick.signalType].last4WeeksRoi) * 10) / 10}u`,
     });
   }
 
@@ -365,10 +365,10 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
         fullHistory.signals[pick.signalType].weeklyTrend;
       breakdown.push({
         key: "temporal",
-        label: "Tendance 4 semaines",
+        label: "4-week trend",
         value: temporal,
         impact: temporal,
-        detail: trend === "up" ? "↑ amélioration" : trend === "down" ? "↓ déclin" : "→ stable",
+        detail: trend === "up" ? "↑ improving" : trend === "down" ? "↓ declining" : "→ stable",
       });
     }
 
@@ -377,7 +377,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
       confidence += toxic;
       breakdown.push({
         key: "toxic_combo",
-        label: "Combo historiquement toxique",
+        label: "Historically toxic combo",
         value: toxic,
         impact: toxic,
       });
@@ -388,7 +388,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
       confidence += profitBoost;
       breakdown.push({
         key: "profitable_combo",
-        label: "Combo profitable",
+        label: "Profitable combo",
         value: profitBoost,
         impact: profitBoost,
       });
@@ -400,7 +400,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
     confidence += recencyBoost;
     breakdown.push({
       key: "recency",
-      label: "Poids récent (6 mois)",
+      label: "Recent weight (6 months)",
       value: Math.round(signalStats.recentReturn * 10) / 10,
       impact: Math.round(recencyBoost * 10) / 10,
     });
@@ -411,7 +411,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
     confidence += cross.delta;
     breakdown.push({
       key: "cross_signal",
-      label: "Croisement signaux (slate)",
+      label: "Cross-signal (slate)",
       value: cross.delta,
       impact: cross.delta,
       detail: cross.notes.join(" · ") || undefined,
@@ -422,7 +422,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
     confidence += 5;
     breakdown.push({
       key: "match_quality",
-      label: "Match ESPN confirmé",
+      label: "ESPN game confirmed",
       value: 1,
       impact: 5,
     });
@@ -431,7 +431,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
   let signalPolarity: SignalPolarity = signalStats.blendedRoi >= 0 ? "positive" : "negative";
   let opponentPick: string | undefined;
   let opponentConfidence: number | undefined;
-  let edgeLabel = signalStats.blendedRoi >= 0 ? "Signal profitable" : "Signal faible";
+  let edgeLabel = signalStats.blendedRoi >= 0 ? "Profitable signal" : "Weak signal";
 
   // Rule: Book Needs / Square Top list the public side → always bet the opponent
   if (FADE_SIGNALS.has(pick.signalType)) {
@@ -443,38 +443,38 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
       confidence = opponentConfidence;
       edgeLabel =
         pick.signalType === "book_needs_fade"
-          ? "Book Needs → jouer l'adversaire"
-          : "Square Top → jouer l'adversaire";
+          ? "Book Needs → bet opponent"
+          : "Square Top → bet opponent";
       breakdown.push({
         key: "fade_inverse",
-        label: "Règle fade",
+        label: "Fade rule",
         value: 1,
         impact: opponentConfidence - 50,
-        detail: `${displayTeamName(pick.pick)} listé → jouer ${displayTeamName(opponentPick)}`,
+        detail: `${displayTeamName(pick.pick)} listed → bet ${displayTeamName(opponentPick)}`,
       });
     } else {
       signalPolarity = "negative";
       confidence = Math.round(clamp(confidence, 18, 38));
-      edgeLabel = "Fade sans adversaire identifié";
+      edgeLabel = "Fade with no opponent identified";
       breakdown.push({
         key: "fade_no_opponent",
-        label: "Fade incomplet",
+        label: "Incomplete fade",
         value: 0,
         impact: -12,
-        detail: "Adversaire non trouvé sur la feuille",
+        detail: "Opponent not found on sheet",
       });
     }
   } else if (SHARP_BET_SIGNALS.has(pick.signalType)) {
     // Rule: Sharp Money → always bet the listed team
     signalPolarity = "positive";
     confidence = Math.round(clamp(Math.max(confidence, 80), 78, 95));
-    edgeLabel = "Sharp Money — jouer cette équipe";
+    edgeLabel = "Sharp Money — bet this team";
     breakdown.push({
       key: "sharp_follow",
-      label: "Règle Sharp Money",
+      label: "Sharp Money rule",
       value: 1,
       impact: confidence - 50,
-      detail: `Jouer ${displayTeamName(pick.pick)}`,
+      detail: `Bet ${displayTeamName(pick.pick)}`,
     });
   } else {
     const inverted = shouldInvert(stats, pick.signalType);
@@ -487,20 +487,20 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
       const invertBoost = clamp(70 - signalStats.blendedRoi / 15, 65, 92);
       breakdown.push({
         key: "inversion",
-        label: "Inversion fade (ROI ultra-négatif)",
+        label: "Fade inversion (ultra-negative ROI)",
         value: signalStats.allTimeReturn,
         impact: fadeConfidence - confidence,
         detail: opponentPick
-          ? `Jouer ${opponentPick} au lieu de fade`
-          : "Fade historiquement perdant — inverser",
+          ? `Bet ${opponentPick} instead of fade`
+          : "Historically losing fade — invert",
       });
       confidence = fadeConfidence;
-      edgeLabel = "Fade à éviter — jouer l'adversaire";
+      edgeLabel = "Fade to avoid — bet opponent";
       if (opponentPick) {
         opponentConfidence = Math.round(invertBoost);
         breakdown.push({
           key: "opponent_boost",
-          label: `Pick inversé: ${opponentPick}`,
+          label: `Inverted pick: ${opponentPick}`,
           value: invertBoost,
           impact: invertBoost - confidence,
         });
@@ -510,13 +510,13 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
       confidence = clamp(confidence - 15, 15, 45);
       breakdown.push({
         key: "ultra_negative",
-        label: "Signal ultra-négatif",
+        label: "Ultra-negative signal",
         value: signalStats.allTimeReturn,
         impact: -15,
       });
-      edgeLabel = "Signal historiquement perdant";
+      edgeLabel = "Historically losing signal";
     } else if (signalStats.blendedRoi > 20) {
-      edgeLabel = "Argent intelligent";
+      edgeLabel = "Smart money";
     }
   }
 
@@ -537,10 +537,10 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
   if (highConviction && !FADE_SIGNALS.has(pick.signalType)) {
     breakdown.push({
       key: "high_conviction",
-      label: "Haute conviction",
+      label: "High conviction",
       value: 1,
       impact: 6,
-      detail: "Tendance hebdo + all-time alignés",
+      detail: "Weekly trend + all-time aligned",
     });
     confidence = Math.round(clamp(confidence + 6, 0, 100));
   }
@@ -551,7 +551,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
     opponentPick: signalPolarity === "inverted" ? opponentPick : undefined,
     opponentConfidence: signalPolarity === "inverted" ? opponentConfidence : undefined,
     signalPolarity,
-    edgeLabel: highConviction ? `${edgeLabel} · Haute conviction` : edgeLabel,
+    edgeLabel: highConviction ? `${edgeLabel} · High conviction` : edgeLabel,
     historicalWinRate,
     historicalRoi,
     weeklyTrend,
@@ -728,7 +728,7 @@ function contributionForRec(
 
   if (!FADE_SIGNALS.has(rec.signalType) && fadeTargets.has(team.teamNorm)) {
     edge = -rec.confidence * 0.9 * weight;
-    note = `${SIGNAL_LABELS[rec.signalType]} sur cible fade ${team.teamDisplay} (${Math.round(edge)})`;
+    note = `${SIGNAL_LABELS[rec.signalType]} on fade target ${team.teamDisplay} (${Math.round(edge)})`;
   } else if (rec.signalPolarity === "inverted") {
     const boost = rec.opponentConfidence ?? invertBoostForSignal(stats, rec.signalType);
     edge = boost * weight;
@@ -738,7 +738,7 @@ function contributionForRec(
     note = `${SIGNAL_LABELS[rec.signalType]} → ${team.teamDisplay} (+${Math.round(edge)})`;
   } else {
     edge = rec.confidence * 0.2 * weight;
-    note = `${SIGNAL_LABELS[rec.signalType]} (faible) → ${team.teamDisplay}`;
+    note = `${SIGNAL_LABELS[rec.signalType]} (weak) → ${team.teamDisplay}`;
   }
 
   return {
@@ -765,7 +765,7 @@ function applyGameCrossSignalRules(
   const teamsSupported = new Set(contributions.map((c) => c.teamNorm));
 
   if (hasBook && hasSquare && teamsSupported.size > 1) {
-    notes.push("Book Needs + Square Top sur côtés opposés — pas de pari");
+    notes.push("Book Needs + Square Top on opposite sides — no bet");
     dampenConfidence = true;
   }
 
@@ -776,15 +776,15 @@ function applyGameCrossSignalRules(
   for (const sharp of sharps) {
     if (fadeTargets.has(sharp.teamNorm)) {
       edgeDelta.set(sharp.teamNorm, (edgeDelta.get(sharp.teamNorm) ?? 0) - 40);
-      notes.push(`Sharp sur cible fade ${sharp.teamDisplay} — signal ignoré`);
+      notes.push(`Sharp on fade target ${sharp.teamDisplay} — signal ignored`);
       continue;
     }
     for (const fade of fades) {
       if (sharp.teamNorm === fade.teamNorm) {
         edgeDelta.set(sharp.teamNorm, (edgeDelta.get(sharp.teamNorm) ?? 0) + 12);
-        notes.push(`Confluence sharp+fade → ${sharp.teamDisplay} (+12)`);
+        notes.push(`Sharp+fade confluence → ${sharp.teamDisplay} (+12)`);
       } else {
-        notes.push(`Sharp vs fade opposés (${sharp.teamDisplay} vs ${fade.teamDisplay})`);
+        notes.push(`Sharp vs opposing fade (${sharp.teamDisplay} vs ${fade.teamDisplay})`);
       }
     }
   }
@@ -799,7 +799,7 @@ function applyFadeTargetPenalties(
   for (const [norm, display] of fadeTargets) {
     const existing = teamEdges.get(norm) ?? { edge: 0, display, notes: [] };
     existing.edge -= FADE_TARGET_EDGE_PENALTY;
-    existing.notes.push(`${display} listé en fade — EV négatif`);
+    existing.notes.push(`${display} listed as fade — negative EV`);
     teamEdges.set(norm, existing);
   }
 }
@@ -857,8 +857,8 @@ function matchupLabels(
   }
   const list = [...teams].slice(0, 2);
   return {
-    awayTeam: list[0] ?? "Équipe A",
-    homeTeam: list[1] ?? "Équipe B",
+    awayTeam: list[0] ?? "Team A",
+    homeTeam: list[1] ?? "Team B",
   };
 }
 
@@ -961,7 +961,7 @@ function buildOpposingDualFadeNoBet(
     confidenceBreakdown: [
       {
         key: "no_bet_dual_fade",
-        label: "Pas de pari",
+        label: "No bet",
         value: 0,
         impact: 0,
         detail: noBetReason,
@@ -969,7 +969,7 @@ function buildOpposingDualFadeNoBet(
     ],
     hasConflict: true,
     pickIds: recs.map((r) => r.id),
-    reasoning: `Match: ${awayTeam} @ ${homeTeam} · ${noBetReason}`,
+    reasoning: `Game: ${awayTeam} @ ${homeTeam} · ${noBetReason}`,
     matchedGame,
     dualFade: {
       isDualFade: true,
@@ -983,10 +983,10 @@ function buildOpposingDualFadeNoBet(
     ...rec,
     gameKey,
     gameConflict: true,
-    conflictNote: "Dual-fade opposé — pas de pari",
+    conflictNote: "Opposing dual-fade — no bet",
     consolidatedTeam: undefined,
     consolidatedConfidence: 0,
-    edgeLabel: "Pas de pari — signaux contradictoires",
+    edgeLabel: "No bet — conflicting signals",
   }));
 
   return { consolidated, updatedRecs };
@@ -1124,7 +1124,7 @@ function resolveSingleGame(
 
   if (matchedGame && !validateRecommendedTeam(winnerDisplay, matchedGame)) {
     const { awayTeam, homeTeam } = matchupLabels(recs);
-    const noBetReason = `${winnerDisplay} ne fait pas partie de ${awayTeam} @ ${homeTeam}`;
+    const noBetReason = `${winnerDisplay} is not part of ${awayTeam} @ ${homeTeam}`;
     const consolidated: GameConsolidatedRecommendation = {
       gameKey,
       league: recs[0].league,
@@ -1137,7 +1137,7 @@ function resolveSingleGame(
       confidenceBreakdown: [
         {
           key: "invalid_team",
-          label: "Équipe invalide pour ce match",
+          label: "Invalid team for this game",
           value: 0,
           impact: 0,
           detail: noBetReason,
@@ -1145,7 +1145,7 @@ function resolveSingleGame(
       ],
       hasConflict: true,
       pickIds: recs.map((r) => r.id),
-      reasoning: `Match: ${awayTeam} @ ${homeTeam} · ${noBetReason}`,
+      reasoning: `Game: ${awayTeam} @ ${homeTeam} · ${noBetReason}`,
       matchedGame,
     };
 
@@ -1153,10 +1153,10 @@ function resolveSingleGame(
       ...rec,
       gameKey,
       gameConflict: true,
-      conflictNote: "Équipe hors match — pas de pari",
+      conflictNote: "Team not in game — no bet",
       consolidatedTeam: undefined,
       consolidatedConfidence: 0,
-      edgeLabel: "Pas de pari — équipe invalide",
+      edgeLabel: "No bet — invalid team",
     }));
 
     return { consolidated, updatedRecs };
@@ -1166,7 +1166,7 @@ function resolveSingleGame(
   const breakdown: ConfidenceBreakdownItem[] = [
     {
       key: "game_net_edge",
-      label: dualFadeInfo?.isDualFade ? "Résolution dual-fade" : `Edge net — ${winnerDisplay}`,
+      label: dualFadeInfo?.isDualFade ? "Dual-fade resolution" : `Net edge — ${winnerDisplay}`,
       value: Math.round(winnerEdge * 10) / 10,
       impact: confidence - 50,
       detail: sorted.map(([t, v]) => `${v.display}: ${Math.round(v.edge)}`).join(" · "),
@@ -1176,7 +1176,7 @@ function resolveSingleGame(
   if (dualFadeInfo?.isDualFade) {
     breakdown.push({
       key: "dual_fade_dynamic",
-      label: "Dynamique dual-fade",
+      label: "Dual-fade dynamic",
       value: dualFadeInfo.archiveWinRate ?? 0,
       impact: confidence - 55,
       detail: dualFadeReasoning,
@@ -1186,7 +1186,7 @@ function resolveSingleGame(
   if (cross.notes.length > 0) {
     breakdown.push({
       key: "game_cross_signal",
-      label: "Règles croisées (match)",
+      label: "Cross rules (game)",
       value: cross.notes.length,
       impact: 0,
       detail: cross.notes.join(" · "),
@@ -1204,11 +1204,11 @@ function resolveSingleGame(
   }
 
   const reasoningParts = [
-    `Match: ${awayTeam} @ ${homeTeam}`,
-    `Recommandation: ${winnerDisplay} (${confidence}%)`,
+    `Game: ${awayTeam} @ ${homeTeam}`,
+    `Recommendation: ${winnerDisplay} (${confidence}%)`,
     ...(dualFadeReasoning ? [dualFadeReasoning] : []),
     ...contributions.map((c) => c.note),
-    ...(cross.notes.length ? [`Règles: ${cross.notes.join("; ")}`] : []),
+    ...(cross.notes.length ? [`Rules: ${cross.notes.join("; ")}`] : []),
   ];
 
   const consolidated: GameConsolidatedRecommendation = {
@@ -1255,8 +1255,8 @@ function resolveSingleGame(
       gameKey,
       gameConflict: true,
       conflictNote: dualFadeInfo?.isDualFade
-        ? "Dual-fade résolu — voir recommandation match"
-        : "Conflit — voir recommandation match",
+        ? "Dual-fade resolved — see game recommendation"
+        : "Conflict — see game recommendation",
       standaloneConfidence: standalone,
       consolidatedTeam: winnerDisplay,
       consolidatedConfidence: confidence,
@@ -1266,8 +1266,8 @@ function resolveSingleGame(
           ? Math.min(rec.opponentConfidence, alignsWithWinner ? 42 : 35)
           : rec.opponentConfidence,
       edgeLabel: dualFadeInfo?.isDualFade
-        ? "Dual-fade résolu"
-        : "Conflit — voir recommandation match",
+        ? "Dual-fade resolved"
+        : "Conflict — see game recommendation",
     };
   });
 

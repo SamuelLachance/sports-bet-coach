@@ -54,7 +54,7 @@ import {
 
 } from "../services/confidenceEngine.js";
 
-import { SIGNAL_LABELS_FR } from "../services/signalMapping.js";
+import { SIGNAL_LABELS } from "../services/signalMapping.js";
 
 import type { ParsedSheets, SheetPick } from "../types.js";
 
@@ -290,7 +290,7 @@ async function main() {
 
       console.log(
 
-        `  ${SIGNAL_LABELS_FR[c.signalType].padEnd(22)} × ${c.league.padEnd(4)} ROI ${c.blendedRoi.toFixed(1).padStart(7)}u  WR ${Math.round(c.winRate * 100)}%  n=${c.sampleSize}`
+        `  ${SIGNAL_LABELS[c.signalType].padEnd(22)} × ${c.league.padEnd(4)} ROI ${c.blendedRoi.toFixed(1).padStart(7)}u  WR ${Math.round(c.winRate * 100)}%  n=${c.sampleSize}`
 
       );
 
@@ -302,7 +302,7 @@ async function main() {
 
       console.log(
 
-        `  ${SIGNAL_LABELS_FR[c.signalType].padEnd(22)} × ${c.league.padEnd(4)} ROI ${c.blendedRoi.toFixed(1).padStart(7)}u`
+        `  ${SIGNAL_LABELS[c.signalType].padEnd(22)} × ${c.league.padEnd(4)} ROI ${c.blendedRoi.toFixed(1).padStart(7)}u`
 
       );
 
@@ -314,7 +314,7 @@ async function main() {
 
       if (s.profitableAsInverse) {
 
-        console.log(`  ${SIGNAL_LABELS_FR[s.signalType]}: all-time ${s.allTimeRoi.toFixed(0)}u → jouer l'inverse`);
+        console.log(`  ${SIGNAL_LABELS[s.signalType]}: all-time ${s.allTimeRoi.toFixed(0)}u → jouer l'inverse`);
 
       }
 
@@ -364,7 +364,7 @@ async function main() {
 
     console.log(
 
-      `${SIGNAL_LABELS_FR[s.signalType].padEnd(22)} all-time: ${s.allTimeReturn.toFixed(1).padStart(8)}u  blended: ${s.blendedRoi.toFixed(1).padStart(8)}u  W/L: ${s.wins}/${s.losses}`
+      `${SIGNAL_LABELS[s.signalType].padEnd(22)} all-time: ${s.allTimeReturn.toFixed(1).padStart(8)}u  blended: ${s.blendedRoi.toFixed(1).padStart(8)}u  W/L: ${s.wins}/${s.losses}`
 
     );
 
@@ -424,7 +424,7 @@ async function main() {
 
     console.log(
 
-      `  ${pick.league.padEnd(4)} ${SIGNAL_LABELS_FR[pick.signalType].padEnd(20)} ${pick.pick.slice(0, 25).padEnd(25)} ${result.confidence}% → ${enhanced.confidence}% (${delta >= 0 ? "+" : ""}${delta})${trend}${enhanced.highConviction ? " ★" : ""}`
+      `  ${pick.league.padEnd(4)} ${SIGNAL_LABELS[pick.signalType].padEnd(20)} ${pick.pick.slice(0, 25).padEnd(25)} ${result.confidence}% → ${enhanced.confidence}% (${delta >= 0 ? "+" : ""}${delta})${trend}${enhanced.highConviction ? " ★" : ""}`
 
     );
 
@@ -510,7 +510,7 @@ async function main() {
 
       signalType: pick.signalType,
 
-      signalLabel: SIGNAL_LABELS_FR[pick.signalType],
+      signalLabel: SIGNAL_LABELS[pick.signalType],
 
       pick: pick.pick,
 

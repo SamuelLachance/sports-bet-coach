@@ -202,7 +202,7 @@ function buildCrossSignalRules(
         signalB: b,
         sameSide: true,
         boost: clamp(Math.round(avgRoi / 15), 6, 15),
-        label: `${a}+${b} accord`,
+        label: `${a}+${b} agreement`,
         sampleHint: Math.min(signals[a].sampleSize, signals[b].sampleSize),
       });
     }
@@ -215,7 +215,7 @@ function buildCrossSignalRules(
         signalB: neg,
         sameSide: false,
         boost: -10,
-        label: `${pos} vs fade ${neg} conflit`,
+        label: `${pos} vs fade ${neg} conflict`,
         sampleHint: signals[neg].sampleSize,
       });
       rules.push({
@@ -223,7 +223,7 @@ function buildCrossSignalRules(
         signalB: neg,
         sameSide: true,
         boost: clamp(Math.round(signals[pos].blendedRoi / 20), 4, 12),
-        label: `${pos}+fade ${neg} confluence fade`,
+        label: `${pos}+fade ${neg} fade confluence`,
         sampleHint: signals[neg].sampleSize,
       });
     }
@@ -251,7 +251,7 @@ function buildCrossSignalRules(
         signalB: neg,
         sameSide: true,
         boost: clamp(Math.round(signals[pos].blendedRoi / 12), 5, 14),
-        label: `Sharp+ vs signal négatif ${neg}`,
+        label: `Sharp+ vs negative signal ${neg}`,
         sampleHint: signals[pos].sampleSize,
       });
     }

@@ -16,9 +16,9 @@ export function LeaguesView({ recommendations, leagues }: LeaguesViewProps) {
   return (
     <div className="space-y-4">
       <div className="card">
-        <h2 className="font-display text-lg font-semibold">Ligues actives</h2>
+        <h2 className="font-display text-lg font-semibold">Active leagues</h2>
         <p className="text-sm text-slate-400 mt-1">
-          Ligues détectées dans la feuille Google Sheets du jour
+          Leagues detected in today&apos;s Google Sheet
         </p>
       </div>
 
@@ -35,11 +35,11 @@ export function LeaguesView({ recommendations, leagues }: LeaguesViewProps) {
             </div>
             <div className="text-sm text-slate-400 space-y-2">
               <div>
-                Matchs liés:{" "}
+                Linked games:{" "}
                 <span className="text-white font-medium">{matched}</span>
               </div>
               <div>
-                <span className="text-slate-500">Signaux:</span>
+                <span className="text-slate-500">Signals:</span>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {signals.map((s) => (
                     <span

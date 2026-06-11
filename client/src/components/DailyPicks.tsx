@@ -10,14 +10,14 @@ interface DailyPicksProps {
 }
 
 const SIGNAL_FILTERS = [
-  { id: "all", label: "Tous les signaux" },
+  { id: "all", label: "All signals" },
   { id: "sharp_money", label: "Sharp Money" },
   { id: "book_needs_fade", label: "Book Needs" },
   { id: "square_fade", label: "Square Fade" },
   { id: "reverse_line_movement", label: "RLM" },
   { id: "mega_sharps", label: "Mega Sharps" },
   { id: "whale_plays", label: "Whale" },
-  { id: "model_best_values", label: "Modèle" },
+  { id: "model_best_values", label: "Model" },
 ];
 
 export function DailyPicks({ recommendations, gameRecommendations = [], leagues }: DailyPicksProps) {
@@ -46,10 +46,10 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatBox label="Picks totaux" value={recommendations.length} />
-        <StatBox label="Affichés" value={filtered.length} accent />
-        <StatBox label="Matchs confirmés" value={matched} />
-        <StatBox label="Conflits résolus" value={conflicts || visibleGameRecs.length} />
+        <StatBox label="Total picks" value={recommendations.length} />
+        <StatBox label="Shown" value={filtered.length} accent />
+        <StatBox label="Matched games" value={matched} />
+        <StatBox label="Conflicts resolved" value={conflicts || visibleGameRecs.length} />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -58,7 +58,7 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
           onChange={(e) => setLeagueFilter(e.target.value)}
           className="bg-surface-card border border-surface-border rounded-lg px-3 py-2 text-sm"
         >
-          <option value="ALL">Toutes les ligues</option>
+          <option value="ALL">All leagues</option>
           {leagues.map((l) => (
             <option key={l} value={l}>
               {l}
@@ -80,7 +80,7 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
 
       {filtered.length === 0 ? (
         <div className="card text-center py-12 text-slate-400">
-          Aucun pick pour ces filtres. Essayez de synchroniser les données.
+          No picks match these filters. Try syncing data.
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">

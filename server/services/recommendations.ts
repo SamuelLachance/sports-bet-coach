@@ -14,31 +14,31 @@ import {
   computeConfidence,
   resolveGameConflicts,
 } from "./confidenceEngine.js";
-import { SIGNAL_LABELS_FR } from "./signalMapping.js";
+import { SIGNAL_LABELS } from "./signalMapping.js";
 import { matchPickToGame, todayDisplayDate } from "./calendar.js";
 
 function buildReasoning(pick: SheetPick, game?: CalendarGame): string {
-  const signal = SIGNAL_LABELS_FR[pick.signalType];
+  const signal = SIGNAL_LABELS[pick.signalType];
   const parts = [`Signal: ${signal}`];
 
   if (pick.opponent) {
     parts.push(`Matchup fade: ${pick.pick} vs ${pick.opponent}`);
   } else if (pick.line) {
-    parts.push(`Ligne: ${pick.pick} ${pick.line}`);
+    parts.push(`Line: ${pick.pick} ${pick.line}`);
   } else {
-    parts.push(`Sélection: ${pick.pick}`);
+    parts.push(`Selection: ${pick.pick}`);
   }
 
-  if (pick.gameTime) parts.push(`Heure affichée: ${pick.gameTime}`);
-  if (pick.postingTime) parts.push(`Publié: ${pick.postingTime}`);
+  if (pick.gameTime) parts.push(`Listed time: ${pick.gameTime}`);
+  if (pick.postingTime) parts.push(`Posted: ${pick.postingTime}`);
 
   if (game) {
     parts.push(
-      `Match confirmé: ${game.awayTeam} @ ${game.homeTeam} (${formatInTimeZone(
+      `Game confirmed: ${game.awayTeam} @ ${game.homeTeam} (${formatInTimeZone(
         new Date(game.startTime),
         TIMEZONE,
         "HH:mm"
-      )} HE)`
+      )} ET)`
     );
   }
 
@@ -103,7 +103,7 @@ export async function buildRecommendations(
       id: pick.id,
       league: pick.league,
       signalType: pick.signalType,
-      signalLabel: SIGNAL_LABELS_FR[pick.signalType],
+      signalLabel: SIGNAL_LABELS[pick.signalType],
       pick: pick.pick,
       opponent: pick.opponent,
       gameTime: pick.gameTime,
@@ -155,4 +155,4 @@ export function groupBySignal(
   );
 }
 
-export { SIGNAL_LABELS_FR };
+export { SIGNAL_LABELS };
