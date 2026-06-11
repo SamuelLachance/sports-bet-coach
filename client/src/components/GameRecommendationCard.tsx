@@ -66,15 +66,9 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
           <span className="badge bg-surface-raised text-slate-300 border border-surface-border">
             {game.league}
           </span>
-          {game.hasConflict && (
-          <span className="badge bg-warning/20 text-warning">
-            {game.dualFade?.isOpposingNoBet
-              ? "Opposing dual-fade"
-              : game.dualFade?.isDualFade
-                ? "Dual-fade"
-                : "Conflict resolved"}
-          </span>
-        )}
+          {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (
+            <span className="badge bg-warning/20 text-warning">Multi-fade</span>
+          )}
         </div>
         <div className="text-right">
           <div className={`text-3xl font-bold font-display ${confidenceColor(game.confidence)}`}>
@@ -95,11 +89,6 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
         <div className="font-display text-2xl font-semibold text-accent-glow">
           {game.recommendedTeam}
         </div>
-        {game.hasConflict && !game.dualFade?.isDualFade && (
-          <p className="text-xs text-slate-400 mt-2">
-            Multiple signals on this game — resolved by sharp/fade rules.
-          </p>
-        )}
       </div>
 
       {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (

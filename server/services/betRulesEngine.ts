@@ -20,7 +20,6 @@ import {
   resolveGameTeamDisplay,
   validateRecommendedTeam,
 } from "./calendar.js";
-import { isOpposingDualFade } from "./dualFadeStats.js";
 import { FADE_SIGNALS, SHARP_BET_SIGNALS, SIGNAL_LABELS } from "./signalMapping.js";
 
 /** Fixed confidence — never derived from historical ROI */
@@ -367,18 +366,6 @@ export function collectFadeTargetsForGame(
   return fadeTargetsForRecs(recs, slatePicks ?? [], matchedGame);
 }
 
-function isFadeTargetTeam(
-  teamNorm: string,
-  fadeTargets: Map<string, string>,
-  matchedGame?: CalendarGame
-): boolean {
-  for (const fadeNorm of fadeTargets.keys()) {
-    if (teamNorm === fadeNorm) return true;
-    if (matchedGame && sameTeamInGame(teamNorm, fadeNorm, matchedGame)) return true;
-  }
-  return false;
-}
-
 function sportLeagueFromRec(rec: MatchedRecommendation): string {
   return SPECIAL_TO_SPORT[rec.league] || rec.league;
 }
@@ -415,130 +402,197 @@ function matchupLabels(recs: MatchedRecommendation[]): { awayTeam: string; homeT
   return { awayTeam: list[0] ?? "Team A", homeTeam: list[1] ?? "Team B" };
 }
 
-function fadeTargetNorm(pick: SheetPick, matchedGame?: CalendarGame): string {
-  const stripped = displayTeamName(pick.pick);
+export interface ImpliedBetEntry {
+  signalType: SignalType;
+  label: string;
+  impliedSide: string;
+  impliedNorm: string;
+  detail: string;
+  fadeTarget?: string;
+}
+
+function impliedSideNorm(side: string, matchedGame?: CalendarGame): string {
   const resolved =
-    matchedGame != null ? resolveGameTeamDisplay(stripped, matchedGame) ?? stripped : stripped;
+    matchedGame != null ? resolveGameTeamDisplay(side, matchedGame) ?? side : side;
   return normalizeTeamName(resolved);
 }
 
-function collectFadePicksForGame(
-  recs: MatchedRecommendation[],
+function impliedBetFromRec(
+  rec: MatchedRecommendation,
   slatePicks: SheetPick[],
   matchedGame?: CalendarGame
-): SheetPick[] {
-  const picks: SheetPick[] = [];
-  const seen = new Set<string>();
+): ImpliedBetEntry | null {
+  if (rec.line) return null;
 
-  for (const rec of recs) {
-    if (!FADE_SIGNALS.has(rec.signalType) || rec.line) continue;
-    const pick = sheetPickFromRec(rec, slatePicks);
-    if (seen.has(pick.id)) continue;
-    seen.add(pick.id);
-    picks.push(pick);
+  const pick = sheetPickFromRec(rec, slatePicks);
+  const label = SIGNAL_LABELS[rec.signalType];
+
+  if (SHARP_BET_SIGNALS.has(rec.signalType)) {
+    const side = matchedGame ? displayGameTeam(rec.pick, matchedGame) : displayTeamName(rec.pick);
+    return {
+      signalType: rec.signalType,
+      label,
+      impliedSide: side,
+      impliedNorm: impliedSideNorm(side, matchedGame),
+      detail: `${label} → bet ${side}`,
+    };
   }
 
-  if (matchedGame && recs.length > 0) {
-    const league = sportLeagueFromRec(recs[0]);
-    for (const p of slatePicks) {
-      if (!FADE_SIGNALS.has(p.signalType) || p.line) continue;
-      if (p.league !== league && p.league !== "UNKNOWN") continue;
-      if (!pickBelongsToGame(p.pick, p.opponent, matchedGame)) continue;
-      if (seen.has(p.id)) continue;
-      seen.add(p.id);
-      picks.push(p);
+  if (FADE_SIGNALS.has(rec.signalType)) {
+    const opponent = extractOpponentName(pick, slatePicks, matchedGame) ?? rec.opponentPick;
+    if (!opponent) return null;
+    const side = matchedGame ? displayGameTeam(opponent, matchedGame) : displayTeamName(opponent);
+    const fadeTarget =
+      matchedGame ? displayGameTeam(rec.pick, matchedGame) : displayTeamName(rec.pick);
+    return {
+      signalType: rec.signalType,
+      label,
+      impliedSide: side,
+      impliedNorm: impliedSideNorm(side, matchedGame),
+      fadeTarget,
+      detail: `${label} → bet ${side} (fade ${fadeTarget})`,
+    };
+  }
+
+  const side = matchedGame ? displayGameTeam(rec.pick, matchedGame) : displayTeamName(rec.pick);
+  return {
+    signalType: rec.signalType,
+    label,
+    impliedSide: side,
+    impliedNorm: impliedSideNorm(side, matchedGame),
+    detail: `${label} → bet ${side}`,
+  };
+}
+
+function confidenceForAgreeingSignals(entries: ImpliedBetEntry[]): number {
+  const sharpCount = entries.filter((e) => SHARP_BET_SIGNALS.has(e.signalType)).length;
+  const fadeCount = entries.filter((e) => FADE_SIGNALS.has(e.signalType)).length;
+
+  if (sharpCount > 0 && fadeCount === 0 && entries.length === sharpCount) {
+    return RULE_CONFIDENCE.sharp;
+  }
+  if (sharpCount > 0) {
+    return RULE_CONFIDENCE.sharp;
+  }
+  if (fadeCount >= 2) {
+    return RULE_CONFIDENCE.sameSideDualFade;
+  }
+  if (fadeCount === 1) {
+    return RULE_CONFIDENCE.singleFade;
+  }
+  return RULE_CONFIDENCE.secondary;
+}
+
+export interface ResolveImpliedBetsResult {
+  side: string | null;
+  confidence: number;
+  breakdown: ConfidenceBreakdownItem[];
+  noBetReason?: string;
+  conflictingSides?: string[];
+  dualFade?: DualFadeInfo;
+}
+
+/** Map signals to implied bet sides; recommend only when all agree on one side. */
+export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBetsResult {
+  const breakdown: ConfidenceBreakdownItem[] = entries.map((entry, i) => ({
+    key: `signal_${i}`,
+    label: entry.label,
+    value: 0,
+    impact: 0,
+    detail: entry.detail,
+  }));
+
+  if (entries.length === 0) {
+    return {
+      side: null,
+      confidence: RULE_CONFIDENCE.noBet,
+      breakdown: [
+        ...breakdown,
+        {
+          key: "result",
+          label: "Result",
+          value: 0,
+          impact: 0,
+          detail: "No bet — no resolvable signals",
+        },
+      ],
+      noBetReason: "No resolvable signals on this game.",
+    };
+  }
+
+  const uniqueByNorm = new Map<string, string>();
+  for (const entry of entries) {
+    if (!uniqueByNorm.has(entry.impliedNorm)) {
+      uniqueByNorm.set(entry.impliedNorm, entry.impliedSide);
     }
   }
 
-  return picks;
-}
+  const uniqueSides = [...uniqueByNorm.values()];
 
-/** Two fade picks target different sides of the same game → opposing fades */
-function isOpposingFadePick(
-  a: SheetPick,
-  b: SheetPick,
-  matchedGame?: CalendarGame
-): boolean {
-  if (fadeTargetNorm(a, matchedGame) === fadeTargetNorm(b, matchedGame)) return false;
-  if (isOpposingDualFade(a, b)) return true;
-  if (!matchedGame) return false;
+  if (uniqueSides.length === 1) {
+    const side = uniqueSides[0]!;
+    const confidence = confidenceForAgreeingSignals(entries);
+    const fadeEntries = entries.filter((e) => FADE_SIGNALS.has(e.signalType));
+    const fadeTargets = [...new Set(fadeEntries.map((e) => e.fadeTarget).filter(Boolean))];
 
-  const aInGame = pickBelongsToGame(a.pick, a.opponent, matchedGame);
-  const bInGame = pickBelongsToGame(b.pick, b.opponent, matchedGame);
-  if (!aInGame || !bInGame) return false;
-
-  if (a.gameSlot != null && b.gameSlot != null && a.gameSlot === b.gameSlot) return true;
-
-  return true;
-}
-
-function findOpposingFadePair(
-  fadePicks: SheetPick[],
-  matchedGame?: CalendarGame
-): { a: SheetPick; b: SheetPick } | undefined {
-  for (let i = 0; i < fadePicks.length; i++) {
-    for (let j = i + 1; j < fadePicks.length; j++) {
-      if (isOpposingFadePick(fadePicks[i], fadePicks[j], matchedGame)) {
-        return { a: fadePicks[i], b: fadePicks[j] };
-      }
-    }
-  }
-  return undefined;
-}
-
-function findSameSideFadeCluster(
-  fadePicks: SheetPick[],
-  matchedGame?: CalendarGame
-): SheetPick[] | undefined {
-  if (fadePicks.length < 2) return undefined;
-  const target = fadeTargetNorm(fadePicks[0], matchedGame);
-  const cluster = fadePicks.filter((p) => fadeTargetNorm(p, matchedGame) === target);
-  return cluster.length >= 2 ? cluster : undefined;
-}
-
-function sharpBetTeamNorm(sharp: MatchedRecommendation, matchedGame?: CalendarGame): string {
-  const stripped = displayTeamName(sharp.pick);
-  const resolved =
-    matchedGame != null ? resolveGameTeamDisplay(stripped, matchedGame) ?? stripped : stripped;
-  return normalizeTeamName(resolved);
-}
-
-function sharpBetTeamDisplay(sharp: MatchedRecommendation, matchedGame?: CalendarGame): string {
-  if (matchedGame) return displayGameTeam(sharp.pick, matchedGame);
-  return displayTeamName(sharp.pick);
-}
-
-/** Sharp bets Team X while a fade signal also lists Team X → signals cancel */
-function findSharpFadeSameTeamConflict(
-  sharpRecs: MatchedRecommendation[],
-  fadePicks: SheetPick[],
-  fadeTargets: Map<string, string>,
-  matchedGame?: CalendarGame
-): { sharp: MatchedRecommendation; fadePicks: SheetPick[]; team: string } | undefined {
-  for (const sharp of sharpRecs) {
-    const sharpNorm = sharpBetTeamNorm(sharp, matchedGame);
-    if (!isFadeTargetTeam(sharpNorm, fadeTargets, matchedGame)) continue;
-
-    let team = sharpBetTeamDisplay(sharp, matchedGame);
-    for (const [, display] of fadeTargets) {
-      if (
-        normalizeTeamName(display) === sharpNorm ||
-        (matchedGame && sameTeamInGame(display, sharp.pick, matchedGame))
-      ) {
-        team = matchedGame ? displayGameTeam(display, matchedGame) : display;
-        break;
-      }
+    let dualFade: DualFadeInfo | undefined;
+    if (fadeEntries.length >= 2 && fadeTargets.length === 1) {
+      dualFade = {
+        isDualFade: true,
+        bookNeedsFadeTeam: fadeTargets[0],
+        squareFadeTeam: fadeTargets[0],
+      };
     }
 
-    const conflictingFades = fadePicks.filter(
-      (p) => fadeTargetNorm(p, matchedGame) === sharpNorm ||
-        (matchedGame && sameTeamInGame(p.pick, sharp.pick, matchedGame))
-    );
-    if (conflictingFades.length === 0) continue;
-
-    return { sharp, fadePicks: conflictingFades, team };
+    return {
+      side,
+      confidence,
+      breakdown: [
+        ...breakdown,
+        {
+          key: "result",
+          label: "Result",
+          value: confidence,
+          impact: confidence - 50,
+          detail: `Result: ${side}`,
+        },
+      ],
+      dualFade,
+    };
   }
-  return undefined;
+
+  const conflictingSides = uniqueSides.slice(0, 2);
+  const conflictLabel = conflictingSides.join(" vs ");
+  const fadeEntries = entries.filter((e) => FADE_SIGNALS.has(e.signalType));
+  const fadeTargets = [...new Set(fadeEntries.map((e) => e.fadeTarget).filter(Boolean))];
+
+  let dualFade: DualFadeInfo | undefined;
+  if (fadeEntries.length >= 2 && fadeTargets.length >= 2) {
+    dualFade = {
+      isDualFade: true,
+      isOpposingNoBet: true,
+      bookNeedsFadeTeam: fadeTargets[0],
+      squareFadeTeam: fadeTargets[1],
+    };
+  }
+
+  return {
+    side: null,
+    confidence: RULE_CONFIDENCE.noBet,
+    breakdown: [
+      ...breakdown,
+      {
+        key: "result",
+        label: "Result",
+        value: 0,
+        impact: 0,
+        detail: `No bet — conflicting signals: ${conflictLabel}`,
+      },
+    ],
+    noBetReason: `Conflicting signals on this game (${conflictLabel}) — no bet.`,
+    conflictingSides,
+    dualFade,
+  };
 }
 
 function buildNoBetCard(
@@ -580,7 +634,7 @@ function buildNoBetCard(
     ...rec,
     gameKey,
     gameConflict: true,
-    conflictNote: "No bet — conflicting signals",
+    conflictNote: reason,
     consolidatedTeam: undefined,
     consolidatedConfidence: 0,
     edgeLabel: "No bet — conflicting signals",
@@ -597,11 +651,9 @@ function buildBetCard(
   breakdown: ConfidenceBreakdownItem[],
   reasoning: string,
   matchedGame?: CalendarGame,
-  dualFade?: DualFadeInfo,
-  hasConflict = false
+  dualFade?: DualFadeInfo
 ): { consolidated: GameConsolidatedRecommendation; updatedRecs: MatchedRecommendation[] } {
   const { awayTeam, homeTeam } = matchupLabels(recs);
-  const winnerNorm = normalizeTeamName(recommendedTeam);
 
   const consolidated: GameConsolidatedRecommendation = {
     gameKey,
@@ -611,39 +663,19 @@ function buildBetCard(
     recommendedTeam,
     confidence,
     confidenceBreakdown: breakdown,
-    hasConflict,
+    hasConflict: false,
     pickIds: recs.map((r) => r.id),
     reasoning: `Game: ${awayTeam} @ ${homeTeam} · ${reasoning}`,
     matchedGame,
     dualFade,
   };
 
-  const updatedRecs = recs.map((rec) => {
-    const effTeam =
-      FADE_SIGNALS.has(rec.signalType) && rec.opponentPick
-        ? normalizeTeamName(rec.opponentPick)
-        : SHARP_BET_SIGNALS.has(rec.signalType)
-          ? normalizeTeamName(rec.pick)
-          : normalizeTeamName(rec.pick);
-
-    const aligns = matchedGame
-      ? effTeam === winnerNorm || sameTeamInGame(effTeam, recommendedTeam, matchedGame)
-      : effTeam === winnerNorm;
-
-    if (!hasConflict) {
-      return { ...rec, gameKey, consolidatedTeam: recommendedTeam, consolidatedConfidence: confidence };
-    }
-
-    return {
-      ...rec,
-      gameKey,
-      gameConflict: true,
-      conflictNote: "Conflict resolved — see game recommendation",
-      consolidatedTeam: recommendedTeam,
-      consolidatedConfidence: confidence,
-      confidence: aligns ? rec.confidence : Math.min(rec.confidence, 40),
-    };
-  });
+  const updatedRecs = recs.map((rec) => ({
+    ...rec,
+    gameKey,
+    consolidatedTeam: recommendedTeam,
+    consolidatedConfidence: confidence,
+  }));
 
   return { consolidated, updatedRecs };
 }
@@ -655,277 +687,45 @@ function resolveGameGroup(
 ): { consolidated: GameConsolidatedRecommendation; updatedRecs: MatchedRecommendation[] } {
   recs = filterRecsForGame(recs);
   const matchedGame = recs.find((r) => r.matchedGame)?.matchedGame;
-  const fadeTargets = fadeTargetsForRecs(recs, slatePicks, matchedGame);
-  const fadePicks = collectFadePicksForGame(recs, slatePicks, matchedGame);
 
-  const sharpRecs = recs.filter((r) => SHARP_BET_SIGNALS.has(r.signalType) && !r.line);
+  const impliedEntries = recs
+    .map((rec) => impliedBetFromRec(rec, slatePicks, matchedGame))
+    .filter((entry): entry is ImpliedBetEntry => entry != null);
 
-  // Opposing fades on same game → no bet
-  const opposingPair = findOpposingFadePair(fadePicks, matchedGame);
-  if (opposingPair) {
-    const { a, b } = opposingPair;
-    const fadeATeam = displayTeamName(a.pick);
-    const fadeBTeam = displayTeamName(b.pick);
-    const inverseA = a.opponent ? displayTeamName(a.opponent) : fadeBTeam;
-    const inverseB = b.opponent ? displayTeamName(b.opponent) : fadeATeam;
-    const labelA = SIGNAL_LABELS[a.signalType];
-    const labelB = SIGNAL_LABELS[b.signalType];
-    const reason =
-      `${labelA} lists ${fadeATeam} (→ ${inverseA}) and ${labelB} lists ${fadeBTeam} (→ ${inverseB}). ` +
-      `Both teams on opposite sides — conflicting signals, no bet.`;
+  const resolved = resolveImpliedBets(impliedEntries);
 
-    return buildNoBetCard(gameKey, recs, reason, {
-      isDualFade: true,
-      isOpposingNoBet: true,
-      bookNeedsFadeTeam: fadeATeam,
-      squareFadeTeam: fadeBTeam,
-    }, matchedGame, [
-      {
-        key: "no_bet_dual_fade",
-        label: "No bet",
-        value: 0,
-        impact: 0,
-        detail: `${fadeATeam} vs ${fadeBTeam} — opposing fades cancel`,
-      },
-      {
-        key: "fade_a",
-        label: labelA,
-        value: RULE_CONFIDENCE.singleFade,
-        impact: 0,
-        detail: `Fade ${fadeATeam} → would bet ${inverseA}`,
-      },
-      {
-        key: "fade_b",
-        label: labelB,
-        value: RULE_CONFIDENCE.singleFade,
-        impact: 0,
-        detail: `Fade ${fadeBTeam} → would bet ${inverseB}`,
-      },
-    ]);
-  }
-
-  // Sharp bets Team X while a fade also targets Team X → no bet (signals cancel)
-  const sharpFadeConflict = findSharpFadeSameTeamConflict(
-    sharpRecs,
-    fadePicks,
-    fadeTargets,
-    matchedGame
-  );
-  if (sharpFadeConflict) {
-    const { sharp, fadePicks: conflictingFades, team } = sharpFadeConflict;
-    const sharpLabel = SIGNAL_LABELS[sharp.signalType];
-    const fadeLabels = [...new Set(conflictingFades.map((p) => SIGNAL_LABELS[p.signalType]))].join(
-      " + "
-    );
-    const reason =
-      `${sharpLabel} bets ${team} but ${fadeLabels} fade ${team} — conflicting signals, no bet.`;
-
-    const breakdown: ConfidenceBreakdownItem[] = [
-      {
-        key: "no_bet_sharp_fade",
-        label: "No bet",
-        value: 0,
-        impact: 0,
-        detail: `${team} — sharp and fade cancel`,
-      },
-      {
-        key: "sharp_conflict",
-        label: sharpLabel,
-        value: RULE_CONFIDENCE.sharp,
-        impact: 0,
-        detail: `Bet ${team}`,
-      },
-    ];
-    for (const fadePick of conflictingFades) {
-      const fadeTarget = displayTeamName(fadePick.pick);
-      const inverse =
-        extractOpponentName(fadePick, slatePicks, matchedGame) ?? "opponent";
-      breakdown.push({
-        key: `fade_${fadePick.id}`,
-        label: SIGNAL_LABELS[fadePick.signalType],
-        value: RULE_CONFIDENCE.singleFade,
-        impact: 0,
-        detail: `Fade ${fadeTarget} → would bet ${displayTeamName(inverse)}`,
-      });
-    }
-
-    return buildNoBetCard(gameKey, recs, reason, undefined, matchedGame, breakdown);
-  }
-
-  // Sharp takes priority over fades that target a different team
-  if (sharpRecs.length > 0) {
-    const sharp = sharpRecs[0];
-    const team = sharpBetTeamDisplay(sharp, matchedGame);
-    const breakdown: ConfidenceBreakdownItem[] = [
-      {
-        key: "sharp_priority",
-        label: SIGNAL_LABELS[sharp.signalType],
-        value: RULE_CONFIDENCE.sharp,
-        impact: RULE_CONFIDENCE.sharp - 50,
-        detail: `Sharp rule — bet ${team}`,
-      },
-    ];
-    for (const fadeRec of recs.filter((r) => FADE_SIGNALS.has(r.signalType))) {
-      breakdown.push({
-        key: `fade_${fadeRec.id}`,
-        label: SIGNAL_LABELS[fadeRec.signalType],
-        value: 0,
-        impact: 0,
-        detail: `Overridden by ${SIGNAL_LABELS[sharp.signalType]} on ${team}`,
-      });
-    }
-    return buildBetCard(
-      gameKey,
-      recs,
-      team,
-      RULE_CONFIDENCE.sharp,
-      breakdown,
-      `${SIGNAL_LABELS[sharp.signalType]} → ${team} (${RULE_CONFIDENCE.sharp}%)`,
-      matchedGame,
-      undefined,
-      recs.length > 1
-    );
-  }
-
-  // Same-side multi-fade → bet opponent
-  const sameSideCluster = findSameSideFadeCluster(fadePicks, matchedGame);
-  if (sameSideCluster) {
-    const anchor = sameSideCluster[0];
-    const fadeTarget = displayTeamName(anchor.pick);
-    const opponent =
-      extractOpponentName(anchor, slatePicks, matchedGame) ??
-      sameSideCluster
-        .map((p) => extractOpponentName(p, slatePicks, matchedGame))
-        .find(Boolean);
-    if (opponent) {
-      let team = opponent;
-      if (matchedGame) team = displayGameTeam(opponent, matchedGame);
-      const signalSummary = [...new Set(sameSideCluster.map((p) => SIGNAL_LABELS[p.signalType]))].join(
-        " + "
-      );
-      return buildBetCard(
-        gameKey,
-        recs,
-        team,
-        RULE_CONFIDENCE.sameSideDualFade,
-        [
-          {
-            key: "same_side_multi_fade",
-            label: "Same-side multi-fade",
-            value: RULE_CONFIDENCE.sameSideDualFade,
-            impact: RULE_CONFIDENCE.sameSideDualFade - 50,
-            detail: `${signalSummary} fade ${fadeTarget} → bet ${team}`,
-          },
-        ],
-        `${signalSummary} fade ${fadeTarget} → ${team} (${RULE_CONFIDENCE.sameSideDualFade}%)`,
-        matchedGame,
-        {
-          isDualFade: true,
-          bookNeedsFadeTeam: fadeTarget,
-          squareFadeTeam: fadeTarget,
-        },
-        true
-      );
-    }
-  }
-
-  // Rule 2/3: single fade
-  const fadeRec = recs.find((r) => FADE_SIGNALS.has(r.signalType) && !r.line);
-  if (fadeRec?.opponentPick) {
-    let team = fadeRec.opponentPick;
-    if (matchedGame) team = displayGameTeam(fadeRec.opponentPick, matchedGame);
-    const fadeTarget = displayTeamName(fadeRec.pick);
-    const signalLabel = SIGNAL_LABELS[fadeRec.signalType];
-    return buildBetCard(
-      gameKey,
-      recs,
-      team,
-      RULE_CONFIDENCE.singleFade,
-      [
-        {
-          key: "single_fade",
-          label: signalLabel,
-          value: RULE_CONFIDENCE.singleFade,
-          impact: RULE_CONFIDENCE.singleFade - 50,
-          detail: `${signalLabel}: fade ${fadeTarget} → bet ${team}`,
-        },
-      ],
-      `${signalLabel}: fade ${fadeTarget} → ${team} (${RULE_CONFIDENCE.singleFade}%)`,
-      matchedGame
-    );
-  }
-
-  // Secondary signals — prefer side that is NOT a fade target
-  const nonFadeRecs = recs.filter((r) => !FADE_SIGNALS.has(r.signalType) && !r.line);
-  for (const rec of nonFadeRecs) {
-    const teamNorm = normalizeTeamName(rec.pick);
-    if (!isFadeTargetTeam(teamNorm, fadeTargets, matchedGame)) {
-      let team = displayTeamName(rec.pick);
-      if (matchedGame) team = displayGameTeam(rec.pick, matchedGame);
-      return buildBetCard(
-        gameKey,
-        recs,
-        team,
-        RULE_CONFIDENCE.secondary,
-        [
-          {
-            key: "secondary",
-            label: SIGNAL_LABELS[rec.signalType],
-            value: RULE_CONFIDENCE.secondary,
-            impact: RULE_CONFIDENCE.secondary - 50,
-            detail: `Bet ${team}`,
-          },
-        ],
-        `${SIGNAL_LABELS[rec.signalType]} → ${team}`,
-        matchedGame,
-        undefined,
-        recs.length > 1
-      );
-    }
-  }
-
-  // Fade-only without resolved opponent
-  if (fadeRec) {
+  if (resolved.side == null) {
     return buildNoBetCard(
       gameKey,
       recs,
-      "Fade signal present but opponent could not be identified.",
-      undefined,
-      matchedGame
+      resolved.noBetReason ?? "Conflicting signals on this game — no bet.",
+      resolved.dualFade,
+      matchedGame,
+      resolved.breakdown
     );
   }
 
-  // Fallback: first rec listed side
-  const first = recs[0];
-  let team = displayTeamName(first.pick);
-  if (matchedGame) team = displayGameTeam(first.pick, matchedGame);
-
+  const team = resolved.side;
   if (matchedGame && !validateRecommendedTeam(team, matchedGame)) {
     return buildNoBetCard(
       gameKey,
       recs,
       `${team} is not part of this matchup.`,
       undefined,
-      matchedGame
+      matchedGame,
+      resolved.breakdown
     );
-  }
-
-  if (isFadeTargetTeam(normalizeTeamName(team), fadeTargets, matchedGame)) {
-    const opp = extractOpponentName(sheetPickFromRec(first, slatePicks), slatePicks, matchedGame);
-    if (opp) {
-      if (matchedGame) team = displayGameTeam(opp, matchedGame);
-      else team = opp;
-    }
   }
 
   return buildBetCard(
     gameKey,
     recs,
     team,
-    first.confidence,
-    first.confidenceBreakdown,
-    first.edgeLabel,
-    matchedGame
+    resolved.confidence,
+    resolved.breakdown,
+    `Result: ${team} (${resolved.confidence}%)`,
+    matchedGame,
+    resolved.dualFade
   );
 }
 
@@ -955,9 +755,9 @@ export function resolveGameConflicts(
     const needsCard =
       recs.length > 1 ||
       (recs.length === 1 &&
-        FADE_SIGNALS.has(recs[0].signalType) &&
         !recs[0].line &&
-        recs[0].matchedGame);
+        recs[0].matchedGame &&
+        (FADE_SIGNALS.has(recs[0].signalType) || SHARP_BET_SIGNALS.has(recs[0].signalType)));
 
     if (!needsCard) {
       recById.set(recs[0].id, { ...recs[0], gameKey: key });

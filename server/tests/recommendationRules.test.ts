@@ -8,7 +8,9 @@ import {
   collectFadeTargetsForGame,
   computePickRules,
   resolveGameConflicts,
+  resolveImpliedBets,
   RULE_CONFIDENCE,
+  type ImpliedBetEntry,
 } from "../services/betRulesEngine.js";
 import { isOpposingDualFade, resolveDualFadeMatch } from "../services/dualFadeStats.js";
 import { buildHistoricalStats } from "../services/historicalStats.js";
@@ -301,6 +303,39 @@ const squareCarolinaPick: SheetPick = {
   signalCol: 6,
 };
 
+const sharpSeattlePick: SheetPick = {
+  id: "sharp-sea",
+  league: "MLB",
+  signalType: "sharp_money",
+  pick: "SEATTLE",
+  opponent: "BALTIMORE",
+  rawRow: 60,
+  gameSlot: 1,
+  signalCol: 2,
+};
+
+const bookFadeSeattlePick: SheetPick = {
+  id: "book-sea",
+  league: "MLB",
+  signalType: "book_needs_fade",
+  pick: "SEATTLE",
+  opponent: "BALTIMORE",
+  rawRow: 60,
+  gameSlot: 1,
+  signalCol: 4,
+};
+
+const SEATTLE_ORIOLES_GAME: CalendarGame = {
+  id: "401815687",
+  league: "MLB",
+  homeTeam: "Baltimore Orioles",
+  awayTeam: "Seattle Mariners",
+  homeAbbr: "BAL",
+  awayAbbr: "SEA",
+  startTime: "2026-06-09T22:35:00Z",
+  status: "Scheduled",
+};
+
 const stats = buildHistoricalStats([], [], 0, "");
 
 function makeRec(
@@ -552,8 +587,8 @@ function main() {
   assert.equal(oddsOnlyCard!.confidence, 0);
   assert.ok(oddsOnlyCard!.dualFade?.isOpposingNoBet, "Opposing dual-fade flag set");
   assert.ok(
-    oddsOnlyCard!.confidenceBreakdown.some((b) => b.label === "No bet"),
-    "Breakdown shows no-bet, not misleading edge totals"
+    oddsOnlyCard!.confidenceBreakdown.some((b) => b.detail?.includes("No bet")),
+    "Breakdown shows no-bet result, not misleading edge totals"
   );
 
   const sameSideSlate = [sameSideBookPick, sameSideSquarePick];
@@ -708,6 +743,97 @@ function main() {
     RULE_CONFIDENCE.sameSideDualFade,
     "Same-side book + model fade uses multi-fade confidence"
   );
+
+  // resolveImpliedBets unit cases
+  const sharpOnly: ImpliedBetEntry[] = [
+    {
+      signalType: "sharp_money",
+      label: "Sharp Money",
+      impliedSide: "Carolina Hurricanes",
+      impliedNorm: "CAROLINA HURRICANES",
+      detail: "Sharp Money → bet Carolina Hurricanes",
+    },
+  ];
+  const sharpOnlyResult = resolveImpliedBets(sharpOnly);
+  assert.equal(sharpOnlyResult.side, "Carolina Hurricanes");
+  assert.equal(sharpOnlyResult.confidence, RULE_CONFIDENCE.sharp);
+  assert.ok(sharpOnlyResult.breakdown.some((b) => b.detail === "Result: Carolina Hurricanes"));
+
+  const singleFade: ImpliedBetEntry[] = [
+    {
+      signalType: "square_fade",
+      label: "Square Top (Fade)",
+      impliedSide: "Vegas Golden Knights",
+      impliedNorm: "VEGAS GOLDEN KNIGHTS",
+      fadeTarget: "Carolina Hurricanes",
+      detail: "Square Top (Fade) → bet Vegas Golden Knights (fade Carolina Hurricanes)",
+    },
+  ];
+  const singleFadeResult = resolveImpliedBets(singleFade);
+  assert.equal(singleFadeResult.side, "Vegas Golden Knights");
+  assert.equal(singleFadeResult.confidence, RULE_CONFIDENCE.singleFade);
+
+  const conflict: ImpliedBetEntry[] = [
+    sharpOnly[0]!,
+    singleFade[0]!,
+  ];
+  const conflictResult = resolveImpliedBets(conflict);
+  assert.equal(conflictResult.side, null);
+  assert.ok(
+    conflictResult.breakdown.some((b) =>
+      b.detail?.includes("No bet — conflicting signals:")
+    )
+  );
+
+  // Sharp Carolina only → Carolina 85%
+  const { gameRecommendations: sharpOnlyCards } = resolveGameConflicts(
+    [makeRec(sharpCarolinaPick, VEGAS_CAROLINA_GAME, [sharpCarolinaPick])],
+    stats,
+    { slatePicks: [sharpCarolinaPick] }
+  );
+  const sharpOnlyCard = sharpOnlyCards.find((g) => g.matchedGame?.id === VEGAS_CAROLINA_GAME.id);
+  assert.ok(sharpOnlyCard, "Sharp-only game produces consolidated card");
+  assert.ok(
+    sharpOnlyCard!.recommendedTeam.toUpperCase().includes("CAROLINA"),
+    "Sharp Carolina only → bet Carolina"
+  );
+  assert.equal(sharpOnlyCard!.confidence, RULE_CONFIDENCE.sharp);
+
+  // Square fade Carolina only → Vegas 75%
+  const { gameRecommendations: squareOnlyCarolinaCards } = resolveGameConflicts(
+    [makeRec(squareCarolinaPick, VEGAS_CAROLINA_GAME, [squareCarolinaPick])],
+    stats,
+    { slatePicks: [squareCarolinaPick] }
+  );
+  const squareOnlyCarolinaCard = squareOnlyCarolinaCards.find(
+    (g) => g.matchedGame?.id === VEGAS_CAROLINA_GAME.id
+  );
+  assert.ok(squareOnlyCarolinaCard, "Square-only fade produces consolidated card");
+  assert.ok(
+    squareOnlyCarolinaCard!.recommendedTeam.toUpperCase().includes("VEGAS"),
+    "Square fade Carolina only → bet Vegas"
+  );
+  assert.equal(squareOnlyCarolinaCard!.confidence, RULE_CONFIDENCE.singleFade);
+  assert.ok(
+    !squareOnlyCarolinaCard!.recommendedTeam.toUpperCase().includes("CAROLINA"),
+    "Fade target must not be recommended"
+  );
+
+  // Sharp Seattle + Book fade Seattle → no bet
+  const seaSlate = [sharpSeattlePick, bookFadeSeattlePick];
+  const { gameRecommendations: seaConflictCards } = resolveGameConflicts(
+    [
+      makeRec(sharpSeattlePick, SEATTLE_ORIOLES_GAME, seaSlate),
+      makeRec(bookFadeSeattlePick, SEATTLE_ORIOLES_GAME, seaSlate),
+    ],
+    stats,
+    { slatePicks: seaSlate }
+  );
+  const seaConflictCard = seaConflictCards.find(
+    (g) => g.matchedGame?.id === SEATTLE_ORIOLES_GAME.id
+  );
+  assert.ok(seaConflictCard?.noBet, "Sharp Seattle + book fade Seattle → no bet");
+  assert.equal(seaConflictCard!.recommendedTeam, "");
 
   // Sharp + square fade same target team → no bet (signals cancel)
   const carolinaSlate = [sharpCarolinaPick, squareCarolinaPick];
