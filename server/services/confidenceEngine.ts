@@ -82,6 +82,37 @@ function displayTeamName(text: string): string {
   return text.replace(/\s*[+-]?\d+\.?\d*\s*$/g, "").replace(/\s+/g, " ").trim();
 }
 
+function sameTeamInGame(teamA: string, teamB: string, game: CalendarGame): boolean {
+  const resolvedA = resolveGameTeamDisplay(teamA, game) ?? displayTeamName(teamA);
+  const resolvedB = resolveGameTeamDisplay(teamB, game) ?? displayTeamName(teamB);
+  return normalizeTeamName(resolvedA) === normalizeTeamName(resolvedB);
+}
+
+function isFadeTargetTeam(
+  teamNorm: string,
+  fadeTargets: Map<string, string>,
+  matchedGame?: CalendarGame
+): boolean {
+  for (const fadeNorm of fadeTargets.keys()) {
+    if (teamNorm === fadeNorm) return true;
+    if (matchedGame && sameTeamInGame(teamNorm, fadeNorm, matchedGame)) return true;
+  }
+  return false;
+}
+
+function findTeamEdgeKey(
+  teamNorm: string,
+  teamEdges: Map<string, { edge: number; display: string; notes: string[] }>,
+  matchedGame?: CalendarGame
+): string {
+  if (teamEdges.has(teamNorm)) return teamNorm;
+  if (!matchedGame) return teamNorm;
+  for (const key of teamEdges.keys()) {
+    if (sameTeamInGame(key, teamNorm, matchedGame)) return key;
+  }
+  return teamNorm;
+}
+
 /** Group picks on same game (ESPN id, team pair, or VS slot within a sheet row) */
 export function buildGameKey(
   pick: SheetPick,
@@ -636,8 +667,12 @@ export function collectFadeTargetsForGame(
   const targets = new Map<string, string>();
 
   const addTarget = (team: string) => {
-    const norm = normalizeTeamName(team);
-    if (norm) targets.set(norm, displayTeamName(team));
+    const stripped = displayTeamName(team);
+    if (!stripped) return;
+    const resolved =
+      matchedGame != null ? resolveGameTeamDisplay(stripped, matchedGame) ?? stripped : stripped;
+    const norm = normalizeTeamName(resolved);
+    if (norm) targets.set(norm, resolved);
   };
 
   for (const rec of recs) {
@@ -714,7 +749,8 @@ function effectiveTeamForRec(rec: MatchedRecommendation): {
 function contributionForRec(
   rec: MatchedRecommendation,
   stats: ConfidenceStatsCache,
-  fadeTargets: Set<string>
+  fadeTargets: Map<string, string>,
+  matchedGame?: CalendarGame
 ): TeamEdgeContribution | null {
   const team = effectiveTeamForRec(rec);
   if (!team) return null;
@@ -726,7 +762,7 @@ function contributionForRec(
   let edge: number;
   let note: string;
 
-  if (!FADE_SIGNALS.has(rec.signalType) && fadeTargets.has(team.teamNorm)) {
+  if (!FADE_SIGNALS.has(rec.signalType) && isFadeTargetTeam(team.teamNorm, fadeTargets, matchedGame)) {
     edge = -rec.confidence * 0.9 * weight;
     note = `${SIGNAL_LABELS[rec.signalType]} on fade target ${team.teamDisplay} (${Math.round(edge)})`;
   } else if (rec.signalPolarity === "inverted") {
@@ -754,7 +790,8 @@ function contributionForRec(
 
 function applyGameCrossSignalRules(
   contributions: TeamEdgeContribution[],
-  fadeTargets: Set<string>
+  fadeTargets: Map<string, string>,
+  matchedGame?: CalendarGame
 ): {
   edgeDelta: Map<string, number>;
   notes: string[];
@@ -782,7 +819,7 @@ function applyGameCrossSignalRules(
   const sharps = contributions.filter((c) => sharpTypes.includes(c.signalType));
 
   for (const sharp of sharps) {
-    if (fadeTargets.has(sharp.teamNorm)) {
+    if (isFadeTargetTeam(sharp.teamNorm, fadeTargets, matchedGame)) {
       edgeDelta.set(sharp.teamNorm, (edgeDelta.get(sharp.teamNorm) ?? 0) - 40);
       notes.push(`Sharp on fade target ${sharp.teamDisplay} — signal ignored`);
       continue;
@@ -802,13 +839,15 @@ function applyGameCrossSignalRules(
 
 function applyFadeTargetPenalties(
   teamEdges: Map<string, { edge: number; display: string; notes: string[] }>,
-  fadeTargets: Map<string, string>
+  fadeTargets: Map<string, string>,
+  matchedGame?: CalendarGame
 ): void {
   for (const [norm, display] of fadeTargets) {
-    const existing = teamEdges.get(norm) ?? { edge: 0, display, notes: [] };
+    const edgeKey = findTeamEdgeKey(norm, teamEdges, matchedGame);
+    const existing = teamEdges.get(edgeKey) ?? { edge: 0, display, notes: [] };
     existing.edge -= FADE_TARGET_EDGE_PENALTY;
     existing.notes.push(`${display} listed as fade — negative EV`);
-    teamEdges.set(norm, existing);
+    teamEdges.set(edgeKey, existing);
   }
 }
 
@@ -819,7 +858,7 @@ function enforceFadeTargetWinner(
   matchedGame?: CalendarGame,
   recs?: MatchedRecommendation[]
 ): { norm: string; display: string; flipped: boolean } {
-  if (!fadeTargets.has(winnerNorm)) {
+  if (!isFadeTargetTeam(winnerNorm, fadeTargets, matchedGame)) {
     return { norm: winnerNorm, display: winnerDisplay, flipped: false };
   }
 
@@ -1113,10 +1152,8 @@ function resolveSingleGame(
     }
   }
 
-  const fadeTargetNorms = new Set(fadeTargets.keys());
-
   const contributions = recs
-    .map((r) => contributionForRec(r, stats, fadeTargetNorms))
+    .map((r) => contributionForRec(r, stats, fadeTargets, matchedGame))
     .filter((c): c is TeamEdgeContribution => c != null);
 
   const teamEdges = new Map<string, { edge: number; display: string; notes: string[] }>();
@@ -1128,9 +1165,9 @@ function resolveSingleGame(
     teamEdges.set(c.teamNorm, existing);
   }
 
-  applyFadeTargetPenalties(teamEdges, fadeTargets);
+  applyFadeTargetPenalties(teamEdges, fadeTargets, matchedGame);
 
-  const cross = applyGameCrossSignalRules(contributions, fadeTargetNorms);
+  const cross = applyGameCrossSignalRules(contributions, fadeTargets, matchedGame);
   for (const [team, delta] of cross.edgeDelta) {
     const existing = teamEdges.get(team);
     if (existing) existing.edge += delta;
@@ -1191,7 +1228,7 @@ function resolveSingleGame(
   const sharpRecs = recs.filter((r) => SHARP_BET_SIGNALS.has(r.signalType) && !r.line);
   if (sharpRecs.length > 0) {
     const sharpSide = effectiveTeamForRec(sharpRecs[0]);
-    if (sharpSide && !fadeTargetNorms.has(sharpSide.teamNorm)) {
+    if (sharpSide && !isFadeTargetTeam(sharpSide.teamNorm, fadeTargets, matchedGame)) {
       const clamped = clampWinnerToGame(sharpSide.teamDisplay, sharpSide.teamNorm, matchedGame);
       winnerNorm = clamped.norm;
       winnerDisplay = clamped.display;

@@ -99,7 +99,8 @@ const TEAM_ALIASES: Record<string, string[]> = {
   "washington nationals": ["nationals", "washington", "wsh"],
   "vegas golden knights": ["golden knights", "vegas", "vgk", "las vegas"],
   "dallas wings": ["wings", "dallas", "dal"],
-  "pittsburgh pirates": ["pirates", "pit"],
+  "pittsburgh pirates": ["pirates", "pit", "pittsburgh"],
+  "los angeles dodgers": ["dodgers", "lad", "la dodgers"],
   "atlanta braves": ["braves", "atl", "atlanta"],
   "chicago white sox": ["white sox", "white", "cws", "chw"],
   "kansas city royals": ["royals", "kc"],
@@ -136,6 +137,7 @@ const GENERIC_LOCATION_WORDS = new Set([
 
 function normalizeTeam(name: string): string {
   return name
+    .replace(/\s*[+-]?\d+\.?\d*\s*$/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .replace(/\s+/g, " ")

@@ -35,6 +35,17 @@ const WHITE_SOX_GAME: CalendarGame = {
   status: "Scheduled",
 };
 
+const DODGERS_PIRATES_GAME: CalendarGame = {
+  id: "401815700",
+  league: "MLB",
+  homeTeam: "Pittsburgh Pirates",
+  awayTeam: "Los Angeles Dodgers",
+  homeAbbr: "PIT",
+  awayAbbr: "LAD",
+  startTime: "2026-06-11T18:40:00Z",
+  status: "Scheduled",
+};
+
 const bookPick: SheetPick = {
   id: "book-1",
   league: "MLB",
@@ -142,6 +153,50 @@ const modelOnFadedTeam: SheetPick = {
   pick: "WHITE SOX",
   opponent: "ATLANTA",
   rawRow: 23,
+  gameSlot: 1,
+  signalCol: 8,
+};
+
+const pittsburghBookPick: SheetPick = {
+  id: "book-pit",
+  league: "MLB",
+  signalType: "book_needs_fade",
+  pick: "PITTSBURGH +140",
+  opponent: "LA DODGERS",
+  rawRow: 40,
+  gameSlot: 1,
+  signalCol: 4,
+};
+
+const dodgersSquarePick: SheetPick = {
+  id: "square-lad",
+  league: "MLB",
+  signalType: "square_fade",
+  pick: "LA DODGERS",
+  opponent: "PITTSBURGH",
+  rawRow: 40,
+  gameSlot: 1,
+  signalCol: 6,
+};
+
+const pittsburghBookOnlyPick: SheetPick = {
+  id: "book-pit-only",
+  league: "MLB",
+  signalType: "book_needs_fade",
+  pick: "PITTSBURGH +140",
+  opponent: "LA DODGERS",
+  rawRow: 41,
+  gameSlot: 1,
+  signalCol: 4,
+};
+
+const modelOnPirates: SheetPick = {
+  id: "model-pit",
+  league: "MLB",
+  signalType: "model_best_values",
+  pick: "PITTSBURGH +140",
+  opponent: "LA DODGERS",
+  rawRow: 42,
   gameSlot: 1,
   signalCol: 8,
 };
@@ -427,7 +482,79 @@ function main() {
     [bookOnlyPick],
     WHITE_SOX_GAME
   );
-  assert.ok(fadeTargets.has("WHITE SOX"), "Book listed team tracked as fade target");
+  assert.ok(
+    fadeTargets.has("CHICAGO WHITE SOX"),
+    "Book listed team tracked as fade target (game-resolved)"
+  );
+
+  assert.ok(
+    isOpposingDualFade(pittsburghBookPick, dodgersSquarePick),
+    "Pittsburgh book + LA Dodgers square on opposite VS sides"
+  );
+
+  const pitGameKey = buildGameKey(
+    pittsburghBookPick,
+    [pittsburghBookPick, dodgersSquarePick],
+    DODGERS_PIRATES_GAME
+  );
+  const { gameRecommendations: pitDualCards } = resolveGameConflicts(
+    [
+      makeRec(pittsburghBookPick, DODGERS_PIRATES_GAME, [pittsburghBookPick, dodgersSquarePick]),
+      makeRec(dodgersSquarePick, DODGERS_PIRATES_GAME, [pittsburghBookPick, dodgersSquarePick]),
+    ],
+    stats,
+    {
+      slatePicks: [pittsburghBookPick, dodgersSquarePick],
+      dualStats: emptyDualStats,
+    }
+  );
+  const pitDualCard = pitDualCards.find((g) => g.gameKey === pitGameKey);
+  assert.ok(pitDualCard?.noBet, "Pittsburgh book + Dodgers square → no bet");
+  assert.equal(pitDualCard!.recommendedTeam, "");
+  assert.equal(pitDualCard!.confidence, 0);
+
+  const { gameRecommendations: pitBookOnlyCards } = resolveGameConflicts(
+    [makeRec(pittsburghBookOnlyPick, DODGERS_PIRATES_GAME, [pittsburghBookOnlyPick])],
+    stats,
+    { slatePicks: [pittsburghBookOnlyPick], dualStats: emptyDualStats }
+  );
+  const pitBookOnlyCard = pitBookOnlyCards.find(
+    (g) => g.matchedGame?.id === DODGERS_PIRATES_GAME.id
+  );
+  assert.ok(pitBookOnlyCard, "Single Pittsburgh book fade produces consolidated game card");
+  assertNeverRecommendsFadeTarget(pitBookOnlyCard!, "PITTSBURGH", "Single Pittsburgh book fade");
+  assertNeverRecommendsFadeTarget(pitBookOnlyCard!, "PIRATES", "Single Pittsburgh book fade");
+  assert.ok(
+    pitBookOnlyCard!.recommendedTeam.toUpperCase().includes("DODGER"),
+    "Book fade PITTSBURGH → bet Dodgers"
+  );
+
+  const { gameRecommendations: pitModelCards } = resolveGameConflicts(
+    [
+      makeRec(pittsburghBookOnlyPick, DODGERS_PIRATES_GAME, [
+        pittsburghBookOnlyPick,
+        modelOnPirates,
+      ]),
+      makeRec(modelOnPirates, DODGERS_PIRATES_GAME, [pittsburghBookOnlyPick, modelOnPirates]),
+    ],
+    stats,
+    {
+      slatePicks: [pittsburghBookOnlyPick, modelOnPirates],
+      dualStats: emptyDualStats,
+    }
+  );
+  const pitModelCard = pitModelCards.find((g) => g.matchedGame?.id === DODGERS_PIRATES_GAME.id);
+  assert.ok(pitModelCard, "Pittsburgh book + model on Pirates produces consolidated card");
+  assertNeverRecommendsFadeTarget(
+    pitModelCard!,
+    "PITTSBURGH",
+    "Model vs Pittsburgh book fade"
+  );
+  assertNeverRecommendsFadeTarget(pitModelCard!, "PIRATES", "Model vs Pittsburgh book fade");
+  assert.ok(
+    pitModelCard!.recommendedTeam.toUpperCase().includes("DODGER"),
+    "Book fade must beat model picking Pirates (odds in pick text)"
+  );
 
   console.log("✓ All recommendation rule tests passed");
 }
