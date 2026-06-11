@@ -747,6 +747,18 @@ function matchupLabels(
   };
 }
 
+function sportLeagueFromRec(rec: MatchedRecommendation): string {
+  const map: Partial<Record<LeagueCode, string>> = {
+    MEGA_SHARPS: "MLB",
+    WHALE: "MLB",
+    MODEL: "MLB",
+    RLM: "MLB",
+  };
+  return map[rec.league] || rec.league;
+}
+
+const PREMIUM_LEAGUES = new Set<LeagueCode>(["MEGA_SHARPS", "WHALE", "MODEL", "RLM"]);
+
 function filterRecsForGame(recs: MatchedRecommendation[]): MatchedRecommendation[] {
   const game = recs.find((r) => r.matchedGame)?.matchedGame;
   if (!game) return recs;
@@ -754,6 +766,10 @@ function filterRecsForGame(recs: MatchedRecommendation[]): MatchedRecommendation
   return recs.filter((rec) => {
     if (!rec.matchedGame) return false;
     if (rec.matchedGame.id !== game.id) return false;
+    if (rec.matchedGame.league !== game.league) return false;
+    if (!PREMIUM_LEAGUES.has(rec.league) && sportLeagueFromRec(rec) !== game.league) {
+      return false;
+    }
     return pickBelongsToGame(rec.pick, rec.opponent, game);
   });
 }
@@ -972,17 +988,43 @@ function resolveSingleGame(
   confidence = Math.round(confidence);
 
   if (matchedGame && !validateRecommendedTeam(winnerDisplay, matchedGame)) {
-    const fallback = clampWinnerToGame(
-      sorted[0]?.[1].display ?? winnerDisplay,
-      sorted[0]?.[0] ?? winnerNorm,
-      matchedGame
-    );
-    winnerDisplay = fallback.display;
-    winnerNorm = fallback.norm;
-    winnerEdge = sorted[0]?.[1].edge ?? winnerEdge;
-    dualFadeReasoning = "";
-    dualFadeConfidence = undefined;
-    dualFadeInfo = undefined;
+    const { awayTeam, homeTeam } = matchupLabels(recs);
+    const noBetReason = `${winnerDisplay} ne fait pas partie de ${awayTeam} @ ${homeTeam}`;
+    const consolidated: GameConsolidatedRecommendation = {
+      gameKey,
+      league: recs[0].league,
+      awayTeam,
+      homeTeam,
+      recommendedTeam: "",
+      confidence: 0,
+      noBet: true,
+      noBetReason,
+      confidenceBreakdown: [
+        {
+          key: "invalid_team",
+          label: "Équipe invalide pour ce match",
+          value: 0,
+          impact: 0,
+          detail: noBetReason,
+        },
+      ],
+      hasConflict: true,
+      pickIds: recs.map((r) => r.id),
+      reasoning: `Match: ${awayTeam} @ ${homeTeam} · ${noBetReason}`,
+      matchedGame,
+    };
+
+    const updatedRecs = recs.map((rec) => ({
+      ...rec,
+      gameKey,
+      gameConflict: true,
+      conflictNote: "Équipe hors match — pas de pari",
+      consolidatedTeam: undefined,
+      consolidatedConfidence: 0,
+      edgeLabel: "Pas de pari — équipe invalide",
+    }));
+
+    return { consolidated, updatedRecs };
   }
 
   const { awayTeam, homeTeam } = matchupLabels(recs);
@@ -1095,16 +1137,6 @@ function resolveSingleGame(
   });
 
   return { consolidated, updatedRecs };
-}
-
-function sportLeagueFromRec(rec: MatchedRecommendation): string {
-  const map: Partial<Record<LeagueCode, string>> = {
-    MEGA_SHARPS: "MLB",
-    WHALE: "MLB",
-    MODEL: "MLB",
-    RLM: "MLB",
-  };
-  return map[rec.league] || rec.league;
 }
 
 export interface GameConflictResult {

@@ -88,22 +88,50 @@ export function todayDisplayDate(): string {
 const TEAM_ALIASES: Record<string, string[]> = {
   "ny yankees": ["yankees", "new york yankees", "nyy"],
   "ny mets": ["mets", "new york mets", "nym"],
-  cubs: ["chicago cubs", "chc"],
-  "san diego": ["padres", "san diego padres", "sd"],
-  milwaukee: ["brewers", "milwaukee brewers", "mil"],
-  baltimore: ["orioles", "baltimore orioles", "bal"],
-  seattle: ["mariners", "seattle mariners", "sea"],
-  cleveland: ["guardians", "cleveland guardians", "cle"],
-  colorado: ["rockies", "colorado rockies", "col"],
-  washington: ["nationals", "washington nationals", "wsh"],
-  vegas: ["golden knights", "vegas golden knights", "vgk", "las vegas"],
-  dallas: ["wings", "dallas wings", "dal"],
-  chicago: ["sky", "chicago sky", "chi"],
-  pirates: ["pittsburgh pirates", "pit"],
-  braves: ["atlanta braves", "atl"],
-  royals: ["kansas city royals", "kc"],
-  philadelphia: ["phillies", "philadelphia phillies", "phi"],
+  "chicago cubs": ["cubs", "chc"],
+  "chicago sky": ["sky", "chi sky"],
+  "san diego padres": ["padres", "san diego", "sd"],
+  "milwaukee brewers": ["brewers", "milwaukee", "mil"],
+  "baltimore orioles": ["orioles", "baltimore", "bal"],
+  "seattle mariners": ["mariners", "seattle", "sea"],
+  "cleveland guardians": ["guardians", "cleveland", "cle"],
+  "colorado rockies": ["rockies", "colorado", "col"],
+  "washington nationals": ["nationals", "washington", "wsh"],
+  "vegas golden knights": ["golden knights", "vegas", "vgk", "las vegas"],
+  "dallas wings": ["wings", "dallas", "dal"],
+  "pittsburgh pirates": ["pirates", "pit"],
+  "atlanta braves": ["braves", "atl"],
+  "kansas city royals": ["royals", "kc"],
+  "philadelphia phillies": ["phillies", "philadelphia", "phi"],
 };
+
+/** City/region tokens — too broad to match teams on their own */
+const GENERIC_LOCATION_WORDS = new Set([
+  "chicago",
+  "baltimore",
+  "seattle",
+  "cleveland",
+  "colorado",
+  "washington",
+  "milwaukee",
+  "philadelphia",
+  "dallas",
+  "vegas",
+  "san",
+  "diego",
+  "angeles",
+  "new",
+  "york",
+  "golden",
+  "kansas",
+  "city",
+  "los",
+  "las",
+  "pittsburgh",
+  "atlanta",
+  "kansas",
+  "philadelphia",
+]);
 
 function normalizeTeam(name: string): string {
   return name
@@ -120,24 +148,32 @@ function abbrMatchesPick(pick: string, abbr: string): boolean {
   return re.test(pick);
 }
 
+function aliasMatchesName(name: string, alias: string): boolean {
+  if (name === alias) return true;
+  if (name.startsWith(`${alias} `) || name.endsWith(` ${alias}`)) return true;
+  if (alias.startsWith(`${name} `) || alias.endsWith(` ${name}`)) return true;
+  return false;
+}
+
 function teamMatches(pickTeam: string, gameTeam: string, gameAbbr: string): boolean {
   const pick = normalizeTeam(pickTeam);
   const team = normalizeTeam(gameTeam);
   const abbr = gameAbbr.toLowerCase();
 
   if (pick === team) return true;
-  if (team.startsWith(pick + " ") || pick.startsWith(team + " ")) return true;
   if (abbr && abbrMatchesPick(pick, abbr)) return true;
 
-  for (const [key, aliases] of Object.entries(TEAM_ALIASES)) {
-    const all = [key, ...aliases].map(normalizeTeam);
-    const pickHit = all.some((a) => pick === a || pick.startsWith(a + " ") || a.startsWith(pick + " "));
-    const teamHit = all.some((a) => team === a || team.startsWith(a + " ") || a.startsWith(team + " "));
-    if (pickHit && teamHit) return true;
+  for (const [canonical, aliases] of Object.entries(TEAM_ALIASES)) {
+    const forms = [canonical, ...aliases].map(normalizeTeam);
+    for (const form of forms) {
+      if (aliasMatchesName(pick, form) && aliasMatchesName(team, form)) {
+        return true;
+      }
+    }
   }
 
-  const pickWords = pick.split(" ").filter((w) => w.length > 3);
-  return pickWords.some((w) => team.includes(w) || w.includes(team));
+  const pickWords = pick.split(" ").filter((w) => w.length > 3 && !GENERIC_LOCATION_WORDS.has(w));
+  return pickWords.some((w) => team.includes(w));
 }
 
 export function pickTeamInGame(teamName: string, game: CalendarGame): boolean {

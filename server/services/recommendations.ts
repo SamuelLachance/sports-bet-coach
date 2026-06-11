@@ -60,8 +60,18 @@ const SPECIAL_TO_SPORT: Partial<Record<string, string>> = {
   RLM: "MLB",
 };
 
+const PREMIUM_LEAGUES = new Set(["MEGA_SHARPS", "WHALE", "MODEL", "RLM"]);
+
 function sportLeagueForPick(pick: SheetPick): string {
   return SPECIAL_TO_SPORT[pick.league] || pick.league;
+}
+
+function gamesForPick(pick: SheetPick, games: CalendarGame[]): CalendarGame[] {
+  if (PREMIUM_LEAGUES.has(pick.league)) {
+    return games;
+  }
+  const sportLeague = sportLeagueForPick(pick);
+  return games.filter((g) => g.league === sportLeague);
 }
 
 export async function buildRecommendations(
@@ -78,8 +88,7 @@ export async function buildRecommendations(
   const fullHistory = (await getFullHistoryStats()) ?? undefined;
 
   const rawRecs = sheets.dailyPicks.map((pick) => {
-    const sportLeague = sportLeagueForPick(pick);
-    const leagueGames = games.filter((g) => g.league === sportLeague);
+    const leagueGames = gamesForPick(pick, games);
     const matchedGame = matchPickToGame(pick.pick, pick.opponent, leagueGames);
 
     const confidenceResult = computeConfidence({
