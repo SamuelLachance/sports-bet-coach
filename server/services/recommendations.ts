@@ -178,8 +178,9 @@ export async function buildRecommendations(
     gameDate,
   });
 
+  if (!isDratingsEnabled()) return engineResult;
+
   if (options?.skipDratingsFetch && !options.dratingsTrends) {
-    if (!isDratingsEnabled()) return engineResult;
     // DRatings enabled but no trends (e.g. browser sync without baked cache) — block per spec
     return applyDratingsFilter(engineResult, []);
   }

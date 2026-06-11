@@ -84,10 +84,10 @@ export const DRATINGS_LEAGUE_PATHS: Partial<
 export const DRATINGS_USER_AGENT =
   process.env.DRATINGS_USER_AGENT || "sports-bet-coach/1.0 (+https://github.com/sports-bet-coach)";
 
-/** When false, skip DRatings confirmation filter (dev/CI). Default: enabled. */
+/** When false, skip DRatings confirmation filter. Default: disabled. */
 export function isDratingsEnabled(): boolean {
   const v = process.env.DRATINGS_ENABLED;
-  if (v == null || v === "") return true;
+  if (v == null || v === "") return false;
   return !/^false|0|no$/i.test(v);
 }
 

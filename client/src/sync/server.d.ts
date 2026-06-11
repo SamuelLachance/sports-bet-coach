@@ -86,7 +86,19 @@ declare module "@server/services/confidenceCache.js" {
   ): Promise<unknown>;
 }
 
+declare module "@server/services/dratingsTrends.js" {
+  export interface DratingsGameTrend {
+    gameKey: string;
+    league: string;
+    awayTeam: string;
+    homeTeam: string;
+    moneyLine: { trendLabel?: string };
+    total: { trendLabel?: string };
+  }
+}
+
 declare module "@server/services/recommendations.js" {
+  import type { DratingsGameTrend } from "@server/services/dratingsTrends.js";
   import type {
     CalendarGame,
     GameConsolidatedRecommendation,
@@ -97,7 +109,8 @@ declare module "@server/services/recommendations.js" {
   export function buildRecommendations(
     sheets: ParsedSheets,
     games: CalendarGame[],
-    targetDate?: string
+    targetDate?: string,
+    options?: { dratingsTrends?: DratingsGameTrend[]; skipDratingsFetch?: boolean }
   ): Promise<{
     recommendations: MatchedRecommendation[];
     gameRecommendations: GameConsolidatedRecommendation[];

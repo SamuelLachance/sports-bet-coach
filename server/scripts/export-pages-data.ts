@@ -43,8 +43,12 @@ async function main() {
     console.log(
       `DRatings: ${dratingsCache.trends.length} games, ${dratingsCache.errors.length} fetch errors`
     );
-  } else if (skipDratingsFetch) {
-    console.log("DRatings fetch skipped (CI without DRATINGS_ENABLED=true)");
+  } else {
+    console.log(
+      dratingsEnabled
+        ? "DRatings fetch skipped (CI without DRATINGS_ENABLED=true)"
+        : "DRatings disabled (DRATINGS_ENABLED=false)"
+    );
   }
 
   const built = await buildRecommendations(sheets, games, displayDate, {
