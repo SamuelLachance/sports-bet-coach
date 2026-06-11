@@ -598,13 +598,11 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
-/** Detect if two fade picks oppose on the same VS row */
+/** Detect if two fade picks oppose on the same matchup (VS row may split across raw rows). */
 export function isOpposingDualFade(
   bookNeedsPick: SheetPick,
   squarePick: SheetPick
 ): boolean {
-  if (bookNeedsPick.rawRow !== squarePick.rawRow) return false;
-
   const bookFade = normalizeTeam(bookNeedsPick.pick);
   const squareFade = normalizeTeam(squarePick.pick);
   const bookOpp = bookNeedsPick.opponent
@@ -612,11 +610,19 @@ export function isOpposingDualFade(
     : "";
   const squareOpp = squarePick.opponent ? normalizeTeam(squarePick.opponent) : "";
 
-  if (bookOpp && squareFade === bookOpp && squareOpp && bookFade === squareOpp) {
-    return true;
-  }
+  const fullCross =
+    !!bookOpp &&
+    !!squareOpp &&
+    squareFade === bookOpp &&
+    bookFade === squareOpp;
 
-  return bookOpp === squareFade || squareOpp === bookFade;
+  if (fullCross) return true;
+
+  const partialCross = bookOpp === squareFade || squareOpp === bookFade;
+  if (!partialCross) return false;
+
+  // Partial opponent data — require same sheet row to avoid false positives
+  return bookNeedsPick.rawRow === squarePick.rawRow;
 }
 
 export function resolveDualFadeMatch(

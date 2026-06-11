@@ -21,6 +21,17 @@ const CUBS_ROCKIES: CalendarGame = {
   status: "Scheduled",
 };
 
+const WHITE_SOX_BRAVES: CalendarGame = {
+  id: "401815699",
+  league: "MLB",
+  homeTeam: "Atlanta Braves",
+  awayTeam: "Chicago White Sox",
+  homeAbbr: "ATL",
+  awayAbbr: "CWS",
+  startTime: "2026-06-11T18:10:00Z",
+  status: "Scheduled",
+};
+
 const SKY_MYSTICS: CalendarGame = {
   id: "401800001",
   league: "WNBA",
@@ -52,6 +63,14 @@ function main() {
   assert.ok(
     pickBelongsToGame("CHICAGO SKY", undefined, SKY_MYSTICS),
     "Chicago Sky belongs to WNBA game"
+  );
+  assert.ok(
+    pickBelongsToGame("WHITE SOX", "ATLANTA", WHITE_SOX_BRAVES),
+    "WHITE SOX vs ATLANTA belongs to White Sox @ Braves"
+  );
+  assert.ok(
+    pickBelongsToGame("ATLANTA", "WHITE SOX", WHITE_SOX_BRAVES),
+    "ATLANTA vs WHITE SOX belongs to White Sox @ Braves"
   );
 
   const mlbGames = [CUBS_ROCKIES];

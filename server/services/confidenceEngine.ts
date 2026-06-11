@@ -903,6 +903,35 @@ function clampWinnerToGame(
   return { display: winnerDisplay, norm: winnerNorm };
 }
 
+function matchedRecToSheetPick(rec: MatchedRecommendation): SheetPick {
+  return {
+    id: rec.id,
+    league: rec.league,
+    signalType: rec.signalType,
+    pick: rec.pick,
+    opponent: rec.opponent,
+    rawRow: 0,
+    signalCol: 0,
+  };
+}
+
+function findOpposingFadeRecPair(
+  recs: MatchedRecommendation[]
+): { book: MatchedRecommendation; square: MatchedRecommendation } | null {
+  const books = recs.filter((r) => r.signalType === "book_needs_fade" && !r.line);
+  const squares = recs.filter((r) => r.signalType === "square_fade" && !r.line);
+
+  for (const book of books) {
+    for (const square of squares) {
+      if (isOpposingDualFade(matchedRecToSheetPick(book), matchedRecToSheetPick(square))) {
+        return { book, square };
+      }
+    }
+  }
+
+  return null;
+}
+
 function buildOpposingDualFadeNoBet(
   gameKey: string,
   recs: MatchedRecommendation[],
@@ -1003,6 +1032,17 @@ function resolveSingleGame(
 
   const matchedGame = recs.find((r) => r.matchedGame)?.matchedGame;
 
+  const recPair = findOpposingFadeRecPair(recs);
+  if (recPair) {
+    return buildOpposingDualFadeNoBet(
+      gameKey,
+      recs,
+      matchedRecToSheetPick(recPair.book),
+      matchedRecToSheetPick(recPair.square),
+      matchedGame
+    );
+  }
+
   if (slatePicks?.length && matchedGame) {
     const league = sportLeagueFromRec(recs[0]);
     const pair = findDualFadePair(slatePicks, league, {
@@ -1036,6 +1076,20 @@ function resolveSingleGame(
   for (const [team, delta] of cross.edgeDelta) {
     const existing = teamEdges.get(team);
     if (existing) existing.edge += delta;
+  }
+
+  if (cross.dampenConfidence) {
+    const bookRec = recs.find((r) => r.signalType === "book_needs_fade" && !r.line);
+    const squareRec = recs.find((r) => r.signalType === "square_fade" && !r.line);
+    if (bookRec && squareRec) {
+      return buildOpposingDualFadeNoBet(
+        gameKey,
+        recs,
+        matchedRecToSheetPick(bookRec),
+        matchedRecToSheetPick(squareRec),
+        matchedGame
+      );
+    }
   }
 
   const sorted = [...teamEdges.entries()].sort((a, b) => b[1].edge - a[1].edge);

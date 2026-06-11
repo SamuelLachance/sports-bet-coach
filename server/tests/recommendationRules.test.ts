@@ -27,10 +27,10 @@ const GAME: CalendarGame = {
 const WHITE_SOX_GAME: CalendarGame = {
   id: "401815699",
   league: "MLB",
-  homeTeam: "Chicago White Sox",
-  awayTeam: "Atlanta Braves",
-  homeAbbr: "CWS",
-  awayAbbr: "ATL",
+  homeTeam: "Atlanta Braves",
+  awayTeam: "Chicago White Sox",
+  homeAbbr: "ATL",
+  awayAbbr: "CWS",
   startTime: "2026-06-11T18:10:00Z",
   status: "Scheduled",
 };
@@ -77,6 +77,19 @@ const atlantaSquarePick: SheetPick = {
   rawRow: 20,
   gameSlot: 1,
   signalCol: 6,
+};
+
+/** Same VS matchup but book/square parsed on different sheet rows (production layout). */
+const whiteSoxBookSplitRow: SheetPick = {
+  ...whiteSoxBookPick,
+  id: "book-ws-split",
+  rawRow: 31,
+};
+
+const atlantaSquareSplitRow: SheetPick = {
+  ...atlantaSquarePick,
+  id: "square-atl-split",
+  rawRow: 32,
 };
 
 const bookOnlyPick: SheetPick = {
@@ -211,6 +224,10 @@ function main() {
     isOpposingDualFade(whiteSoxBookPick, atlantaSquarePick),
     "White Sox book vs Atlanta square on opposite VS sides"
   );
+  assert.ok(
+    isOpposingDualFade(whiteSoxBookSplitRow, atlantaSquareSplitRow),
+    "Opposing fades detected even when sheet rows differ"
+  );
 
   const bookConf = computeConfidence({
     pick: bookPick,
@@ -311,6 +328,22 @@ function main() {
   );
   const wsCard = wsCards.find((g) => g.gameKey === wsGameKey);
   assert.ok(wsCard?.noBet, "White Sox vs Atlanta opposing fades → no bet");
+  assert.equal(wsCard!.recommendedTeam, "");
+  assert.equal(wsCard!.confidence, 0);
+
+  const wsSplitSlate = [whiteSoxBookSplitRow, atlantaSquareSplitRow];
+  const { gameRecommendations: wsSplitCards } = resolveGameConflicts(
+    [
+      makeRec(whiteSoxBookSplitRow, WHITE_SOX_GAME, wsSplitSlate),
+      makeRec(atlantaSquareSplitRow, WHITE_SOX_GAME, wsSplitSlate),
+    ],
+    stats,
+    { slatePicks: wsSplitSlate, dualStats: emptyDualStats }
+  );
+  const wsSplitCard = wsSplitCards.find((g) => g.matchedGame?.id === WHITE_SOX_GAME.id);
+  assert.ok(wsSplitCard?.noBet, "Split-row opposing fades → no bet");
+  assert.equal(wsSplitCard!.recommendedTeam, "");
+  assert.equal(wsSplitCard!.confidence, 0);
 
   const { gameRecommendations: bookOnlyCards } = resolveGameConflicts(
     [makeRec(bookOnlyPick, WHITE_SOX_GAME, [bookOnlyPick])],

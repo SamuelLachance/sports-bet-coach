@@ -100,7 +100,8 @@ const TEAM_ALIASES: Record<string, string[]> = {
   "vegas golden knights": ["golden knights", "vegas", "vgk", "las vegas"],
   "dallas wings": ["wings", "dallas", "dal"],
   "pittsburgh pirates": ["pirates", "pit"],
-  "atlanta braves": ["braves", "atl"],
+  "atlanta braves": ["braves", "atl", "atlanta"],
+  "chicago white sox": ["white sox", "white", "cws", "chw"],
   "kansas city royals": ["royals", "kc"],
   "philadelphia phillies": ["phillies", "philadelphia", "phi"],
 };
