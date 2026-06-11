@@ -68,6 +68,19 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
           {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (
             <span className="badge bg-warning/20 text-warning">Multi-fade</span>
           )}
+          {game.dualAlgoConfirmed && (
+            <span
+              className="badge bg-success/20 text-success"
+              title={game.sportsOddsTrendLabel || "Coach + Sports Odds agree"}
+            >
+              Dual algo ✓
+            </span>
+          )}
+          {game.sportsOddsConfirmed && !game.dualAlgoConfirmed && (
+            <span className="badge bg-accent/20 text-accent-glow" title={game.sportsOddsTrendLabel}>
+              Odds algo ✓
+            </span>
+          )}
           {game.dratingsConfirmed && (
             <span className="badge bg-success/20 text-success" title={game.dratingsTrendLabel}>
               DRatings ✓

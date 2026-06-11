@@ -91,6 +91,20 @@ export function isDratingsEnabled(): boolean {
   return !/^false|0|no$/i.test(v);
 }
 
+/** Live FastAPI server or GitHub Pages root for Sports Odds Algorithms. */
+export const SPORTS_ODDS_BASE_URL =
+  process.env.SPORTS_ODDS_BASE_URL ||
+  "https://samuellachance.github.io/Sports-Odds-Algorithms";
+
+export const SPORTS_ODDS_SUPPORTED_LEAGUES = ["MLB", "NBA", "NHL"] as const;
+
+/** Dual-algo gate: coach rules + Sports Odds Algo V2 must agree. Default: enabled. */
+export function isSportsOddsEnabled(): boolean {
+  const v = process.env.SPORTS_ODDS_ENABLED;
+  if (v == null || v === "") return true;
+  return !/^false|0|no$/i.test(v);
+}
+
 export const ESPN_LEAGUES: Record<
   string,
   { sport: string; league: string; label: string }

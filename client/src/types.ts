@@ -104,6 +104,10 @@ export interface GameConsolidatedRecommendation {
   dratingsConfirmed?: boolean;
   dratingsStatus?: "agrees" | "disagrees" | "unavailable";
   dratingsTrendLabel?: string;
+  sportsOddsConfirmed?: boolean;
+  sportsOddsStatus?: "agrees" | "disagrees" | "unavailable";
+  sportsOddsTrendLabel?: string;
+  dualAlgoConfirmed?: boolean;
 }
 
 export interface MatchedRecommendation {
@@ -142,6 +146,10 @@ export interface MatchedRecommendation {
   dratingsConfirmed?: boolean;
   dratingsStatus?: "agrees" | "disagrees" | "unavailable";
   dratingsBlocked?: boolean;
+  sportsOddsConfirmed?: boolean;
+  sportsOddsStatus?: "agrees" | "disagrees" | "unavailable";
+  sportsOddsBlocked?: boolean;
+  dualAlgoConfirmed?: boolean;
 }
 
 export interface LeaguePerformance {

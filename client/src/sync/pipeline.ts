@@ -78,6 +78,22 @@ function buildSyncStatus(sheets: ParsedSheets, leagues: string[], gameCount: num
   };
 }
 
+async function loadBakedSportsOddsPredictions(): Promise<
+  import("@server/services/sportsOddsAlgo.js").SportsOddsGamePrediction[] | undefined
+> {
+  try {
+    const base = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
+    const res = await fetch(`${base}api/sports-odds-cache.json`);
+    if (!res.ok) return undefined;
+    const data = (await res.json()) as {
+      games?: import("@server/services/sportsOddsAlgo.js").SportsOddsGamePrediction[];
+    };
+    return data.games?.length ? data.games : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function loadBakedDratingsTrends(): Promise<
   import("@server/services/dratingsTrends.js").DratingsGameTrend[] | undefined
 > {
@@ -98,9 +114,12 @@ export async function runClientSync(): Promise<ClientSyncSnapshot> {
   const dateKey = todayDateKey();
   const games = await fetchAllSchedules(leagues, dateKey);
   const dratingsTrends = await loadBakedDratingsTrends();
+  const sportsOddsPredictions = await loadBakedSportsOddsPredictions();
   const built = await buildRecommendations(sheets, games, todayDisplayDate(), {
     skipDratingsFetch: true,
     dratingsTrends,
+    skipSportsOddsFetch: true,
+    sportsOddsPredictions,
   });
   const tracking = await updateTracking(
     built.gameRecommendations,

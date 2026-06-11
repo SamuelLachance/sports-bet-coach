@@ -25,7 +25,7 @@ function isActionableGameRec(g: GameConsolidatedRecommendation): boolean {
 }
 
 function isVisiblePick(rec: MatchedRecommendation): boolean {
-  return !rec.dratingsBlocked;
+  return !rec.dratingsBlocked && !rec.sportsOddsBlocked;
 }
 
 export function DailyPicks({ recommendations, gameRecommendations = [], leagues }: DailyPicksProps) {

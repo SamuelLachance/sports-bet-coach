@@ -1,6 +1,6 @@
 ﻿import fs from "node:fs/promises";
 import path from "node:path";
-import { TIMEZONE, isDratingsEnabled } from "../config.js";
+import { TIMEZONE, isDratingsEnabled, isSportsOddsEnabled } from "../config.js";
 import {
   fetchAllSchedules,
   todayDateKey,
@@ -10,8 +10,10 @@ import { fetchDratingsTrends } from "../services/dratingsTrends.js";
 import {
   buildRecommendations,
   countDratingsFilterStats,
+  countSportsOddsFilterStats,
   getActiveLeagues,
 } from "../services/recommendations.js";
+import { fetchSportsOddsSlate } from "../services/sportsOddsAlgo.js";
 import { syncAllSheets } from "../services/sheetFetcher.js";
 import { updateTracking } from "../services/tracking.js";
 
@@ -35,6 +37,18 @@ async function main() {
   const skipDratingsFetch =
     process.env.CI === "true" && process.env.DRATINGS_ENABLED !== "true";
   const dratingsEnabled = isDratingsEnabled();
+  const sportsOddsEnabled = isSportsOddsEnabled();
+
+  let sportsOddsCache: Awaited<ReturnType<typeof fetchSportsOddsSlate>> | undefined;
+  if (sportsOddsEnabled) {
+    console.log("Fetching Sports Odds daily slate…");
+    sportsOddsCache = await fetchSportsOddsSlate(displayDate);
+    console.log(
+      `Sports Odds: ${sportsOddsCache.games.length} games, ${sportsOddsCache.errors.length} errors`
+    );
+  } else {
+    console.log("Sports Odds dual-algo gate disabled (SPORTS_ODDS_ENABLED=false)");
+  }
 
   let dratingsCache: Awaited<ReturnType<typeof fetchDratingsTrends>> | undefined;
   if (dratingsEnabled && !skipDratingsFetch) {
@@ -54,7 +68,16 @@ async function main() {
   const built = await buildRecommendations(sheets, games, displayDate, {
     skipDratingsFetch,
     dratingsTrends: dratingsCache?.trends,
+    skipSportsOddsFetch: sportsOddsEnabled && !sportsOddsCache?.games.length,
+    sportsOddsPredictions: sportsOddsCache?.games,
   });
+
+  if (sportsOddsEnabled) {
+    const stats = countSportsOddsFilterStats(built);
+    console.log(
+      `Sports Odds filter: ${stats.gamesConfirmed} games confirmed, ${stats.gamesNoBet} games → no bet, ${stats.dualAlgoGames} dual-algo games`
+    );
+  }
 
   if (dratingsEnabled && !skipDratingsFetch) {
     const stats = countDratingsFilterStats(built);
@@ -119,6 +142,15 @@ async function main() {
       trends: dratingsCache.trends,
       errors: dratingsCache.errors,
       source: dratingsCache.source,
+    });
+  }
+  if (sportsOddsCache) {
+    await writeJson("sports-odds-cache", {
+      fetchedAt: sportsOddsCache.fetchedAt,
+      date: sportsOddsCache.date,
+      games: sportsOddsCache.games,
+      errors: sportsOddsCache.errors,
+      source: sportsOddsCache.source,
     });
   }
 
