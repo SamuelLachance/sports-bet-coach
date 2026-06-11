@@ -18,7 +18,7 @@ import {
 } from "./fullHistoryStats.js";
 import {
   findDualFadePair,
-  formatHistoricalSampleLabel,
+  isOpposingDualFade,
   resolveDualFadeMatch,
   type DualFadeStatsCache,
 } from "./dualFadeStats.js";
@@ -27,7 +27,7 @@ import {
   resolveGameTeamDisplay,
   validateRecommendedTeam,
 } from "./calendar.js";
-import { FADE_SIGNALS, SIGNAL_LABELS_FR } from "./signalMapping.js";
+import { FADE_SIGNALS, SHARP_BET_SIGNALS, SIGNAL_LABELS_FR } from "./signalMapping.js";
 
 export interface ConfidenceInput {
   pick: SheetPick;
@@ -431,52 +431,89 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
   let opponentConfidence: number | undefined;
   let edgeLabel = signalStats.blendedRoi >= 0 ? "Signal profitable" : "Signal faible";
 
-  const inverted = shouldInvert(stats, pick.signalType);
-  const ultraNeg = isUltraNegative(stats, pick.signalType);
-
-  if (inverted && FADE_SIGNALS.has(pick.signalType)) {
-    signalPolarity = "inverted";
+  // Rule: Book Needs / Square Top list the public side → always bet the opponent
+  if (FADE_SIGNALS.has(pick.signalType)) {
     opponentPick = extractOpponentName(pick, slatePicks);
-
-    const fadeConfidence = clamp(25 + signalStats.blendedRoi / 20, 10, 35);
-    const invertBoost = clamp(70 - signalStats.blendedRoi / 15, 65, 92);
-
-    breakdown.push({
-      key: "inversion",
-      label: "Inversion fade (ROI ultra-négatif)",
-      value: signalStats.allTimeReturn,
-      impact: fadeConfidence - confidence,
-      detail: opponentPick
-        ? `Jouer ${opponentPick} au lieu de fade`
-        : "Fade historiquement perdant — inverser",
-    });
-
-    confidence = fadeConfidence;
-    edgeLabel = "Fade à éviter — jouer l'adversaire";
-
     if (opponentPick) {
-      opponentConfidence = Math.round(invertBoost);
+      signalPolarity = "inverted";
+      opponentConfidence = Math.round(clamp(74 + signalStats.blendedRoi / 40, 70, 88));
+      confidence = opponentConfidence;
+      edgeLabel =
+        pick.signalType === "book_needs_fade"
+          ? "Book Needs → jouer l'adversaire"
+          : "Square Top → jouer l'adversaire";
       breakdown.push({
-        key: "opponent_boost",
-        label: `Pick inversé: ${opponentPick}`,
-        value: invertBoost,
-        impact: invertBoost - confidence,
+        key: "fade_inverse",
+        label: "Règle fade",
+        value: 1,
+        impact: opponentConfidence - 50,
+        detail: `${displayTeamName(pick.pick)} listé → jouer ${displayTeamName(opponentPick)}`,
+      });
+    } else {
+      signalPolarity = "negative";
+      confidence = Math.round(clamp(confidence, 18, 38));
+      edgeLabel = "Fade sans adversaire identifié";
+      breakdown.push({
+        key: "fade_no_opponent",
+        label: "Fade incomplet",
+        value: 0,
+        impact: -12,
+        detail: "Adversaire non trouvé sur la feuille",
       });
     }
-  } else if (ultraNeg) {
-    signalPolarity = "negative";
-    confidence = clamp(confidence - 15, 15, 45);
+  } else if (SHARP_BET_SIGNALS.has(pick.signalType)) {
+    // Rule: Sharp Money → always bet the listed team
+    signalPolarity = "positive";
+    confidence = Math.round(clamp(Math.max(confidence, 80), 78, 95));
+    edgeLabel = "Sharp Money — jouer cette équipe";
     breakdown.push({
-      key: "ultra_negative",
-      label: "Signal ultra-négatif",
-      value: signalStats.allTimeReturn,
-      impact: -15,
+      key: "sharp_follow",
+      label: "Règle Sharp Money",
+      value: 1,
+      impact: confidence - 50,
+      detail: `Jouer ${displayTeamName(pick.pick)}`,
     });
-    edgeLabel = "Signal historiquement perdant";
-  } else if (signalStats.blendedRoi > 20) {
-    edgeLabel = "Argent intelligent";
-    if (pick.signalType === "sharp_money" || pick.signalType === "mega_sharps") {
-      edgeLabel = "Consensus sharps";
+  } else {
+    const inverted = shouldInvert(stats, pick.signalType);
+    const ultraNeg = isUltraNegative(stats, pick.signalType);
+
+    if (inverted && pick.signalType === "whale_plays") {
+      signalPolarity = "inverted";
+      opponentPick = extractOpponentName(pick, slatePicks);
+      const fadeConfidence = clamp(25 + signalStats.blendedRoi / 20, 10, 35);
+      const invertBoost = clamp(70 - signalStats.blendedRoi / 15, 65, 92);
+      breakdown.push({
+        key: "inversion",
+        label: "Inversion fade (ROI ultra-négatif)",
+        value: signalStats.allTimeReturn,
+        impact: fadeConfidence - confidence,
+        detail: opponentPick
+          ? `Jouer ${opponentPick} au lieu de fade`
+          : "Fade historiquement perdant — inverser",
+      });
+      confidence = fadeConfidence;
+      edgeLabel = "Fade à éviter — jouer l'adversaire";
+      if (opponentPick) {
+        opponentConfidence = Math.round(invertBoost);
+        breakdown.push({
+          key: "opponent_boost",
+          label: `Pick inversé: ${opponentPick}`,
+          value: invertBoost,
+          impact: invertBoost - confidence,
+        });
+      }
+    } else if (ultraNeg) {
+      signalPolarity = "negative";
+      confidence = clamp(confidence - 15, 15, 45);
+      breakdown.push({
+        key: "ultra_negative",
+        label: "Signal ultra-négatif",
+        value: signalStats.allTimeReturn,
+        impact: -15,
+      });
+      edgeLabel = "Signal historiquement perdant";
+    } else if (signalStats.blendedRoi > 20) {
+      edgeLabel = "Argent intelligent";
     }
   }
 
@@ -508,8 +545,8 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
   return {
     confidence,
     confidenceBreakdown: breakdown,
-    opponentPick: inverted ? opponentPick : undefined,
-    opponentConfidence: inverted ? opponentConfidence : undefined,
+    opponentPick: signalPolarity === "inverted" ? opponentPick : undefined,
+    opponentConfidence: signalPolarity === "inverted" ? opponentConfidence : undefined,
     signalPolarity,
     edgeLabel: highConviction ? `${edgeLabel} · Haute conviction` : edgeLabel,
     historicalWinRate,
@@ -556,30 +593,11 @@ export function applyConfidenceToRecommendation(
 //
 // Rules (applied per matchup when 2+ picks share the same gameKey):
 //
-// 1. GROUPING — buildGameKey() uses ESPN game id, sorted team pair, or same
-//    sheet row (e.g. Book Needs col + Square col on one MLB line).
-//
-// 2. EFFECTIVE TEAM — each pick maps to one supported team after inversion:
-//    • inverted fade → opponent side (historically losing fade = bet other side)
-//    • positive sharp / whale / model → pick side
-//    • negative non-inverted → weak support for pick side
-//
-// 3. NET EDGE — per team, sum weighted edge:
-//    weight = sampleWeight × |blendedRoi|/150 (stronger historical inversion = more weight)
-//    inverted edge = opponentConfidence × weight
-//    positive edge = confidence × 0.55
-//
-// 4. DOUBLE FADE (Book Needs + Square on OPPOSITE sides of same game):
-//    Both fades are inverted; whichever signal has worse (more negative) ROI gets
-//    a reliability bonus (+12% edge). Apply "Double fade public/book" penalty (-8)
-//    to both sides when edges are within 15% — signals cancel out.
-//
-// 5. SHARP + FADE CONFLUENCE — sharp_money or mega_sharps supporting the same
-//    team as an inverted fade adds +12 edge to that team.
-//
-// 6. OUTPUT — one GameConsolidatedRecommendation per multi-pick game.
-//    Conflicting individual picks get gameConflict=true, dampened confidence,
-//    and conflictNote pointing to the match-level winner.
+// 1. Book Needs / Square Top — sheet lists the public side → bet the opponent.
+// 2. Sharp Money — always bet the listed team.
+// 3. Opposing dual-fade (Book Needs on one side, Square Top on the other) → NO BET.
+// 4. Sharp Money takes priority when consolidating multiple signals on a game.
+// 5. Standalone single fade → bet the opponent when VS opponent is known.
 // ---------------------------------------------------------------------------
 
 interface TeamEdgeContribution {
@@ -611,6 +629,16 @@ function effectiveTeamForRec(rec: MatchedRecommendation): {
   teamDisplay: string;
 } | null {
   if (rec.line) return null;
+
+  if (FADE_SIGNALS.has(rec.signalType)) {
+    const opp = rec.opponentPick ?? rec.opponent;
+    if (opp) {
+      return {
+        teamNorm: normalizeTeamName(opp),
+        teamDisplay: displayTeamName(opp),
+      };
+    }
+  }
 
   if (rec.signalPolarity === "inverted" && rec.opponentPick) {
     return {
@@ -675,25 +703,8 @@ function applyGameCrossSignalRules(
   const teamsSupported = new Set(contributions.map((c) => c.teamNorm));
 
   if (hasBook && hasSquare && teamsSupported.size > 1) {
-    notes.push("Double fade Book Needs + Square sur côtés opposés");
-    const bookRoi = Math.abs(stats.signals.book_needs_fade.blendedRoi);
-    const squareRoi = Math.abs(stats.signals.square_fade.blendedRoi);
-
-    for (const c of contributions) {
-      if (c.signalType === "book_needs_fade" && bookRoi >= squareRoi) {
-        edgeDelta.set(c.teamNorm, (edgeDelta.get(c.teamNorm) ?? 0) + 12);
-        notes.push(`Book Needs ROI plus négatif → bonus ${c.teamDisplay}`);
-      } else if (c.signalType === "square_fade" && squareRoi > bookRoi) {
-        edgeDelta.set(c.teamNorm, (edgeDelta.get(c.teamNorm) ?? 0) + 12);
-        notes.push(`Square ROI plus négatif → bonus ${c.teamDisplay}`);
-      }
-    }
-
+    notes.push("Book Needs + Square Top sur côtés opposés — pas de pari");
     dampenConfidence = true;
-    notes.push("Pénalité double fade opposé (-8 par côté)");
-    for (const team of teamsSupported) {
-      edgeDelta.set(team, (edgeDelta.get(team) ?? 0) - 8);
-    }
   }
 
   const sharpTypes: SignalType[] = ["sharp_money", "mega_sharps"];
@@ -761,6 +772,95 @@ function clampWinnerToGame(
   return { display: winnerDisplay, norm: winnerNorm };
 }
 
+function buildOpposingDualFadeNoBet(
+  gameKey: string,
+  recs: MatchedRecommendation[],
+  bookPick: SheetPick,
+  squarePick: SheetPick,
+  matchedGame?: CalendarGame
+): { consolidated: GameConsolidatedRecommendation; updatedRecs: MatchedRecommendation[] } {
+  const resolution =
+    resolveDualFadeMatch(bookPick, squarePick, {
+      computedAt: "",
+      archiveDays: 0,
+      historicalSample: {
+        weeks: 0,
+        months: 0,
+        archiveDays: 0,
+        recentDualActiveDays: 0,
+        totalPicksTracked: 0,
+        totalDataPoints: 0,
+      },
+      tracker: {
+        bookNeedsAllTimeRoi: 0,
+        squareAllTimeRoi: 0,
+        bookNeedsBlendedRoi: 0,
+        squareBlendedRoi: 0,
+        roiGap: 0,
+      },
+      coOccurrence: {
+        dualActiveDays: 0,
+        dualPositiveDays: 0,
+        dualNegativeDays: 0,
+        combinedWinRate: 0.5,
+        bookOutperformedSquareDays: 0,
+        squareOutperformedBookDays: 0,
+      },
+      archiveTrend: {
+        bookInverseWinRate: 0.5,
+        squareInverseWinRate: 0.5,
+        resolutionRule: "",
+        sampleSize: 0,
+      },
+      byLeague: {},
+    }, sportLeagueFromRec(recs[0]))!;
+
+  const { awayTeam, homeTeam } = matchupLabels(recs);
+  const noBetReason = resolution.reasoning;
+
+  const consolidated: GameConsolidatedRecommendation = {
+    gameKey,
+    league: recs[0].league,
+    awayTeam,
+    homeTeam,
+    recommendedTeam: "",
+    confidence: 0,
+    noBet: true,
+    noBetReason,
+    confidenceBreakdown: [
+      {
+        key: "no_bet_dual_fade",
+        label: "Pas de pari",
+        value: 0,
+        impact: 0,
+        detail: noBetReason,
+      },
+    ],
+    hasConflict: true,
+    pickIds: recs.map((r) => r.id),
+    reasoning: `Match: ${awayTeam} @ ${homeTeam} · ${noBetReason}`,
+    matchedGame,
+    dualFade: {
+      isDualFade: true,
+      isOpposingNoBet: true,
+      bookNeedsFadeTeam: resolution.bookNeedsFadeTeam,
+      squareFadeTeam: resolution.squareFadeTeam,
+    },
+  };
+
+  const updatedRecs = recs.map((rec) => ({
+    ...rec,
+    gameKey,
+    gameConflict: true,
+    conflictNote: "Dual-fade opposé — pas de pari",
+    consolidatedTeam: undefined,
+    consolidatedConfidence: 0,
+    edgeLabel: "Pas de pari — signaux contradictoires",
+  }));
+
+  return { consolidated, updatedRecs };
+}
+
 function resolveSingleGame(
   gameKey: string,
   recs: MatchedRecommendation[],
@@ -769,6 +869,19 @@ function resolveSingleGame(
   slatePicks?: SheetPick[]
 ): { consolidated: GameConsolidatedRecommendation; updatedRecs: MatchedRecommendation[] } {
   recs = filterRecsForGame(recs);
+
+  const matchedGame = recs.find((r) => r.matchedGame)?.matchedGame;
+
+  if (slatePicks?.length && matchedGame) {
+    const league = sportLeagueFromRec(recs[0]);
+    const pair = findDualFadePair(slatePicks, league, {
+      homeTeam: matchedGame.homeTeam,
+      awayTeam: matchedGame.awayTeam,
+    });
+    if (pair.book && pair.square && isOpposingDualFade(pair.book, pair.square)) {
+      return buildOpposingDualFadeNoBet(gameKey, recs, pair.book, pair.square, matchedGame);
+    }
+  }
 
   const contributions = recs
     .map((r) => contributionForRec(r, stats))
@@ -806,8 +919,6 @@ function resolveSingleGame(
   let dualFadeReasoning = "";
   let dualFadeConfidence: number | undefined;
 
-  const matchedGame = recs.find((r) => r.matchedGame)?.matchedGame;
-
   if (dualStats && slatePicks?.length && matchedGame) {
     const league = sportLeagueFromRec(recs[0]);
     const pair = findDualFadePair(slatePicks, league, {
@@ -816,38 +927,7 @@ function resolveSingleGame(
     });
     const resolution = resolveDualFadeMatch(pair.book, pair.square, dualStats, league);
 
-    if (resolution?.isDualFade) {
-      const clamped = clampWinnerToGame(
-        resolution.recommendedSide,
-        resolution.recommendedSideNorm,
-        matchedGame
-      );
-      winnerNorm = clamped.norm;
-      winnerDisplay = clamped.display;
-      winnerEdge = resolution.confidence;
-      margin = resolution.confidence - (runnerEdge || 0);
-      dualFadeReasoning = resolution.reasoning;
-      dualFadeConfidence = resolution.confidence;
-      const hs = dualStats.historicalSample;
-      dualFadeInfo = {
-        isDualFade: true,
-        bookNeedsFadeTeam: resolution.bookNeedsFadeTeam,
-        squareFadeTeam: resolution.squareFadeTeam,
-        strongerFadeColumn: resolution.strongerFadeColumn,
-        archiveWinRate: resolution.archiveWinRate,
-        historicalSample: {
-          weeks: hs.weeks,
-          months: hs.months,
-          archiveDays: hs.archiveDays,
-          totalPicksTracked: hs.totalPicksTracked,
-          totalDataPoints: hs.totalDataPoints,
-          label: formatHistoricalSampleLabel(hs),
-        },
-      };
-      for (const b of resolution.breakdown) {
-        cross.notes.push(`${b.label}: ${b.detail ?? b.value}`);
-      }
-    } else if (resolution?.isStandalone && recs.length === 1) {
+    if (resolution?.isStandalone && recs.length === 1) {
       const clamped = clampWinnerToGame(
         resolution.recommendedSide,
         resolution.recommendedSideNorm,
@@ -867,9 +947,23 @@ function resolveSingleGame(
     }
   }
 
+  const sharpRecs = recs.filter((r) => SHARP_BET_SIGNALS.has(r.signalType) && !r.line);
+  if (sharpRecs.length > 0) {
+    const sharpSide = effectiveTeamForRec(sharpRecs[0]);
+    if (sharpSide) {
+      const clamped = clampWinnerToGame(sharpSide.teamDisplay, sharpSide.teamNorm, matchedGame);
+      winnerNorm = clamped.norm;
+      winnerDisplay = clamped.display;
+      winnerEdge = Math.max(winnerEdge, 84);
+      margin = Math.max(margin, 20);
+    }
+  }
+
   let confidence = clamp(55 + (margin / maxEdge) * 35, 52, 88);
   if (dualFadeConfidence != null) {
     confidence = dualFadeConfidence;
+  } else if (sharpRecs.length > 0) {
+    confidence = Math.round(clamp(82 + sharpRecs.length * 2, 82, 92));
   } else if (cross.dampenConfidence && margin / maxEdge < 0.2) {
     confidence = clamp(confidence - 12, 50, 72);
   } else if (hasConflict && margin / maxEdge < 0.08) {

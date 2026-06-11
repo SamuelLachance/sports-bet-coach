@@ -55,6 +55,8 @@ export interface DualFadeHistoricalSampleInfo {
 
 export interface DualFadeInfo {
   isDualFade: boolean;
+  /** Book Needs + Square Top on opposite sides → no bet */
+  isOpposingNoBet?: boolean;
   bookNeedsFadeTeam?: string;
   squareFadeTeam?: string;
   strongerFadeColumn?: "book_needs_fade" | "square_fade";
@@ -69,6 +71,9 @@ export interface GameConsolidatedRecommendation {
   homeTeam: string;
   recommendedTeam: string;
   confidence: number;
+  /** True when signals cancel out (e.g. opposing Book Needs + Square Top) */
+  noBet?: boolean;
+  noBetReason?: string;
   confidenceBreakdown: ConfidenceBreakdownItem[];
   hasConflict: boolean;
   pickIds: string[];

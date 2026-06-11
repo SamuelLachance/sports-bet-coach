@@ -13,6 +13,7 @@
     "sync": "tsx server/scripts/sync-sheets.ts",
     "test:confidence": "tsx server/scripts/test-confidence.ts",
     "test:game-association": "tsx server/tests/gameAssociation.test.ts",
+    "test:recommendation-rules": "tsx server/tests/recommendationRules.test.ts",
     "start": "tsx server/index.ts"
   },
   "dependencies": {

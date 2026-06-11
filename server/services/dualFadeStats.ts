@@ -569,6 +569,8 @@ export async function loadDualFadeStats(): Promise<DualFadeStatsCache | null> {
 export interface DualFadeResolution {
   isDualFade: boolean;
   isStandalone: boolean;
+  /** Book Needs + Square Top on opposite sides — signals cancel */
+  isNoBet?: boolean;
   recommendedSide: string;
   recommendedSideNorm: string;
   confidence: number;
@@ -637,68 +639,31 @@ export function resolveDualFadeMatch(
       ? displayTeam(squarePick.opponent)
       : bookFadeTeam;
 
-    const bookRoi = fadeRoiForLeague(dualStats, "book_needs_fade", league);
-    const squareRoi = fadeRoiForLeague(dualStats, "square_fade", league);
-
-    const strongerFadeColumn: "book_needs_fade" | "square_fade" =
-      Math.abs(bookRoi) >= Math.abs(squareRoi) ? "book_needs_fade" : "square_fade";
-
-    const recommendedSide =
-      strongerFadeColumn === "book_needs_fade" ? bookNeedsInverse : squareInverse;
-    const archiveWinRate =
-      strongerFadeColumn === "book_needs_fade"
-        ? dualStats.archiveTrend.bookInverseWinRate
-        : dualStats.archiveTrend.squareInverseWinRate;
-
-    const roiGap = Math.abs(Math.abs(bookRoi) - Math.abs(squareRoi));
-    const sample = dualStats.historicalSample;
-    const sampleBonus = Math.min(sample.months / 50, 1) * 4;
-    let confidence = clamp(
-      58 +
-        roiGap / 25 +
-        (Number.isFinite(archiveWinRate) ? archiveWinRate : 0.55) * 18 +
-        dualStats.tracker.roiGap / 120 +
-        sampleBonus,
-      62,
-      88
-    );
-    confidence = Math.round(confidence);
-
-    const sampleLabel = formatHistoricalSampleLabel(sample);
-
-    breakdown.push({
-      key: "dual_fade_roi",
-      label: "ROI tracker fade",
-      value: roiGap,
-      detail: `Book Needs ${bookRoi.toFixed(0)}u · Square ${squareRoi.toFixed(0)}u`,
-    });
-    breakdown.push({
-      key: "dual_fade_archive",
-      label: "Historique dual-fade",
-      value: sample.totalDataPoints,
-      detail: `${sampleLabel} · inverse ${strongerFadeColumn === "book_needs_fade" ? "Book" : "Square"} ~${Math.round(archiveWinRate * 100)}%`,
-    });
-
-    const strongerLabel =
-      strongerFadeColumn === "book_needs_fade" ? "Book Needs" : "Square Top";
     const reasoning =
-      `Dynamique dual-fade: Book Needs fade ${bookFadeTeam} + Square fade ${squareFadeTeam}. ` +
-      `${strongerLabel} ROI tracker plus négatif (${strongerFadeColumn === "book_needs_fade" ? bookRoi.toFixed(0) : squareRoi.toFixed(0)}u vs ${strongerFadeColumn === "book_needs_fade" ? squareRoi.toFixed(0) : bookRoi.toFixed(0)}u) → ` +
-      `jouer ${recommendedSide} (tendance ~${Math.round(archiveWinRate * 100)}%, ${sampleLabel}).`;
+      `Book Needs liste ${bookFadeTeam} (→ ${bookNeedsInverse}) et Square Top liste ${squareFadeTeam} (→ ${squareInverse}). ` +
+      `Les deux équipes apparaissent sur des côtés opposés — signaux contradictoires, pas de pari.`;
+
+    breakdown.push({
+      key: "dual_fade_no_bet",
+      label: "Dual-fade opposé",
+      value: 0,
+      detail: `${bookFadeTeam} vs ${squareFadeTeam} — annulation`,
+    });
 
     return {
       isDualFade: true,
+      isNoBet: true,
       isStandalone: false,
-      recommendedSide,
-      recommendedSideNorm: normalizeTeam(recommendedSide),
-      confidence,
+      recommendedSide: "",
+      recommendedSideNorm: "",
+      confidence: 0,
       reasoning,
-      strongerFadeColumn,
+      strongerFadeColumn: "book_needs_fade",
       bookNeedsFadeTeam: bookFadeTeam,
       squareFadeTeam: squareFadeTeam,
       bookNeedsInverse,
       squareInverse,
-      archiveWinRate,
+      archiveWinRate: 0,
       breakdown,
     };
   }

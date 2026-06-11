@@ -211,7 +211,7 @@ async function main() {
       !marinersCard.recommendedTeam.toUpperCase().includes("COLORADO"),
       "Mariners card must never recommend COLORADO"
     );
-    if (marinersCard.dualFade?.isDualFade) {
+    if (marinersCard.dualFade?.isDualFade && marinersCard.dualFade.bookNeedsFadeTeam) {
       assert.ok(
         !marinersCard.dualFade.bookNeedsFadeTeam.toUpperCase().includes("COLORADO"),
         "Mariners dual-fade book team must not be COLORADO"
@@ -220,12 +220,13 @@ async function main() {
   }
 
   if (cubsCard) {
-    assertRecommendedInGame(CUBS_ROCKIES, cubsCard.recommendedTeam, "Cubs @ Rockies card");
-    const rec = cubsCard.recommendedTeam.toUpperCase();
+    assert.ok(cubsCard.noBet, "Cubs @ Rockies opposing dual-fade should be no bet");
     assert.ok(
-      rec.includes("CUBS") || rec.includes("COLORADO") || rec.includes("CHICAGO") || rec.includes("ROCKIES"),
-      "Cubs @ Rockies card recommends a team from that matchup"
+      cubsCard.dualFade?.isOpposingNoBet,
+      "Cubs @ Rockies should flag opposing dual-fade no bet"
     );
+    assert.equal(cubsCard.recommendedTeam, "", "No bet card has empty recommendedTeam");
+    assert.equal(cubsCard.confidence, 0, "No bet card has zero confidence");
   }
 
   for (const card of gameRecommendations) {

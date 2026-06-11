@@ -18,6 +18,51 @@ function impactSign(n: number) {
 }
 
 export function GameRecommendationCard({ game }: { game: GameConsolidatedRecommendation }) {
+  if (game.noBet) {
+    return (
+      <article className="card border-2 border-warning/40 bg-warning/5 md:col-span-2">
+        <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+          <div className="flex flex-wrap gap-2">
+            <span className="badge bg-warning/20 text-warning">Pas de pari</span>
+            <span className="badge bg-surface-raised text-slate-300 border border-surface-border">
+              {game.league}
+            </span>
+            {game.dualFade?.isOpposingNoBet && (
+              <span className="badge bg-warning/20 text-warning">Dual-fade opposé</span>
+            )}
+          </div>
+        </div>
+
+        <h3 className="font-display text-xl font-semibold text-white mb-1">
+          {game.awayTeam} @ {game.homeTeam}
+        </h3>
+
+        <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3">
+          <div className="text-xs text-warning uppercase tracking-wide mb-1">
+            Recommandation
+          </div>
+          <div className="font-display text-2xl font-semibold text-warning">Pas de pari</div>
+          <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+            {game.noBetReason ||
+              "Signaux contradictoires sur ce match — aucun côté recommandé."}
+          </p>
+        </div>
+
+        {game.dualFade?.isOpposingNoBet && game.dualFade.bookNeedsFadeTeam && game.dualFade.squareFadeTeam && (
+          <div className="bg-surface-raised border border-surface-border rounded-lg p-3 mb-3">
+            <p className="text-sm text-slate-300">
+              Book Needs: <span className="text-white">{game.dualFade.bookNeedsFadeTeam}</span>
+              {" · "}
+              Square Top: <span className="text-white">{game.dualFade.squareFadeTeam}</span>
+            </p>
+          </div>
+        )}
+
+        <p className="text-sm text-slate-400 leading-relaxed">{game.reasoning}</p>
+      </article>
+    );
+  }
+
   return (
     <article className="card border-2 border-accent/40 bg-accent/5 md:col-span-2">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
@@ -28,7 +73,11 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
           </span>
           {game.hasConflict && (
           <span className="badge bg-warning/20 text-warning">
-            {game.dualFade?.isDualFade ? "Dual-fade résolu" : "Conflit résolu"}
+            {game.dualFade?.isOpposingNoBet
+              ? "Dual-fade opposé"
+              : game.dualFade?.isDualFade
+                ? "Dual-fade"
+                : "Conflit résolu"}
           </span>
         )}
           {game.highConviction && (
@@ -78,7 +127,7 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
         )}
       </div>
 
-      {game.dualFade?.isDualFade && (
+      {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (
         <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3">
           <div className="text-xs text-warning uppercase tracking-wide mb-1">
             Dynamique dual-fade

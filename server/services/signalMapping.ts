@@ -26,10 +26,16 @@ export const SIGNAL_TO_CATEGORY: Record<SignalType, string> = {
   mega_rlm: "RLM MS",
 };
 
-/** Fade-style signals: pick targets the faded side; invert when historically unprofitable */
+/** Fade-style signals: sheet lists the public/book side → always bet the opponent */
 export const FADE_SIGNALS = new Set<SignalType>([
   "book_needs_fade",
   "square_fade",
+]);
+
+/** Sharp signals: sheet lists the side to bet directly */
+export const SHARP_BET_SIGNALS = new Set<SignalType>([
+  "sharp_money",
+  "mega_sharps",
 ]);
 
 export const SIGNAL_LABELS_FR: Record<SignalType, string> = {
