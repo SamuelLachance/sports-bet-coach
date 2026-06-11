@@ -79,8 +79,22 @@ export function buildSportsOddsGameKey(
   return `${league}:${[away, home].sort().join("|")}`;
 }
 
+const REMOTE_LEAGUE_TO_COACH: Record<string, LeagueCode> = {
+  mlb: "MLB",
+  nba: "NBA",
+  nhl: "NHL",
+  nfl: "NFL",
+  wnba: "WNBA",
+  cbb: "CBB",
+  cfb: "CFB",
+};
+
 function coachLeagueFromRemote(league?: string): LeagueCode | null {
   if (!league) return null;
+  const key = league.toLowerCase();
+  if (REMOTE_LEAGUE_TO_COACH[key]) {
+    return REMOTE_LEAGUE_TO_COACH[key];
+  }
   const upper = league.toUpperCase();
   if (SPORTS_ODDS_SUPPORTED_LEAGUES.includes(upper as (typeof SPORTS_ODDS_SUPPORTED_LEAGUES)[number])) {
     return upper as LeagueCode;

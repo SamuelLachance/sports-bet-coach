@@ -79,16 +79,16 @@ Les picks sont associ?s aux matchs du jour par correspondance de noms d'?quipes.
 
 ## Dual-algo gate (Coach + Sports Odds)
 
-For **MLB, NBA, and NHL**, a bet is only recommended when **both** algorithms agree:
+For **MLB, NBA, NHL, NFL, WNBA, CBB, and CFB**, a bet is only recommended when **both** algorithms agree:
 
 1. **Coach algo** ? sharp-sheet rules engine consolidates signals on the same game
 2. **Sports Odds algo** ? [Sports-Odds-Algorithms](https://github.com/SamuelLachance/Sports-Odds-Algorithms) Algo V2 live model (ESPN schedules + win probability)
 
-If the odds model favors a different side, the game becomes **No bet**. Totals are blocked on these leagues because the odds model is moneyline-focused. Other leagues (NFL, WNBA, CBB, CFB) still use the coach algo only.
+If the odds model favors a different side, the game becomes **No bet**. Totals are blocked on these leagues because the odds model is moneyline-focused. Soccer and other unsupported coach leagues still use the coach algo only on the bet-coach app.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SPORTS_ODDS_ENABLED` | `true` | Require dual-algo agreement on MLB/NBA/NHL |
+| `SPORTS_ODDS_ENABLED` | `true` | Require dual-algo agreement on MLB/NBA/NHL/NFL/WNBA/CBB/CFB |
 | `SPORTS_ODDS_BASE_URL` | GitHub Pages URL | Live FastAPI (`http://127.0.0.1:8000`) or static slate JSON |
 
 Confirmed picks show a **Dual algo** badge in the UI.
