@@ -80,7 +80,7 @@ GitHub Actions reconstruit le site automatiquement (~2–3 min). Vérifiez dans 
 ## Mise à jour quotidienne (sans action de votre part)
 
 - **Push sur `master`** → redéploiement automatique
-- **Cron quotidien** (midi UTC) → rafraîchit les données Google Sheets / ESPN
+- **Cron 3× par jour** (12h, 16h et 18h, fuseau America/Toronto) → sync Google Sheets, rebuild des recommandations et rafraîchissement des données ESPN. En été (EDT), GitHub Actions exécute à 16:00, 20:00 et 22:00 UTC ; en hiver (EST), décaler d'une heure (17:00, 21:00, 23:00 UTC) si les horaires locaux doivent rester fixes.
 
 ---
 
