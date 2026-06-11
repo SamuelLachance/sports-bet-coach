@@ -279,7 +279,7 @@ export function matchPredictionToCalendarGame(
   );
 }
 
-function recommendedSideForBet(
+export function teamSideForBet(
   ourBet: ParsedBet,
   game: CalendarGame
 ): "away" | "home" | null {
@@ -298,7 +298,7 @@ export function sportsOddsAgreesWithBet(
   prediction: SportsOddsGamePrediction | undefined
 ): boolean {
   if (!ourBet || !game || !prediction) return false;
-  const side = recommendedSideForBet(ourBet, game);
+  const side = teamSideForBet(ourBet, game);
   if (!side) return false;
   return side === prediction.model.favoriteSide;
 }
@@ -396,7 +396,7 @@ export function sportsOddsPreferredBetForCoach(
   }
   if (coachBet.betType === "total") return coachBet;
 
-  const side = recommendedSideForBet(coachBet, game);
+  const side = teamSideForBet(coachBet, game);
   const homeSpread = prediction.market?.spread;
   if (side == null || homeSpread == null || !Number.isFinite(homeSpread)) {
     return coachBet;

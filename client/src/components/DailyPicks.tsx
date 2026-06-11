@@ -68,7 +68,7 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
   const visiblePicks = useMemo(
     () =>
       filtered
-        .filter((r) => !noBetPickIds.has(r.id) && isVisiblePick(r))
+        .filter((r) => !noBetPickIds.has(r.id) && !r.gameConflict && isVisiblePick(r))
         .sort((a, b) => b.confidence - a.confidence),
     [filtered, noBetPickIds]
   );

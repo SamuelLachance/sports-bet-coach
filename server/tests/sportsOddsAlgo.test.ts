@@ -4,6 +4,7 @@
  */
 import assert from "node:assert/strict";
 import {
+  applyEventTeamConflictFilter,
   applySportsOddsFilter,
 } from "../services/recommendations.js";
 import {
@@ -209,5 +210,30 @@ const injected = applySportsOddsFilter(
 assert.equal(injected.sportsOddsForced, true);
 assert.ok(injected.recommendedTeam.includes("Sa -5.5"));
 assert.equal(injected.pickIds.length, 0);
+
+const knicksSpreadRec: GameConsolidatedRecommendation = {
+  ...baseGameRec,
+  gameKey: "nba-other-key",
+  recommendedTeam: "Ny +5.5",
+  recommendedBet: {
+    betType: "spread",
+    team: "NY",
+    rawText: "NY +5.5",
+    spread: 5.5,
+    displayText: "Ny +5.5",
+  },
+  betType: "spread",
+  pickIds: ["pick-2"],
+};
+
+const dualSideConflict = applyEventTeamConflictFilter({
+  recommendations: [],
+  gameRecommendations: [baseGameRec, knicksSpreadRec],
+}).gameRecommendations;
+
+assert.equal(dualSideConflict.length, 1);
+assert.equal(dualSideConflict[0]?.noBet, true);
+assert.ok(dualSideConflict[0]?.pickIds.includes("pick-1"));
+assert.ok(dualSideConflict[0]?.pickIds.includes("pick-2"));
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");

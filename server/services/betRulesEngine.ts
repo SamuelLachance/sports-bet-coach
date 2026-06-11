@@ -460,8 +460,26 @@ export interface ImpliedBetEntry {
   impliedNorm: string;
   impliedBet: ParsedBet;
   betKey: string;
+  /** away / home / total:… — used to detect opposing teams on the same event */
+  teamSideKey: string;
   detail: string;
   fadeTarget?: string;
+}
+
+function teamSideKeyForBet(bet: ParsedBet, matchedGame?: CalendarGame): string {
+  if (bet.betType === "total") {
+    return `total:${bet.totalDirection}:${bet.totalLine}`;
+  }
+  if (!matchedGame || !bet.team) return `unknown:${betKey(bet)}`;
+  const resolved = resolveGameTeamDisplay(bet.team, matchedGame);
+  if (!resolved) return `unknown:${betKey(bet)}`;
+  if (normalizeTeamName(resolved) === normalizeTeamName(matchedGame.awayTeam)) {
+    return "away";
+  }
+  if (normalizeTeamName(resolved) === normalizeTeamName(matchedGame.homeTeam)) {
+    return "home";
+  }
+  return `unknown:${betKey(bet)}`;
 }
 
 function impliedSideNorm(side: string, matchedGame?: CalendarGame): string {
@@ -489,6 +507,7 @@ function impliedBetFromRec(
       impliedNorm: betKey(listedBet),
       impliedBet: listedBet,
       betKey: betKey(listedBet),
+      teamSideKey: teamSideKeyForBet(listedBet, matchedGame),
       detail: `${label} → ${display}`,
     };
   }
@@ -506,6 +525,7 @@ function impliedBetFromRec(
       impliedNorm: betKey(fadedBet),
       impliedBet: fadedBet,
       betKey: betKey(fadedBet),
+      teamSideKey: teamSideKeyForBet(fadedBet, matchedGame),
       fadeTarget,
       detail: `${label} → ${display}`,
     };
@@ -519,6 +539,7 @@ function impliedBetFromRec(
     impliedNorm: betKey(listedBet),
     impliedBet: listedBet,
     betKey: betKey(listedBet),
+    teamSideKey: teamSideKeyForBet(listedBet, matchedGame),
     detail: `${label} → ${display}`,
   };
 }
@@ -570,14 +591,15 @@ export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBe
     };
   }
 
-  const uniqueByKey = new Map<string, { side: string; bet: ParsedBet }>();
+  const uniqueByTeam = new Map<string, { side: string; bet: ParsedBet }>();
   for (const entry of entries) {
-    if (!uniqueByKey.has(entry.betKey)) {
-      uniqueByKey.set(entry.betKey, { side: entry.impliedSide, bet: entry.impliedBet });
+    const teamKey = entry.teamSideKey;
+    if (!uniqueByTeam.has(teamKey)) {
+      uniqueByTeam.set(teamKey, { side: entry.impliedSide, bet: entry.impliedBet });
     }
   }
 
-  const uniqueSides = [...uniqueByKey.values()];
+  const uniqueSides = [...uniqueByTeam.values()];
 
   if (uniqueSides.length === 1) {
     const { side, bet } = uniqueSides[0]!;

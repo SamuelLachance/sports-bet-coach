@@ -758,6 +758,7 @@ function main() {
         displayText: "Carolina Hurricanes",
       },
       betKey: "ml:CAROLINA HURRICANES",
+      teamSideKey: "home",
       detail: "Sharp Money → Carolina Hurricanes",
     },
   ];
@@ -781,6 +782,7 @@ function main() {
         displayText: "Vegas Golden Knights",
       },
       betKey: "ml:VEGAS GOLDEN KNIGHTS",
+      teamSideKey: "away",
       fadeTarget: "Carolina Hurricanes",
       detail: "Square Top (Fade) → Vegas Golden Knights",
     },

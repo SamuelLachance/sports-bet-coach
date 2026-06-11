@@ -29,6 +29,7 @@ import {
   sportsOddsTrendLabel,
   sportsOddsValueBet,
   sportsOddsValueTrendLabel,
+  teamSideForBet,
   type SportsOddsGamePrediction,
 } from "./sportsOddsAlgo.js";
 import { SIGNAL_LABELS } from "./signalMapping.js";
@@ -444,6 +445,175 @@ export function applyDratingsFilter(
   return { recommendations, gameRecommendations };
 }
 
+const EVENT_CONFLICT_REASON =
+  "Conflicting recommendations on different teams for the same game — no bet.";
+
+function eventKeyForGame(game: CalendarGame): string {
+  return game.id
+    ? `${game.league}:espn-${game.id}`
+    : buildSportsOddsGameKey(game.league, game.awayTeam, game.homeTeam);
+}
+
+function isActionableGameRecommendation(
+  rec: GameConsolidatedRecommendation
+): boolean {
+  return !rec.noBet && Boolean(rec.recommendedBet) && Boolean(rec.matchedGame);
+}
+
+function isActionablePickRecommendation(rec: MatchedRecommendation): boolean {
+  if (!rec.matchedGame || rec.confidence <= 0) return false;
+  const bet = impliedBetForRec(rec);
+  if (!bet || bet.betType === "total") return false;
+  return teamSideForBet(bet, rec.matchedGame) != null;
+}
+
+function toEventConflictNoBet(
+  rec: GameConsolidatedRecommendation,
+  pickIds: string[]
+): GameConsolidatedRecommendation {
+  const mergedPickIds = [...new Set([...rec.pickIds, ...pickIds])];
+  return {
+    ...rec,
+    recommendedTeam: "",
+    recommendedBet: undefined,
+    betType: undefined,
+    confidence: RULE_CONFIDENCE.noBet,
+    noBet: true,
+    noBetReason: EVENT_CONFLICT_REASON,
+    hasConflict: true,
+    dualAlgoConfirmed: false,
+    sportsOddsForced: false,
+    sportsOddsConfirmed: false,
+    pickIds: mergedPickIds,
+    confidenceBreakdown: [
+      ...rec.confidenceBreakdown.filter((b) => b.key !== "result"),
+      breakdownItem("result", "Result", `Result: No bet — ${EVENT_CONFLICT_REASON}`),
+    ],
+    reasoning: `Game: ${rec.awayTeam} @ ${rec.homeTeam} · ${EVENT_CONFLICT_REASON}`,
+  };
+}
+
+function buildEventConflictNoBetCard(
+  game: CalendarGame,
+  pickIds: string[]
+): GameConsolidatedRecommendation {
+  const gameKey = eventKeyForGame(game);
+  return {
+    gameKey,
+    league: game.league,
+    awayTeam: game.awayTeam,
+    homeTeam: game.homeTeam,
+    recommendedTeam: "",
+    confidence: RULE_CONFIDENCE.noBet,
+    noBet: true,
+    noBetReason: EVENT_CONFLICT_REASON,
+    confidenceBreakdown: [
+      breakdownItem("result", "Result", `Result: No bet — ${EVENT_CONFLICT_REASON}`),
+    ],
+    hasConflict: true,
+    pickIds: [...new Set(pickIds)],
+    reasoning: `Game: ${game.awayTeam} @ ${game.homeTeam} · ${EVENT_CONFLICT_REASON}`,
+    matchedGame: game,
+  };
+}
+
+export function applyEventTeamConflictFilter(result: {
+  recommendations: MatchedRecommendation[];
+  gameRecommendations: GameConsolidatedRecommendation[];
+}): {
+  recommendations: MatchedRecommendation[];
+  gameRecommendations: GameConsolidatedRecommendation[];
+} {
+  const sidesByEvent = new Map<string, Set<"away" | "home">>();
+  const pickIdsByEvent = new Map<string, string[]>();
+
+  const notePick = (game: CalendarGame, pickId: string) => {
+    const key = eventKeyForGame(game);
+    const ids = pickIdsByEvent.get(key) ?? [];
+    ids.push(pickId);
+    pickIdsByEvent.set(key, ids);
+  };
+
+  const noteSide = (game: CalendarGame, side: "away" | "home") => {
+    const key = eventKeyForGame(game);
+    const sides = sidesByEvent.get(key) ?? new Set();
+    sides.add(side);
+    sidesByEvent.set(key, sides);
+  };
+
+  for (const rec of result.gameRecommendations) {
+    if (!isActionableGameRecommendation(rec) || !rec.recommendedBet || !rec.matchedGame) {
+      continue;
+    }
+    const side = teamSideForBet(rec.recommendedBet, rec.matchedGame);
+    if (!side) continue;
+    noteSide(rec.matchedGame, side);
+    for (const id of rec.pickIds) notePick(rec.matchedGame, id);
+  }
+
+  for (const rec of result.recommendations) {
+    if (!isActionablePickRecommendation(rec) || !rec.matchedGame) continue;
+    const bet = impliedBetForRec(rec)!;
+    const side = teamSideForBet(bet, rec.matchedGame);
+    if (!side) continue;
+    noteSide(rec.matchedGame, side);
+    notePick(rec.matchedGame, rec.id);
+  }
+
+  const conflictedEvents = new Set<string>();
+  for (const [eventKey, sides] of sidesByEvent) {
+    if (sides.size > 1) conflictedEvents.add(eventKey);
+  }
+  if (conflictedEvents.size === 0) return result;
+
+  const recommendations = result.recommendations.map((rec) => {
+    if (!rec.matchedGame) return rec;
+    const key = eventKeyForGame(rec.matchedGame);
+    if (!conflictedEvents.has(key)) return rec;
+    return {
+      ...rec,
+      gameConflict: true,
+      conflictNote: EVENT_CONFLICT_REASON,
+      edgeLabel: "No bet — opposing teams on same game",
+      consolidatedTeam: undefined,
+      consolidatedConfidence: 0,
+    };
+  });
+
+  const gameRecommendations: GameConsolidatedRecommendation[] = [];
+  const handledEvents = new Set<string>();
+
+  for (const rec of result.gameRecommendations) {
+    if (!rec.matchedGame) {
+      gameRecommendations.push(rec);
+      continue;
+    }
+    const key = eventKeyForGame(rec.matchedGame);
+    if (!conflictedEvents.has(key)) {
+      gameRecommendations.push(rec);
+      continue;
+    }
+    if (handledEvents.has(key)) continue;
+    handledEvents.add(key);
+    gameRecommendations.push(
+      toEventConflictNoBet(rec, pickIdsByEvent.get(key) ?? [])
+    );
+  }
+
+  for (const eventKey of conflictedEvents) {
+    if (handledEvents.has(eventKey)) continue;
+    const pickIds = pickIdsByEvent.get(eventKey) ?? [];
+    const sample = result.recommendations.find(
+      (rec) => rec.matchedGame && eventKeyForGame(rec.matchedGame) === eventKey
+    );
+    if (!sample?.matchedGame) continue;
+    handledEvents.add(eventKey);
+    gameRecommendations.push(buildEventConflictNoBetCard(sample.matchedGame, pickIds));
+  }
+
+  return { recommendations, gameRecommendations };
+}
+
 export async function buildRecommendations(
   sheets: ParsedSheets,
   games: CalendarGame[],
@@ -477,10 +647,12 @@ export async function buildRecommendations(
     result = applySportsOddsFilter(result, predictions, games);
   }
 
-  if (!isDratingsEnabled()) return result;
+  if (!isDratingsEnabled()) {
+    return applyEventTeamConflictFilter(result);
+  }
 
   if (options?.skipDratingsFetch && !options.dratingsTrends) {
-    return applyDratingsFilter(result, []);
+    return applyEventTeamConflictFilter(applyDratingsFilter(result, []));
   }
 
   const leagues = [...new Set(games.map((g) => g.league))] as LeagueCode[];
@@ -488,7 +660,7 @@ export async function buildRecommendations(
     options?.dratingsTrends ??
     (await fetchDratingsTrends(leagues, gameDate)).trends;
 
-  return applyDratingsFilter(result, trends);
+  return applyEventTeamConflictFilter(applyDratingsFilter(result, trends));
 }
 
 export function countSportsOddsFilterStats(result: {
