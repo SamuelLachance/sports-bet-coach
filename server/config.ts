@@ -66,6 +66,31 @@ export function getSheetCsvUrl(tab: SheetTabConfig): string {
   return `https://docs.google.com/spreadsheets/d/e/${SHEET_PUBLISH_ID}/pub?output=csv&gid=${tab.gid}`;
 }
 
+/** DRatings prediction list pages (HTML scrape — no public API). */
+export const DRATINGS_BASE = "https://dratings.com";
+
+export const DRATINGS_LEAGUE_PATHS: Partial<
+  Record<import("./types.js").LeagueCode, string>
+> = {
+  MLB: "/predictions/mlb-baseball-predictions/",
+  NBA: "/predictions/nba-basketball-predictions/",
+  NHL: "/predictions/nhl-hockey-predictions/",
+  WNBA: "/predictions/wnba-basketball-predictions/",
+  NFL: "/predictions/nfl-football-predictions/",
+  CFB: "/predictions/ncaa-football-predictions/",
+  CBB: "/predictions/ncaa-mens-basketball-predictions/",
+};
+
+export const DRATINGS_USER_AGENT =
+  process.env.DRATINGS_USER_AGENT || "sports-bet-coach/1.0 (+https://github.com/sports-bet-coach)";
+
+/** When false, skip DRatings confirmation filter (dev/CI). Default: enabled. */
+export function isDratingsEnabled(): boolean {
+  const v = process.env.DRATINGS_ENABLED;
+  if (v == null || v === "") return true;
+  return !/^false|0|no$/i.test(v);
+}
+
 export const ESPN_LEAGUES: Record<
   string,
   { sport: string; league: string; label: string }

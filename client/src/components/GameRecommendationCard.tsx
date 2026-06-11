@@ -68,6 +68,11 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
           {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (
             <span className="badge bg-warning/20 text-warning">Multi-fade</span>
           )}
+          {game.dratingsConfirmed && (
+            <span className="badge bg-success/20 text-success" title={game.dratingsTrendLabel}>
+              DRatings ✓
+            </span>
+          )}
         </div>
         <div className="text-right">
           <div className={`text-3xl font-bold font-display ${confidenceColor(game.confidence)}`}>

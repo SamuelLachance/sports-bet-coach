@@ -157,6 +157,10 @@ export interface GameConsolidatedRecommendation {
   historicalWinRate?: number;
   historicalRoi?: number;
   weeklyTrend?: "up" | "down" | "flat";
+  /** DRatings Bet Trends bar agrees with recommended side */
+  dratingsConfirmed?: boolean;
+  dratingsStatus?: "agrees" | "disagrees" | "unavailable";
+  dratingsTrendLabel?: string;
 }
 
 export interface MatchedRecommendation {
@@ -198,6 +202,9 @@ export interface MatchedRecommendation {
   historicalRoi?: number;
   weeklyTrend?: "up" | "down" | "flat";
   highConviction?: boolean;
+  dratingsConfirmed?: boolean;
+  dratingsStatus?: "agrees" | "disagrees" | "unavailable";
+  dratingsBlocked?: boolean;
 }
 
 export interface SyncStatus {

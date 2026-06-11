@@ -29,7 +29,9 @@ async function main() {
   const leagues = getActiveLeagues(sheets);
   const dateKey = todayDateKey();
   const games = await fetchAllSchedules(leagues, dateKey);
-  const built = await buildRecommendations(sheets, games);
+  const built = await buildRecommendations(sheets, games, todayDisplayDate(), {
+    skipDratingsFetch: process.env.CI === "true" && process.env.DRATINGS_ENABLED !== "true",
+  });
   const tracking = await updateTracking(
     built.gameRecommendations,
     built.recommendations,

@@ -101,6 +101,9 @@ export interface GameConsolidatedRecommendation {
   historicalWinRate?: number;
   historicalRoi?: number;
   weeklyTrend?: "up" | "down" | "flat";
+  dratingsConfirmed?: boolean;
+  dratingsStatus?: "agrees" | "disagrees" | "unavailable";
+  dratingsTrendLabel?: string;
 }
 
 export interface MatchedRecommendation {
@@ -136,6 +139,9 @@ export interface MatchedRecommendation {
   historicalRoi?: number;
   weeklyTrend?: "up" | "down" | "flat";
   highConviction?: boolean;
+  dratingsConfirmed?: boolean;
+  dratingsStatus?: "agrees" | "disagrees" | "unavailable";
+  dratingsBlocked?: boolean;
 }
 
 export interface LeaguePerformance {

@@ -24,6 +24,10 @@ function isActionableGameRec(g: GameConsolidatedRecommendation): boolean {
   return !g.noBet && Boolean(g.recommendedTeam?.trim());
 }
 
+function isVisiblePick(rec: MatchedRecommendation): boolean {
+  return !rec.dratingsBlocked;
+}
+
 export function DailyPicks({ recommendations, gameRecommendations = [], leagues }: DailyPicksProps) {
   const [leagueFilter, setLeagueFilter] = useState("ALL");
   const [signalFilter, setSignalFilter] = useState("all");
@@ -63,7 +67,7 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
   const visiblePicks = useMemo(
     () =>
       filtered
-        .filter((r) => !noBetPickIds.has(r.id))
+        .filter((r) => !noBetPickIds.has(r.id) && isVisiblePick(r))
         .sort((a, b) => b.confidence - a.confidence),
     [filtered, noBetPickIds]
   );
