@@ -41,8 +41,8 @@ jobs:
 
       - name: Build static snapshot and client
         env:
-          # GitHub Pages (URL /sports-bet-coach/) — pour un domaine custom, mettre VITE_BASE: /
-          VITE_BASE: /sports-bet-coach/
+          # Base `/` pour domaine custom (sharpsheettips.com). L'URL github.io/sports-bet-coach/ ne fonctionnera plus tant que le domaine custom n'est pas configuré dans Settings → Pages.
+          VITE_BASE: /
           VITE_STATIC_API: "true"
           VITE_CLIENT_SYNC: "true"
         run: npm run build:pages

@@ -1,103 +1,110 @@
-# Héberger Sharp Sheet Tips — guide simple
+# Hébergement pro en 15 minutes
 
-Votre site est **déjà en ligne**, gratuitement, sur GitHub Pages.
+Ce guide vous mène de l'URL GitHub (`samuellachance.github.io/sports-bet-coach/`) à une adresse professionnelle : **https://sharpsheettips.com**
 
-**Adresse actuelle :** https://samuellachance.github.io/sports-bet-coach/
-
----
-
-## Option A — GitHub Pages (recommandé, 0 $)
-
-C’est la solution déjà en place. Rien à acheter, rien à installer sur un serveur.
-
-### Comment mettre le site à jour
-
-1. Modifiez votre code localement (ou directement sur GitHub).
-2. **Poussez vos changements sur la branche `master`** (ou fusionnez une pull request vers `master`).
-3. GitHub déploie automatiquement — vous n’avez rien d’autre à faire.
-
-### Vérifier que le déploiement a réussi
-
-1. Ouvrez votre dépôt sur GitHub : `https://github.com/samuellachance/sports-bet-coach`
-2. Cliquez sur l’onglet **Actions**.
-3. Cherchez le workflow **« Deploy to GitHub Pages »** — il doit être **vert** (succès).
-4. Attendez **2 à 3 minutes** après un push, puis rafraîchissez le site dans votre navigateur.
-
-> **Astuce :** Le site se reconstruit aussi **tous les jours à midi UTC** (environ 7 h ou 8 h du matin au Québec selon l’heure d’été) pour rafraîchir les données sans que vous ayez à pousser du code.
-
-### Coût
-
-**0 $** — hébergement et certificat HTTPS inclus.
+Le code est déjà prêt (`VITE_BASE=/`). Il ne reste que l'achat du domaine et la configuration DNS.
 
 ---
 
-## Option B — Domaine personnalisé (ex. sharpsheettips.com, ~10 $/an)
+## Pourquoi changer d'URL ?
 
-Si vous voulez une adresse du type `https://sharpsheettips.com` au lieu de l’URL GitHub :
+L'URL actuelle expose votre nom d'utilisateur GitHub et le nom technique du dépôt. Pour un produit public (Sharp Sheet Tips), une adresse du type `sharpsheettips.com` inspire plus confiance et se partage plus facilement.
 
-### Étape 1 — Acheter le domaine
+---
 
-Achetez le nom sur un registrar simple, par exemple :
+## Étape 1 — Acheter le domaine (~10 $/an)
 
-- [Cloudflare Registrar](https://www.cloudflare.com/products/registrar/)
-- [Porkbun](https://porkbun.com/)
+1. Créez un compte sur [Cloudflare Registrar](https://www.cloudflare.com/products/registrar/) (recommandé — prix au coût, sans marge).
+2. Recherchez **sharpsheettips.com** et achetez-le (~**10 $ USD/an**).
+3. Cloudflare devient automatiquement votre gestionnaire DNS.
 
-Budget typique : **environ 10 à 15 $ CAD par an** pour un `.com`.
+**Si le domaine est déjà pris :** alternatives possibles — `sharpsheetpicks.com`, `sheetsignals.com`.
 
-### Étape 2 — Configurer le DNS
+---
 
-Dans le panneau DNS de votre registrar, ajoutez :
+## Étape 2 — Configurer le DNS (GitHub Pages)
 
-| Type  | Nom | Valeur |
-|-------|-----|--------|
-| **A** | `@` | `185.199.108.153` |
-| **A** | `@` | `185.199.109.153` |
-| **A** | `@` | `185.199.110.153` |
-| **A** | `@` | `185.199.111.153` |
-| **CNAME** | `www` | `samuellachance.github.io` |
+Dans Cloudflare → **DNS → Records**, ajoutez :
 
-*(Ce sont les adresses IP officielles de GitHub Pages.)*
+| Type    | Nom | Contenu / Cible              | Proxy |
+|---------|-----|------------------------------|-------|
+| **A**   | `@` | `185.199.108.153`            | DNS only (nuage gris) |
+| **A**   | `@` | `185.199.109.153`            | DNS only |
+| **A**   | `@` | `185.199.110.153`            | DNS only |
+| **A**   | `@` | `185.199.111.153`            | DNS only |
+| **CNAME** | `www` | `samuellachance.github.io` | DNS only |
 
-### Étape 3 — Indiquer le domaine à GitHub
+> **Important :** désactivez le proxy Cloudflare (nuage gris) sur ces enregistrements — GitHub Pages exige des IP directes pour la validation.
 
-1. Sur GitHub : **Settings → Pages → Custom domain**
-2. Entrez `sharpsheettips.com` (ou votre domaine)
-3. Attendez la validation DNS (quelques minutes à 24 h)
-4. Cochez **Enforce HTTPS** une fois disponible
+---
 
-### Étape 4 — Modifier le projet (obligatoire pour un domaine custom)
+## Étape 3 — Domaine custom dans GitHub
 
-Avec un domaine à la racine (`sharpsheettips.com`), le chemin de base du site change.
+1. Ouvrez le dépôt : https://github.com/samuellachance/sports-bet-coach
+2. **Settings → Pages → Custom domain**
+3. Entrez `sharpsheettips.com` et cliquez **Save**
+4. Attendez la vérification DNS (quelques minutes à 24 h)
+5. Cochez aussi `www.sharpsheettips.com` si proposé, ou ajoutez un redirect `www` → racine dans Cloudflare
 
-Dans `.github/workflows/pages.yml`, remplacez :
+---
 
-```yaml
-VITE_BASE: /sports-bet-coach/
+## Étape 4 — Forcer HTTPS
+
+Une fois le domaine validé (coche verte dans GitHub Pages) :
+
+1. **Settings → Pages → Enforce HTTPS** — cochez la case
+2. Attendez quelques minutes que le certificat Let's Encrypt soit émis
+
+---
+
+## Étape 5 — Pousser le code (déjà configuré)
+
+Le workflow `.github/workflows/pages.yml` utilise déjà `VITE_BASE: /` (chemin racine pour domaine custom).
+
+```bash
+git push origin master
 ```
 
-par :
-
-```yaml
-VITE_BASE: /
-```
-
-Puis poussez sur `master`. Sans ce changement, les liens et ressources du site ne fonctionneront pas correctement sur le domaine custom.
-
-### Coût total avec domaine custom
-
-- Hébergement GitHub Pages : **0 $**
-- Nom de domaine : **~10 $/an**
-- **Total : ~10 $/an**
+GitHub Actions reconstruit le site automatiquement (~2–3 min). Vérifiez dans **Actions → Deploy to GitHub Pages** que le workflow est vert.
 
 ---
 
-## Résumé rapide
+## Vérifier que tout fonctionne
 
-| | Option A (GitHub Pages) | Option B (domaine custom) |
-|--|-------------------------|---------------------------|
-| URL | `samuellachance.github.io/sports-bet-coach/` | `sharpsheettips.com` |
-| Coût | **0 $** | **~10 $/an** |
-| Mise à jour | Push sur `master` | Push sur `master` + DNS + changement `VITE_BASE` |
-| Difficulté | Très simple | Un peu plus de configuration |
+1. Ouvrez https://sharpsheettips.com — la page d'accueil Sharp Sheet Tips s'affiche
+2. Rafraîchissez les picks — les données JSON se chargent (onglet Réseau du navigateur)
+3. Le cadenas HTTPS est actif
 
-**Pour la plupart des usages, l’option A suffit amplement.**
+---
+
+## Mise à jour quotidienne (sans action de votre part)
+
+- **Push sur `master`** → redéploiement automatique
+- **Cron quotidien** (midi UTC) → rafraîchit les données Google Sheets / ESPN
+
+---
+
+## Coût total
+
+| Poste                         | Coût        |
+|-------------------------------|-------------|
+| Hébergement GitHub Pages      | **0 $**     |
+| Domaine sharpsheettips.com    | **~10 $/an** |
+| Certificat HTTPS              | **0 $** (inclus) |
+| **Total**                     | **~10 $/an** |
+
+---
+
+## Option gratuite (URL GitHub)
+
+Si vous ne souhaitez pas acheter de domaine, vous pouvez garder l'URL GitHub — mais il faudra remettre `VITE_BASE: /sports-bet-coach/` dans `.github/workflows/pages.yml` :
+
+**Adresse :** https://samuellachance.github.io/sports-bet-coach/
+
+Coût : **0 $**. Voir la section ci-dessus pour le compromis entre URL pro et URL GitHub.
+
+---
+
+## Limitations GitHub Pages
+
+Pas d'API Express en direct — pas de sync manuelle ni refresh live entre les déploiements. Pour l'expérience complète (sync, ESPN live), lancez `npm run dev` en local ou hébergez le serveur Node (`npm start`) séparément.
