@@ -11,6 +11,7 @@ import {
   getActiveLeagues,
 } from "../services/recommendations.js";
 import { syncAllSheets } from "../services/sheetFetcher.js";
+import { updateTracking } from "../services/tracking.js";
 
 const outDir = path.join(process.cwd(), "client", "public", "api");
 
@@ -29,6 +30,11 @@ async function main() {
   const dateKey = todayDateKey();
   const games = await fetchAllSchedules(leagues, dateKey);
   const built = await buildRecommendations(sheets, games);
+  const tracking = await updateTracking(
+    built.gameRecommendations,
+    built.recommendations,
+    todayDisplayDate()
+  );
 
   const syncStatus = {
     lastSync: sheets.syncedAt,
@@ -73,6 +79,7 @@ async function main() {
     mtd: sheets.mtd,
     archiveCount: sheets.archive.length,
   });
+  await writeJson("tracking", tracking);
 
   console.log(
     `Wrote API snapshot to ${outDir} (${built.recommendations.length} picks, ${games.length} games)`

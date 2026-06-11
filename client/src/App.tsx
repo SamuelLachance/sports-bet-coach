@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchRecommendations,
-  fetchStats,
   fetchSyncStatus,
+  fetchTracking,
   triggerSync,
   isStaticDeploy,
 } from "./api";
@@ -11,12 +11,12 @@ import { DailyPicks } from "./components/DailyPicks";
 import { Layout, type Tab } from "./components/Layout";
 import { LeaguesView } from "./components/LeaguesView";
 import { SettingsView } from "./components/SettingsView";
-import { StatsView } from "./components/StatsView";
+import { TrackingView } from "./components/TrackingView";
 import type {
   CalendarGame,
   MatchedRecommendation,
-  StatsResponse,
   SyncStatus,
+  TrackingResponse,
 } from "./types";
 
 function App() {
@@ -30,7 +30,7 @@ function App() {
   const [games, setGames] = useState<CalendarGame[]>([]);
   const [leagues, setLeagues] = useState<string[]>([]);
   const [date, setDate] = useState("");
-  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [tracking, setTracking] = useState<TrackingResponse | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +39,9 @@ function App() {
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [recData, statsData, statusData] = await Promise.all([
+      const [recData, trackingData, statusData] = await Promise.all([
         fetchRecommendations(),
-        fetchStats(),
+        fetchTracking(),
         fetchSyncStatus(),
       ]);
       setRecommendations(recData.recommendations);
@@ -49,7 +49,7 @@ function App() {
       setGames(recData.games);
       setDate(recData.date);
       setLeagues(statusData.leagues);
-      setStats(statsData);
+      setTracking(trackingData);
       setSyncStatus(statusData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
@@ -114,7 +114,7 @@ function App() {
       {tab === "leagues" && (
         <LeaguesView recommendations={recommendations} leagues={leagues} />
       )}
-      {tab === "stats" && <StatsView stats={stats} />}
+      {tab === "tracking" && <TrackingView tracking={tracking} />}
       {tab === "settings" && (
         <SettingsView
           syncStatus={syncStatus}

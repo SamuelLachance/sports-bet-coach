@@ -17,6 +17,7 @@ import {
   buildRecommendations,
   getActiveLeagues,
 } from "@server/services/recommendations.js";
+import { updateTracking } from "@server/services/tracking.js";
 import type { ParsedSheets } from "@server/types.js";
 import type { MatchedRecommendation, StatsResponse, SyncStatus } from "../types";
 import type { ClientSyncSnapshot } from "./types";
@@ -83,6 +84,11 @@ export async function runClientSync(): Promise<ClientSyncSnapshot> {
   const dateKey = todayDateKey();
   const games = await fetchAllSchedules(leagues, dateKey);
   const built = await buildRecommendations(sheets, games);
+  const tracking = await updateTracking(
+    built.gameRecommendations,
+    built.recommendations,
+    todayDisplayDate()
+  ) as unknown as import("../types.js").TrackingResponse;
 
   const stats: StatsResponse = {
     performanceDaily: sheets.performanceDaily,
@@ -97,6 +103,7 @@ export async function runClientSync(): Promise<ClientSyncSnapshot> {
     games,
     date: todayDisplayDate(),
     stats,
+    tracking,
     syncStatus: buildSyncStatus(sheets, leagues, games.length),
   };
 }

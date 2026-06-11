@@ -4,6 +4,7 @@ import type {
   StatsResponse,
   SyncStatus,
   GameConsolidatedRecommendation,
+  TrackingResponse,
 } from "../types";
 
 export interface ClientSyncSnapshot {
@@ -12,5 +13,6 @@ export interface ClientSyncSnapshot {
   games: CalendarGame[];
   date: string;
   stats: StatsResponse;
+  tracking: TrackingResponse;
   syncStatus: SyncStatus;
 }

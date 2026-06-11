@@ -1,4 +1,5 @@
 import type { MatchedRecommendation } from "../types";
+import { SignalBreakdown } from "./SignalBreakdown";
 
 const LEAGUE_COLORS: Record<string, string> = {
   MLB: "bg-red-500/20 text-red-300",
@@ -34,10 +35,6 @@ function confidenceColor(c: number) {
   if (c >= 75) return "text-accent-glow";
   if (c >= 50) return "text-slate-200";
   return "text-warning";
-}
-
-function impactSign(n: number) {
-  return n >= 0 ? `+${n}` : `${n}`;
 }
 
 export function PickCard({ rec }: { rec: MatchedRecommendation }) {
@@ -148,33 +145,7 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
         {rec.postingTime && <span>Posted: {rec.postingTime}</span>}
       </div>
 
-      {rec.confidenceBreakdown?.length > 0 && (
-        <details className="mb-3 group">
-          <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
-            Confidence breakdown ({rec.confidenceBreakdown.length} rules)
-          </summary>
-          <ul className="mt-2 space-y-1.5 text-xs">
-            {rec.confidenceBreakdown.map((item) => (
-              <li
-                key={item.key}
-                className="flex flex-wrap justify-between gap-x-2 gap-y-0.5 bg-surface-raised rounded px-2 py-1.5"
-              >
-                <span className="text-slate-300">{item.label}</span>
-                <span
-                  className={
-                    item.impact >= 0 ? "text-success font-medium" : "text-warning font-medium"
-                  }
-                >
-                  {impactSign(Math.round(item.impact * 10) / 10)}
-                </span>
-                {item.detail && (
-                  <span className="w-full text-slate-500">{item.detail}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <SignalBreakdown items={rec.confidenceBreakdown} />
 
       <p className="text-sm text-slate-400 leading-relaxed">{rec.reasoning}</p>
     </article>

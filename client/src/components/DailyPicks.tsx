@@ -49,6 +49,14 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
     return ids;
   }, [gameRecommendations]);
 
+  const visibleNoBetGameRecs = useMemo(() => {
+    if (!gameRecommendations.length) return [];
+    const filteredIds = new Set(filtered.map((r) => r.id));
+    return gameRecommendations.filter(
+      (g) => !isActionableGameRec(g) && g.pickIds.some((id) => filteredIds.has(id))
+    );
+  }, [gameRecommendations, filtered]);
+
   const visibleGameRecs = useMemo(() => {
     if (!gameRecommendations.length) return [];
     const filteredIds = new Set(filtered.map((r) => r.id));
@@ -107,12 +115,15 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
         <div className="card text-center py-12 text-slate-400">
           No picks match these filters. Try syncing data.
         </div>
-      ) : visibleGameRecs.length === 0 && visiblePicks.length === 0 ? (
+      ) : visibleNoBetGameRecs.length === 0 && visibleGameRecs.length === 0 && visiblePicks.length === 0 ? (
         <div className="card text-center py-12 text-slate-400">
           No actionable bets for these filters — conflicting signals were resolved to no bet.
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
+          {visibleNoBetGameRecs.map((game) => (
+            <GameRecommendationCard key={game.gameKey} game={game} />
+          ))}
           {visibleGameRecs.map((game) => (
             <GameRecommendationCard key={game.gameKey} game={game} />
           ))}

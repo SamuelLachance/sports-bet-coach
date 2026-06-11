@@ -79,6 +79,15 @@ function displayGameTeam(teamName: string, game: CalendarGame): string {
   return resolveGameTeamDisplay(teamName, game) ?? displayTeamName(teamName);
 }
 
+function breakdownItem(
+  key: string,
+  label: string,
+  detail: string,
+  value = 0
+): ConfidenceBreakdownItem {
+  return { key, label, value, impact: 0, detail };
+}
+
 export function extractOpponentName(
   pick: SheetPick,
   slatePicks: SheetPick[],
@@ -186,13 +195,11 @@ export function computePickRules(input: {
   if (SHARP_BET_SIGNALS.has(pick.signalType)) {
     const confidence =
       pick.signalType === "mega_sharps" ? RULE_CONFIDENCE.megaSharps : RULE_CONFIDENCE.sharp;
-    breakdown.push({
-      key: "sharp_rule",
-      label: SIGNAL_LABELS[pick.signalType],
-      value: confidence,
-      impact: confidence - 50,
-      detail: `Bet ${displayTeamName(pick.pick)}${pick.line ? ` ${pick.line}` : ""}`,
-    });
+    const signalLabel = SIGNAL_LABELS[pick.signalType];
+    const team = `${displayTeamName(pick.pick)}${pick.line ? ` ${pick.line}` : ""}`;
+    breakdown.push(
+      breakdownItem("sharp_rule", signalLabel, `${signalLabel} → ${team}`, confidence)
+    );
     return {
       confidence,
       confidenceBreakdown: breakdown,
@@ -206,13 +213,14 @@ export function computePickRules(input: {
     const confidence = RULE_CONFIDENCE.singleFade;
     if (opponentPick) {
       const signalLabel = SIGNAL_LABELS[pick.signalType];
-      breakdown.push({
-        key: "fade_rule",
-        label: signalLabel,
-        value: confidence,
-        impact: confidence - 50,
-        detail: `Fade ${displayTeamName(pick.pick)} → bet ${displayTeamName(opponentPick)}`,
-      });
+      breakdown.push(
+        breakdownItem(
+          "fade_rule",
+          signalLabel,
+          `${signalLabel} → ${displayTeamName(opponentPick)}`,
+          confidence
+        )
+      );
       return {
         confidence,
         confidenceBreakdown: breakdown,
@@ -223,13 +231,9 @@ export function computePickRules(input: {
       };
     }
 
-    breakdown.push({
-      key: "fade_incomplete",
-      label: "Incomplete fade",
-      value: 0,
-      impact: -50,
-      detail: "Opponent not identified on sheet",
-    });
+    breakdown.push(
+      breakdownItem("fade_incomplete", "Incomplete fade", "Incomplete fade — opponent not identified")
+    );
     return {
       confidence: 0,
       confidenceBreakdown: breakdown,
@@ -238,13 +242,15 @@ export function computePickRules(input: {
     };
   }
 
-  breakdown.push({
-    key: "secondary_signal",
-    label: SIGNAL_LABELS[pick.signalType],
-    value: RULE_CONFIDENCE.secondary,
-    impact: RULE_CONFIDENCE.secondary - 50,
-    detail: `Bet ${displayTeamName(pick.pick)}`,
-  });
+  const signalLabel = SIGNAL_LABELS[pick.signalType];
+  breakdown.push(
+    breakdownItem(
+      "secondary_signal",
+      signalLabel,
+      `${signalLabel} → ${displayTeamName(pick.pick)}`,
+      RULE_CONFIDENCE.secondary
+    )
+  );
   return {
     confidence: RULE_CONFIDENCE.secondary,
     confidenceBreakdown: breakdown,
@@ -434,7 +440,7 @@ function impliedBetFromRec(
       label,
       impliedSide: side,
       impliedNorm: impliedSideNorm(side, matchedGame),
-      detail: `${label} → bet ${side}`,
+      detail: `${label} → ${side}`,
     };
   }
 
@@ -450,7 +456,7 @@ function impliedBetFromRec(
       impliedSide: side,
       impliedNorm: impliedSideNorm(side, matchedGame),
       fadeTarget,
-      detail: `${label} → bet ${side} (fade ${fadeTarget})`,
+      detail: `${label} → ${side}`,
     };
   }
 
@@ -460,7 +466,7 @@ function impliedBetFromRec(
     label,
     impliedSide: side,
     impliedNorm: impliedSideNorm(side, matchedGame),
-    detail: `${label} → bet ${side}`,
+    detail: `${label} → ${side}`,
   };
 }
 
@@ -494,13 +500,9 @@ export interface ResolveImpliedBetsResult {
 
 /** Map signals to implied bet sides; recommend only when all agree on one side. */
 export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBetsResult {
-  const breakdown: ConfidenceBreakdownItem[] = entries.map((entry, i) => ({
-    key: `signal_${i}`,
-    label: entry.label,
-    value: 0,
-    impact: 0,
-    detail: entry.detail,
-  }));
+  const breakdown: ConfidenceBreakdownItem[] = entries.map((entry, i) =>
+    breakdownItem(`signal_${i}`, entry.label, entry.detail)
+  );
 
   if (entries.length === 0) {
     return {
@@ -508,13 +510,7 @@ export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBe
       confidence: RULE_CONFIDENCE.noBet,
       breakdown: [
         ...breakdown,
-        {
-          key: "result",
-          label: "Result",
-          value: 0,
-          impact: 0,
-          detail: "No bet — no resolvable signals",
-        },
+        breakdownItem("result", "Result", "Result: No bet — no resolvable signals"),
       ],
       noBetReason: "No resolvable signals on this game.",
     };
@@ -549,13 +545,7 @@ export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBe
       confidence,
       breakdown: [
         ...breakdown,
-        {
-          key: "result",
-          label: "Result",
-          value: confidence,
-          impact: confidence - 50,
-          detail: `Result: ${side}`,
-        },
+        breakdownItem("result", "Result", `Result: ${side} (${confidence}%)`, confidence),
       ],
       dualFade,
     };
@@ -563,6 +553,7 @@ export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBe
 
   const conflictingSides = uniqueSides.slice(0, 2);
   const conflictLabel = conflictingSides.join(" vs ");
+  const conflictSignals = entries.map((e) => `${e.label} → ${e.impliedSide}`).join(" vs ");
   const fadeEntries = entries.filter((e) => FADE_SIGNALS.has(e.signalType));
   const fadeTargets = [...new Set(fadeEntries.map((e) => e.fadeTarget).filter(Boolean))];
 
@@ -581,13 +572,11 @@ export function resolveImpliedBets(entries: ImpliedBetEntry[]): ResolveImpliedBe
     confidence: RULE_CONFIDENCE.noBet,
     breakdown: [
       ...breakdown,
-      {
-        key: "result",
-        label: "Result",
-        value: 0,
-        impact: 0,
-        detail: `No bet — conflicting signals: ${conflictLabel}`,
-      },
+      breakdownItem(
+        "result",
+        "Result",
+        `Result: No bet — conflicting: ${conflictSignals || conflictLabel}`
+      ),
     ],
     noBetReason: `Conflicting signals on this game (${conflictLabel}) — no bet.`,
     conflictingSides,
@@ -614,15 +603,7 @@ function buildNoBetCard(
     confidence: RULE_CONFIDENCE.noBet,
     noBet: true,
     noBetReason: reason,
-    confidenceBreakdown: breakdown ?? [
-      {
-        key: "no_bet",
-        label: "No bet",
-        value: 0,
-        impact: 0,
-        detail: reason,
-      },
-    ],
+    confidenceBreakdown: breakdown ?? [breakdownItem("no_bet", "No bet", `Result: No bet — ${reason}`)],
     hasConflict: true,
     pickIds: recs.map((r) => r.id),
     reasoning: `Game: ${awayTeam} @ ${homeTeam} · ${reason}`,

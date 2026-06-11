@@ -1,4 +1,4 @@
-﻿import type { MatchedRecommendation, StatsResponse, SyncStatus } from "./types";
+﻿import type { MatchedRecommendation, StatsResponse, SyncStatus, TrackingResponse } from "./types";
 import { getClientSnapshot, setClientSnapshot } from "./sync/state";
 
 const STATIC_API = import.meta.env.VITE_STATIC_API === "true";
@@ -10,6 +10,7 @@ const STATIC_ROUTES: Record<string, string> = {
   "/recommendations": "recommendations.json",
   "/calendar": "calendar.json",
   "/stats": "stats.json",
+  "/tracking": "tracking.json",
   "/sync/status": "sync-status.json",
 };
 
@@ -86,6 +87,15 @@ export async function fetchStats() {
   const res = await fetch(resolveUrl("/stats"));
   if (!res.ok) throw new Error("Failed to load statistics");
   return res.json() as Promise<StatsResponse>;
+}
+
+export async function fetchTracking() {
+  if (getClientSnapshot()?.tracking) {
+    return getClientSnapshot()!.tracking!;
+  }
+  const res = await fetch(resolveUrl("/tracking"));
+  if (!res.ok) throw new Error("Failed to load tracking");
+  return res.json() as Promise<TrackingResponse>;
 }
 
 export async function fetchSyncStatus() {

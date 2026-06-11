@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type Tab = "picks" | "calendar" | "leagues" | "stats" | "settings";
+export type Tab = "picks" | "calendar" | "leagues" | "tracking" | "settings";
 
 interface LayoutProps {
   activeTab: Tab;
@@ -15,7 +15,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "picks", label: "Today's Picks" },
   { id: "calendar", label: "Calendar" },
   { id: "leagues", label: "Leagues" },
-  { id: "stats", label: "Trends" },
+  { id: "tracking", label: "Tracking" },
   { id: "settings", label: "Settings" },
 ];
 

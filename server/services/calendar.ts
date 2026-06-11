@@ -5,19 +5,30 @@ import type { CalendarGame, LeagueCode } from "../types.js";
 
 const cache = new NodeCache({ stdTTL: 300 });
 
+interface EspnCompetitor {
+  homeAway: string;
+  winner?: boolean;
+  score?: string;
+  team: { displayName: string; abbreviation: string };
+}
+
 interface EspnScoreboard {
   events?: Array<{
     id: string;
     date: string;
-    status?: { type?: { description?: string } };
+    status?: { type?: { description?: string; completed?: boolean } };
     competitions?: Array<{
       venue?: { fullName?: string };
-      competitors?: Array<{
-        homeAway: string;
-        team: { displayName: string; abbreviation: string };
-      }>;
+      competitors?: EspnCompetitor[];
     }>;
   }>;
+}
+
+export interface GameResult extends CalendarGame {
+  homeScore?: number;
+  awayScore?: number;
+  winnerTeam?: string;
+  isFinal: boolean;
 }
 
 function espnUrl(sport: string, league: string, date?: string): string {
@@ -26,23 +37,54 @@ function espnUrl(sport: string, league: string, date?: string): string {
   return base;
 }
 
+function parseScore(value?: string): number | undefined {
+  if (value == null || value === "") return undefined;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function mapEspnEvent(
+  event: NonNullable<EspnScoreboard["events"]>[number],
+  league: LeagueCode
+): GameResult {
+  const comp = event.competitions?.[0];
+  const home = comp?.competitors?.find((c) => c.homeAway === "home");
+  const away = comp?.competitors?.find((c) => c.homeAway === "away");
+  const statusDesc = event.status?.type?.description || "Scheduled";
+  const isFinal =
+    event.status?.type?.completed === true ||
+    /final/i.test(statusDesc);
+
+  const homeScore = parseScore(home?.score);
+  const awayScore = parseScore(away?.score);
+  let winnerTeam: string | undefined;
+  if (isFinal && homeScore != null && awayScore != null) {
+    if (homeScore > awayScore) winnerTeam = home?.team.displayName;
+    else if (awayScore > homeScore) winnerTeam = away?.team.displayName;
+  } else if (isFinal) {
+    if (home?.winner) winnerTeam = home.team.displayName;
+    else if (away?.winner) winnerTeam = away.team.displayName;
+  }
+
+  return {
+    id: event.id,
+    league,
+    homeTeam: home?.team.displayName || "TBD",
+    awayTeam: away?.team.displayName || "TBD",
+    homeAbbr: home?.team.abbreviation || "",
+    awayAbbr: away?.team.abbreviation || "",
+    startTime: event.date,
+    status: statusDesc,
+    venue: comp?.venue?.fullName,
+    homeScore,
+    awayScore,
+    winnerTeam,
+    isFinal,
+  };
+}
+
 function mapEspnToGames(data: EspnScoreboard, league: LeagueCode): CalendarGame[] {
-  return (data.events || []).map((event) => {
-    const comp = event.competitions?.[0];
-    const home = comp?.competitors?.find((c) => c.homeAway === "home");
-    const away = comp?.competitors?.find((c) => c.homeAway === "away");
-    return {
-      id: event.id,
-      league,
-      homeTeam: home?.team.displayName || "TBD",
-      awayTeam: away?.team.displayName || "TBD",
-      homeAbbr: home?.team.abbreviation || "",
-      awayAbbr: away?.team.abbreviation || "",
-      startTime: event.date,
-      status: event.status?.type?.description || "Scheduled",
-      venue: comp?.venue?.fullName,
-    };
-  });
+  return (data.events || []).map((event) => mapEspnEvent(event, league));
 }
 
 export async function fetchLeagueSchedule(
@@ -75,6 +117,41 @@ export async function fetchAllSchedules(
   return results.flat().sort(
     (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
   );
+}
+
+export async function fetchLeagueResults(
+  league: LeagueCode,
+  date: string
+): Promise<GameResult[]> {
+  const config = ESPN_LEAGUES[league];
+  if (!config) return [];
+
+  const cacheKey = `results-${league}-${date}`;
+  const cached = cache.get<GameResult[]>(cacheKey);
+  if (cached) return cached;
+
+  const url = espnUrl(config.sport, config.league, date);
+  const res = await fetch(url, { headers: { "User-Agent": "sports-bet-coach/1.0" } });
+  if (!res.ok) return [];
+
+  const data = (await res.json()) as EspnScoreboard;
+  const games = (data.events || []).map((event) => mapEspnEvent(event, league));
+  cache.set(cacheKey, games);
+  return games;
+}
+
+export async function fetchResultsForDate(
+  leagues: LeagueCode[],
+  dateKey: string
+): Promise<GameResult[]> {
+  const unique = [...new Set(leagues.filter((l) => ESPN_LEAGUES[l]))];
+  const results = await Promise.all(unique.map((l) => fetchLeagueResults(l, dateKey)));
+  return results.flat();
+}
+
+/** yyyy-MM-dd → yyyyMMdd for ESPN */
+export function displayDateToEspnKey(displayDate: string): string {
+  return displayDate.replace(/-/g, "");
 }
 
 export function todayDateKey(): string {

@@ -34,12 +34,46 @@ declare module "@server/parsers/performance.js" {
 
 declare module "@server/services/calendar.js" {
   import type { CalendarGame, LeagueCode } from "@server/types.js";
+  export interface GameResult extends CalendarGame {
+    homeScore?: number;
+    awayScore?: number;
+    winnerTeam?: string;
+    isFinal: boolean;
+  }
   export function fetchAllSchedules(
     leagues: LeagueCode[],
     date?: string
   ): Promise<CalendarGame[]>;
+  export function fetchResultsForDate(
+    leagues: LeagueCode[],
+    dateKey: string
+  ): Promise<GameResult[]>;
+  export function displayDateToEspnKey(displayDate: string): string;
+  export function pickTeamInGame(teamName: string, game: CalendarGame): boolean;
   export function todayDateKey(): string;
   export function todayDisplayDate(): string;
+}
+
+declare module "@server/services/tracking.js" {
+  import type {
+    GameConsolidatedRecommendation,
+    MatchedRecommendation,
+  } from "@server/types.js";
+  export interface TrackingResponse {
+    bets: unknown[];
+    summary: Record<string, unknown>;
+    weekly: unknown[];
+    monthly: unknown[];
+    trackingSince: string | null;
+    note?: string;
+    timezone: string;
+    lastUpdated: string;
+  }
+  export function updateTracking(
+    gameRecommendations: GameConsolidatedRecommendation[],
+    recommendations: MatchedRecommendation[],
+    date: string
+  ): Promise<TrackingResponse>;
 }
 
 declare module "@server/services/confidenceCache.js" {

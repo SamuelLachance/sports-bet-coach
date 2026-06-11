@@ -1,14 +1,11 @@
 import type { GameConsolidatedRecommendation } from "../types";
+import { SignalBreakdown } from "./SignalBreakdown";
 
 function confidenceColor(c: number) {
   if (c >= 85) return "text-success";
   if (c >= 75) return "text-accent-glow";
   if (c >= 50) return "text-slate-200";
   return "text-warning";
-}
-
-function impactSign(n: number) {
-  return n >= 0 ? `+${n}` : `${n}`;
 }
 
 export function GameRecommendationCard({ game }: { game: GameConsolidatedRecommendation }) {
@@ -52,6 +49,8 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
             </p>
           </div>
         )}
+
+        <SignalBreakdown items={game.confidenceBreakdown} />
 
         <p className="text-sm text-slate-400 leading-relaxed">{game.reasoning}</p>
       </article>
@@ -118,33 +117,7 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
         </div>
       )}
 
-      {game.confidenceBreakdown?.length > 0 && (
-        <details className="mb-3 group">
-          <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
-            Signal breakdown ({game.confidenceBreakdown.length} rules)
-          </summary>
-          <ul className="mt-2 space-y-1.5 text-xs">
-            {game.confidenceBreakdown.map((item) => (
-              <li
-                key={item.key}
-                className="flex flex-wrap justify-between gap-x-2 gap-y-0.5 bg-surface-raised rounded px-2 py-1.5"
-              >
-                <span className="text-slate-300">{item.label}</span>
-                <span
-                  className={
-                    item.impact >= 0 ? "text-success font-medium" : "text-warning font-medium"
-                  }
-                >
-                  {impactSign(Math.round(item.impact * 10) / 10)}
-                </span>
-                {item.detail && (
-                  <span className="w-full text-slate-500">{item.detail}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      <SignalBreakdown items={game.confidenceBreakdown} />
 
       <p className="text-sm text-slate-400 leading-relaxed">{game.reasoning}</p>
       <p className="text-xs text-slate-500 mt-2">

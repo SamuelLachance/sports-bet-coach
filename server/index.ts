@@ -12,6 +12,7 @@ import {
   getActiveLeagues,
 } from "./services/recommendations.js";
 import { loadCachedSheets, syncAllSheets } from "./services/sheetFetcher.js";
+import { getTracking, updateTracking } from "./services/tracking.js";
 import type { LeagueCode, SyncStatus } from "./types.js";
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -103,6 +104,8 @@ app.get("/api/recommendations", async (req, res) => {
     let recs = built.recommendations;
     const gameRecommendations = built.gameRecommendations;
 
+    await updateTracking(gameRecommendations, recs, todayDisplayDate());
+
     const league = req.query.league as LeagueCode | "ALL" | undefined;
     if (league) recs = filterByLeague(recs, league);
 
@@ -117,6 +120,16 @@ app.get("/api/recommendations", async (req, res) => {
       gameRecommendations,
       games,
     });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get("/api/tracking", async (_req, res) => {
+  try {
+    const tracking = await getTracking();
+    res.json(tracking);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });

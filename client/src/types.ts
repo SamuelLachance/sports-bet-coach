@@ -154,3 +154,59 @@ export interface StatsResponse {
   mtd?: { wins: number; losses: number; returnUnits: number };
   archiveCount: number;
 }
+
+export type BetResult = "pending" | "win" | "loss" | "push";
+
+export interface TrackedBet {
+  id: string;
+  date: string;
+  gameKey: string;
+  league: LeagueCode;
+  awayTeam: string;
+  homeTeam: string;
+  recommendedTeam: string;
+  confidence: number;
+  signalTypes: SignalType[];
+  signalLabels: string[];
+  status: BetResult;
+  units: number;
+  stakeUnits: number;
+  gradedAt?: string;
+  espnGameId?: string;
+  finalScore?: string;
+  highConviction?: boolean;
+  recordedAt: string;
+}
+
+export interface PeriodRollup {
+  key: string;
+  label: string;
+  wins: number;
+  losses: number;
+  pushes: number;
+  pending: number;
+  units: number;
+  bets: number;
+}
+
+export interface TrackingSummary {
+  totalUnits: number;
+  wins: number;
+  losses: number;
+  pushes: number;
+  pending: number;
+  roiPercent: number;
+  record: string;
+  currentStreak: { type: "win" | "loss"; count: number } | null;
+}
+
+export interface TrackingResponse {
+  bets: TrackedBet[];
+  summary: TrackingSummary;
+  weekly: PeriodRollup[];
+  monthly: PeriodRollup[];
+  trackingSince: string | null;
+  note?: string;
+  timezone: string;
+  lastUpdated: string;
+}

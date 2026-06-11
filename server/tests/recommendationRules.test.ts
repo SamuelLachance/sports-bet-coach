@@ -587,7 +587,7 @@ function main() {
   assert.equal(oddsOnlyCard!.confidence, 0);
   assert.ok(oddsOnlyCard!.dualFade?.isOpposingNoBet, "Opposing dual-fade flag set");
   assert.ok(
-    oddsOnlyCard!.confidenceBreakdown.some((b) => b.detail?.includes("No bet")),
+    oddsOnlyCard!.confidenceBreakdown.some((b) => b.detail?.includes("Result: No bet")),
     "Breakdown shows no-bet result, not misleading edge totals"
   );
 
@@ -751,13 +751,15 @@ function main() {
       label: "Sharp Money",
       impliedSide: "Carolina Hurricanes",
       impliedNorm: "CAROLINA HURRICANES",
-      detail: "Sharp Money → bet Carolina Hurricanes",
+      detail: "Sharp Money → Carolina Hurricanes",
     },
   ];
   const sharpOnlyResult = resolveImpliedBets(sharpOnly);
   assert.equal(sharpOnlyResult.side, "Carolina Hurricanes");
   assert.equal(sharpOnlyResult.confidence, RULE_CONFIDENCE.sharp);
-  assert.ok(sharpOnlyResult.breakdown.some((b) => b.detail === "Result: Carolina Hurricanes"));
+  assert.ok(
+    sharpOnlyResult.breakdown.some((b) => b.detail === "Result: Carolina Hurricanes (85%)")
+  );
 
   const singleFade: ImpliedBetEntry[] = [
     {
@@ -766,7 +768,7 @@ function main() {
       impliedSide: "Vegas Golden Knights",
       impliedNorm: "VEGAS GOLDEN KNIGHTS",
       fadeTarget: "Carolina Hurricanes",
-      detail: "Square Top (Fade) → bet Vegas Golden Knights (fade Carolina Hurricanes)",
+      detail: "Square Top (Fade) → Vegas Golden Knights",
     },
   ];
   const singleFadeResult = resolveImpliedBets(singleFade);
@@ -781,7 +783,7 @@ function main() {
   assert.equal(conflictResult.side, null);
   assert.ok(
     conflictResult.breakdown.some((b) =>
-      b.detail?.includes("No bet — conflicting signals:")
+      b.detail?.includes("Result: No bet — conflicting:")
     )
   );
 
