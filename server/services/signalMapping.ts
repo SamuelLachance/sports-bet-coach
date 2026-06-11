@@ -38,7 +38,7 @@ export const SHARP_BET_SIGNALS = new Set<SignalType>([
   "mega_sharps",
 ]);
 
-export const SIGNAL_LABELS_FR: Record<SignalType, string> = {
+export const SIGNAL_LABELS: Record<SignalType, string> = {
   sharp_money: "Sharp Money",
   book_needs_fade: "Book Needs (Fade)",
   square_fade: "Square Top (Fade)",
@@ -48,6 +48,9 @@ export const SIGNAL_LABELS_FR: Record<SignalType, string> = {
   model_best_values: "Model Best Values",
   mega_rlm: "Mega RLM (4+)",
 };
+
+/** @deprecated alias — use SIGNAL_LABELS */
+export const SIGNAL_LABELS_FR = SIGNAL_LABELS;
 
 export function categoryForSignal(signal: SignalType): string {
   return SIGNAL_TO_CATEGORY[signal];

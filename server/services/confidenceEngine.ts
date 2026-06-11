@@ -27,7 +27,7 @@ import {
   resolveGameTeamDisplay,
   validateRecommendedTeam,
 } from "./calendar.js";
-import { FADE_SIGNALS, SHARP_BET_SIGNALS, SIGNAL_LABELS_FR } from "./signalMapping.js";
+import { FADE_SIGNALS, SHARP_BET_SIGNALS, SIGNAL_LABELS } from "./signalMapping.js";
 
 export interface ConfidenceInput {
   pick: SheetPick;
@@ -52,6 +52,8 @@ export interface ConfidenceResult {
 
 const ULTRA_NEGATIVE_ROI = -50;
 const INVERT_FADE_ROI = -100;
+/** Heavy edge penalty so listed fade teams never win consolidation */
+const FADE_TARGET_EDGE_PENALTY = 250;
 
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
@@ -322,7 +324,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
 
   breakdown.push({
     key: "signal_roi",
-    label: `ROI historique ${SIGNAL_LABELS_FR[pick.signalType]}`,
+    label: `ROI historique ${SIGNAL_LABELS[pick.signalType]}`,
     value: Math.round(signalStats.blendedRoi * 10) / 10,
     impact: Math.round((confidence - 50) * 10) / 10,
     detail: `${signalStats.wins}V-${signalStats.losses}D · ${Math.round(bayesianWr * 100)}% (Bayesian)`,
@@ -436,7 +438,8 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
     opponentPick = extractOpponentName(pick, slatePicks);
     if (opponentPick) {
       signalPolarity = "inverted";
-      opponentConfidence = Math.round(clamp(74 + signalStats.blendedRoi / 40, 70, 88));
+      // Fixed inverse confidence — historical ROI on the fade column must not dilute this rule
+      opponentConfidence = Math.round(clamp(76 + Math.min(Math.abs(signalStats.blendedRoi), 40) / 50, 74, 85));
       confidence = opponentConfidence;
       edgeLabel =
         pick.signalType === "book_needs_fade"
@@ -531,7 +534,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
     ? isHighConviction(fullHistory, pick.signalType, league)
     : false;
 
-  if (highConviction) {
+  if (highConviction && !FADE_SIGNALS.has(pick.signalType)) {
     breakdown.push({
       key: "high_conviction",
       label: "Haute conviction",
@@ -624,6 +627,60 @@ function invertBoostForSignal(stats: ConfidenceStatsCache, signal: SignalType): 
   return clamp(70 - s.blendedRoi / 15, 65, 92);
 }
 
+/** Teams listed in Book Needs / Square Top for a matchup — always negative EV */
+export function collectFadeTargetsForGame(
+  recs: MatchedRecommendation[],
+  slatePicks?: SheetPick[],
+  matchedGame?: CalendarGame
+): Map<string, string> {
+  const targets = new Map<string, string>();
+
+  const addTarget = (team: string) => {
+    const norm = normalizeTeamName(team);
+    if (norm) targets.set(norm, displayTeamName(team));
+  };
+
+  for (const rec of recs) {
+    if (rec.line) continue;
+    if (FADE_SIGNALS.has(rec.signalType)) addTarget(rec.pick);
+  }
+
+  if (slatePicks?.length && matchedGame && recs.length > 0) {
+    const league = sportLeagueFromRec(recs[0]);
+    for (const p of slatePicks) {
+      if (!FADE_SIGNALS.has(p.signalType) || p.line) continue;
+      if (p.league !== league && p.league !== "UNKNOWN") continue;
+      if (pickBelongsToGame(p.pick, p.opponent, matchedGame)) addTarget(p.pick);
+    }
+  }
+
+  return targets;
+}
+
+function opponentOfTeamInGame(
+  teamNorm: string,
+  game: CalendarGame
+): { norm: string; display: string } | null {
+  const awayNorm = normalizeTeamName(game.awayTeam);
+  const homeNorm = normalizeTeamName(game.homeTeam);
+
+  if (teamNorm === awayNorm) {
+    return { norm: homeNorm, display: game.homeTeam };
+  }
+  if (teamNorm === homeNorm) {
+    return { norm: awayNorm, display: game.awayTeam };
+  }
+
+  const resolvedAway = resolveGameTeamDisplay(teamNorm, game);
+  if (resolvedAway) {
+    const resolvedNorm = normalizeTeamName(resolvedAway);
+    if (resolvedNorm === awayNorm) return { norm: homeNorm, display: game.homeTeam };
+    if (resolvedNorm === homeNorm) return { norm: awayNorm, display: game.awayTeam };
+  }
+
+  return null;
+}
+
 function effectiveTeamForRec(rec: MatchedRecommendation): {
   teamNorm: string;
   teamDisplay: string;
@@ -638,6 +695,7 @@ function effectiveTeamForRec(rec: MatchedRecommendation): {
         teamDisplay: displayTeamName(opp),
       };
     }
+    return null;
   }
 
   if (rec.signalPolarity === "inverted" && rec.opponentPick) {
@@ -655,7 +713,8 @@ function effectiveTeamForRec(rec: MatchedRecommendation): {
 
 function contributionForRec(
   rec: MatchedRecommendation,
-  stats: ConfidenceStatsCache
+  stats: ConfidenceStatsCache,
+  fadeTargets: Set<string>
 ): TeamEdgeContribution | null {
   const team = effectiveTeamForRec(rec);
   if (!team) return null;
@@ -667,16 +726,19 @@ function contributionForRec(
   let edge: number;
   let note: string;
 
-  if (rec.signalPolarity === "inverted") {
+  if (!FADE_SIGNALS.has(rec.signalType) && fadeTargets.has(team.teamNorm)) {
+    edge = -rec.confidence * 0.9 * weight;
+    note = `${SIGNAL_LABELS[rec.signalType]} sur cible fade ${team.teamDisplay} (${Math.round(edge)})`;
+  } else if (rec.signalPolarity === "inverted") {
     const boost = rec.opponentConfidence ?? invertBoostForSignal(stats, rec.signalType);
     edge = boost * weight;
-    note = `${SIGNAL_LABELS_FR[rec.signalType]} fade → ${team.teamDisplay} (+${Math.round(edge)})`;
+    note = `${SIGNAL_LABELS[rec.signalType]} fade → ${team.teamDisplay} (+${Math.round(edge)})`;
   } else if (rec.signalPolarity === "positive") {
     edge = rec.confidence * 0.55 * weight;
-    note = `${SIGNAL_LABELS_FR[rec.signalType]} → ${team.teamDisplay} (+${Math.round(edge)})`;
+    note = `${SIGNAL_LABELS[rec.signalType]} → ${team.teamDisplay} (+${Math.round(edge)})`;
   } else {
     edge = rec.confidence * 0.2 * weight;
-    note = `${SIGNAL_LABELS_FR[rec.signalType]} (faible) → ${team.teamDisplay}`;
+    note = `${SIGNAL_LABELS[rec.signalType]} (faible) → ${team.teamDisplay}`;
   }
 
   return {
@@ -691,7 +753,7 @@ function contributionForRec(
 
 function applyGameCrossSignalRules(
   contributions: TeamEdgeContribution[],
-  stats: ConfidenceStatsCache
+  fadeTargets: Set<string>
 ): { edgeDelta: Map<string, number>; notes: string[]; dampenConfidence: boolean } {
   const edgeDelta = new Map<string, number>();
   const notes: string[] = [];
@@ -712,6 +774,11 @@ function applyGameCrossSignalRules(
   const sharps = contributions.filter((c) => sharpTypes.includes(c.signalType));
 
   for (const sharp of sharps) {
+    if (fadeTargets.has(sharp.teamNorm)) {
+      edgeDelta.set(sharp.teamNorm, (edgeDelta.get(sharp.teamNorm) ?? 0) - 40);
+      notes.push(`Sharp sur cible fade ${sharp.teamDisplay} — signal ignoré`);
+      continue;
+    }
     for (const fade of fades) {
       if (sharp.teamNorm === fade.teamNorm) {
         edgeDelta.set(sharp.teamNorm, (edgeDelta.get(sharp.teamNorm) ?? 0) + 12);
@@ -723,6 +790,54 @@ function applyGameCrossSignalRules(
   }
 
   return { edgeDelta, notes: [...new Set(notes)], dampenConfidence };
+}
+
+function applyFadeTargetPenalties(
+  teamEdges: Map<string, { edge: number; display: string; notes: string[] }>,
+  fadeTargets: Map<string, string>
+): void {
+  for (const [norm, display] of fadeTargets) {
+    const existing = teamEdges.get(norm) ?? { edge: 0, display, notes: [] };
+    existing.edge -= FADE_TARGET_EDGE_PENALTY;
+    existing.notes.push(`${display} listé en fade — EV négatif`);
+    teamEdges.set(norm, existing);
+  }
+}
+
+function enforceFadeTargetWinner(
+  winnerNorm: string,
+  winnerDisplay: string,
+  fadeTargets: Map<string, string>,
+  matchedGame?: CalendarGame,
+  recs?: MatchedRecommendation[]
+): { norm: string; display: string; flipped: boolean } {
+  if (!fadeTargets.has(winnerNorm)) {
+    return { norm: winnerNorm, display: winnerDisplay, flipped: false };
+  }
+
+  if (matchedGame) {
+    const opp = opponentOfTeamInGame(winnerNorm, matchedGame);
+    if (opp) {
+      return { norm: opp.norm, display: opp.display, flipped: true };
+    }
+  }
+
+  if (recs) {
+    for (const rec of recs) {
+      if (!FADE_SIGNALS.has(rec.signalType)) continue;
+      if (normalizeTeamName(rec.pick) !== winnerNorm) continue;
+      const opp = rec.opponentPick ?? rec.opponent;
+      if (opp) {
+        return {
+          norm: normalizeTeamName(opp),
+          display: displayTeamName(opp),
+          flipped: true,
+        };
+      }
+    }
+  }
+
+  return { norm: winnerNorm, display: winnerDisplay, flipped: false };
 }
 
 function matchupLabels(
@@ -899,8 +1014,11 @@ function resolveSingleGame(
     }
   }
 
+  const fadeTargets = collectFadeTargetsForGame(recs, slatePicks, matchedGame);
+  const fadeTargetNorms = new Set(fadeTargets.keys());
+
   const contributions = recs
-    .map((r) => contributionForRec(r, stats))
+    .map((r) => contributionForRec(r, stats, fadeTargetNorms))
     .filter((c): c is TeamEdgeContribution => c != null);
 
   const teamEdges = new Map<string, { edge: number; display: string; notes: string[] }>();
@@ -912,7 +1030,9 @@ function resolveSingleGame(
     teamEdges.set(c.teamNorm, existing);
   }
 
-  const cross = applyGameCrossSignalRules(contributions, stats);
+  applyFadeTargetPenalties(teamEdges, fadeTargets);
+
+  const cross = applyGameCrossSignalRules(contributions, fadeTargetNorms);
   for (const [team, delta] of cross.edgeDelta) {
     const existing = teamEdges.get(team);
     if (existing) existing.edge += delta;
@@ -966,13 +1086,28 @@ function resolveSingleGame(
   const sharpRecs = recs.filter((r) => SHARP_BET_SIGNALS.has(r.signalType) && !r.line);
   if (sharpRecs.length > 0) {
     const sharpSide = effectiveTeamForRec(sharpRecs[0]);
-    if (sharpSide) {
+    if (sharpSide && !fadeTargetNorms.has(sharpSide.teamNorm)) {
       const clamped = clampWinnerToGame(sharpSide.teamDisplay, sharpSide.teamNorm, matchedGame);
       winnerNorm = clamped.norm;
       winnerDisplay = clamped.display;
       winnerEdge = Math.max(winnerEdge, 84);
       margin = Math.max(margin, 20);
     }
+  }
+
+  const enforced = enforceFadeTargetWinner(
+    winnerNorm,
+    winnerDisplay,
+    fadeTargets,
+    matchedGame,
+    recs
+  );
+  if (enforced.flipped) {
+    const clamped = clampWinnerToGame(enforced.display, enforced.norm, matchedGame);
+    winnerNorm = clamped.norm;
+    winnerDisplay = clamped.display;
+    winnerEdge = Math.max(winnerEdge, 72);
+    margin = Math.max(margin, 15);
   }
 
   let confidence = clamp(55 + (margin / maxEdge) * 35, 52, 88);
@@ -1061,7 +1196,7 @@ function resolveSingleGame(
   for (const c of contributions) {
     breakdown.push({
       key: `pick_${c.pickId}`,
-      label: SIGNAL_LABELS_FR[c.signalType],
+      label: SIGNAL_LABELS[c.signalType],
       value: Math.round(c.edge * 10) / 10,
       impact: Math.round(c.edge),
       detail: c.note,
@@ -1169,43 +1304,20 @@ export function resolveGameConflicts(
   for (const [key, recs] of byGame) {
     if (recs.length === 1) {
       const single = recs[0];
-      const league = sportLeagueFromRec(single);
       const game = single.matchedGame;
-      const pair =
-        slatePicks && game
-          ? findDualFadePair(slatePicks, league, {
-              homeTeam: game.homeTeam,
-              awayTeam: game.awayTeam,
-            })
-          : {};
-      const isStandaloneFade =
-        (single.signalType === "book_needs_fade" || single.signalType === "square_fade") &&
-        !pair.book &&
-        !pair.square;
+      const isFadePick = FADE_SIGNALS.has(single.signalType) && !single.line;
 
-      if (dualStats && slatePicks && isStandaloneFade) {
-        const pick =
-          single.signalType === "book_needs_fade"
-            ? slatePicks.find((p) => p.id === single.id)
-            : slatePicks.find((p) => p.id === single.id);
-        const resolution = resolveDualFadeMatch(
-          pick?.signalType === "book_needs_fade" ? pick : undefined,
-          pick?.signalType === "square_fade" ? pick : undefined,
+      if (game && isFadePick && slatePicks) {
+        const { consolidated, updatedRecs } = resolveSingleGame(
+          key,
+          recs,
+          stats,
           dualStats,
-          league
+          slatePicks
         );
-        if (resolution?.isStandalone) {
-          const { consolidated, updatedRecs } = resolveSingleGame(
-            key,
-            recs,
-            stats,
-            dualStats,
-            slatePicks
-          );
-          gameRecommendations.push(consolidated);
-          for (const rec of updatedRecs) recById.set(rec.id, rec);
-          continue;
-        }
+        gameRecommendations.push(consolidated);
+        for (const rec of updatedRecs) recById.set(rec.id, rec);
+        continue;
       }
 
       recById.set(single.id, { ...single, gameKey: key });
