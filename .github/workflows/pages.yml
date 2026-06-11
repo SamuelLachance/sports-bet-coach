@@ -47,6 +47,7 @@ jobs:
           VITE_BASE: /
           VITE_STATIC_API: "true"
           VITE_CLIENT_SYNC: "true"
+          DRATINGS_ENABLED: "true"
         run: npm run build:pages
 
       - name: Upload Pages artifact

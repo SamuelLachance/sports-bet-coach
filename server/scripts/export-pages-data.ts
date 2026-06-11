@@ -1,13 +1,15 @@
 ﻿import fs from "node:fs/promises";
 import path from "node:path";
-import { TIMEZONE } from "../config.js";
+import { TIMEZONE, isDratingsEnabled } from "../config.js";
 import {
   fetchAllSchedules,
   todayDateKey,
   todayDisplayDate,
 } from "../services/calendar.js";
+import { fetchDratingsTrends } from "../services/dratingsTrends.js";
 import {
   buildRecommendations,
+  countDratingsFilterStats,
   getActiveLeagues,
 } from "../services/recommendations.js";
 import { syncAllSheets } from "../services/sheetFetcher.js";
@@ -29,9 +31,33 @@ async function main() {
   const leagues = getActiveLeagues(sheets);
   const dateKey = todayDateKey();
   const games = await fetchAllSchedules(leagues, dateKey);
-  const built = await buildRecommendations(sheets, games, todayDisplayDate(), {
-    skipDratingsFetch: process.env.CI === "true" && process.env.DRATINGS_ENABLED !== "true",
+  const displayDate = todayDisplayDate();
+  const skipDratingsFetch =
+    process.env.CI === "true" && process.env.DRATINGS_ENABLED !== "true";
+  const dratingsEnabled = isDratingsEnabled();
+
+  let dratingsCache: Awaited<ReturnType<typeof fetchDratingsTrends>> | undefined;
+  if (dratingsEnabled && !skipDratingsFetch) {
+    console.log("Fetching DRatings Bet Trends…");
+    dratingsCache = await fetchDratingsTrends(leagues, displayDate);
+    console.log(
+      `DRatings: ${dratingsCache.trends.length} games, ${dratingsCache.errors.length} fetch errors`
+    );
+  } else if (skipDratingsFetch) {
+    console.log("DRatings fetch skipped (CI without DRATINGS_ENABLED=true)");
+  }
+
+  const built = await buildRecommendations(sheets, games, displayDate, {
+    skipDratingsFetch,
+    dratingsTrends: dratingsCache?.trends,
   });
+
+  if (dratingsEnabled && !skipDratingsFetch) {
+    const stats = countDratingsFilterStats(built);
+    console.log(
+      `DRatings filter: ${stats.gamesConfirmed} games confirmed, ${stats.gamesNoBet} games → no bet, ${stats.picksBlocked} picks blocked, ${stats.picksConfirmed} picks confirmed`
+    );
+  }
   const tracking = await updateTracking(
     built.gameRecommendations,
     built.recommendations,
@@ -82,6 +108,15 @@ async function main() {
     archiveCount: sheets.archive.length,
   });
   await writeJson("tracking", tracking);
+  if (dratingsCache) {
+    await writeJson("dratings-cache", {
+      fetchedAt: dratingsCache.fetchedAt,
+      date: dratingsCache.date,
+      trends: dratingsCache.trends,
+      errors: dratingsCache.errors,
+      source: dratingsCache.source,
+    });
+  }
 
   console.log(
     `Wrote API snapshot to ${outDir} (${built.recommendations.length} picks, ${games.length} games)`

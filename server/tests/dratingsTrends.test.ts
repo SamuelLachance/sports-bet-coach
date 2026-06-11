@@ -172,6 +172,25 @@ const filteredDisagree = applyDratingsFilter(
 assert.ok(filteredDisagree.gameRecommendations[0]?.noBet, "Disagreeing side → no bet");
 assert.equal(filteredDisagree.gameRecommendations[0]?.dratingsStatus, "disagrees");
 
+const disagreePick = {
+  id: "p-disagree",
+  league: "MLB" as const,
+  signalType: "sharp_money",
+  pickText: "Rangers ML",
+  parsedBet: rangersMlBet,
+  recommendedBet: rangersMlBet,
+  matchedGame: ROYALS_GAME,
+  confidence: 70,
+  confidenceBreakdown: [],
+  gameConflict: false,
+};
+const filteredDisagreePick = applyDratingsFilter(
+  { recommendations: [disagreePick], gameRecommendations: [] },
+  [royalsTrend]
+);
+assert.equal(filteredDisagreePick.recommendations[0]?.dratingsBlocked, true, "Disagreeing pick → dratingsBlocked");
+assert.equal(filteredDisagreePick.recommendations[0]?.dratingsStatus, "disagrees");
+
 const unavailableFiltered = applyDratingsFilter(
   { recommendations: [], gameRecommendations: [actionableCard] },
   []

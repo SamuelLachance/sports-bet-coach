@@ -78,12 +78,30 @@ function buildSyncStatus(sheets: ParsedSheets, leagues: string[], gameCount: num
   };
 }
 
+async function loadBakedDratingsTrends(): Promise<
+  import("@server/services/dratingsTrends.js").DratingsGameTrend[] | undefined
+> {
+  try {
+    const base = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
+    const res = await fetch(`${base}api/dratings-cache.json`);
+    if (!res.ok) return undefined;
+    const data = (await res.json()) as { trends?: import("@server/services/dratingsTrends.js").DratingsGameTrend[] };
+    return data.trends?.length ? data.trends : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function runClientSync(): Promise<ClientSyncSnapshot> {
   const { sheets } = await syncAllSheets();
   const leagues = getActiveLeagues(sheets);
   const dateKey = todayDateKey();
   const games = await fetchAllSchedules(leagues, dateKey);
-  const built = await buildRecommendations(sheets, games);
+  const dratingsTrends = await loadBakedDratingsTrends();
+  const built = await buildRecommendations(sheets, games, todayDisplayDate(), {
+    skipDratingsFetch: true,
+    dratingsTrends,
+  });
   const tracking = await updateTracking(
     built.gameRecommendations,
     built.recommendations,

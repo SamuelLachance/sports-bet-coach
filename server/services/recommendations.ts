@@ -179,7 +179,9 @@ export async function buildRecommendations(
   });
 
   if (options?.skipDratingsFetch && !options.dratingsTrends) {
-    return engineResult;
+    if (!isDratingsEnabled()) return engineResult;
+    // DRatings enabled but no trends (e.g. browser sync without baked cache) — block per spec
+    return applyDratingsFilter(engineResult, []);
   }
 
   const leagues = [...new Set(games.map((g) => g.league))] as LeagueCode[];
@@ -188,6 +190,25 @@ export async function buildRecommendations(
     (await fetchDratingsTrends(leagues, gameDate)).trends;
 
   return applyDratingsFilter(engineResult, trends);
+}
+
+export function countDratingsFilterStats(result: {
+  recommendations: MatchedRecommendation[];
+  gameRecommendations: GameConsolidatedRecommendation[];
+}): {
+  picksBlocked: number;
+  picksConfirmed: number;
+  gamesNoBet: number;
+  gamesConfirmed: number;
+} {
+  return {
+    picksBlocked: result.recommendations.filter((r) => r.dratingsBlocked).length,
+    picksConfirmed: result.recommendations.filter((r) => r.dratingsConfirmed).length,
+    gamesNoBet: result.gameRecommendations.filter(
+      (g) => g.noBet && g.dratingsStatus && g.dratingsStatus !== "agrees"
+    ).length,
+    gamesConfirmed: result.gameRecommendations.filter((g) => g.dratingsConfirmed).length,
+  };
 }
 
 export function getActiveLeagues(sheets: ParsedSheets): LeagueCode[] {
