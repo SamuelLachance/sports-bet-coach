@@ -7,12 +7,6 @@ function confidenceColor(c: number) {
   return "text-warning";
 }
 
-function trendArrow(t?: "up" | "down" | "flat") {
-  if (t === "up") return "↑";
-  if (t === "down") return "↓";
-  return "→";
-}
-
 function impactSign(n: number) {
   return n >= 0 ? `+${n}` : `${n}`;
 }
@@ -80,9 +74,6 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
                 : "Conflict resolved"}
           </span>
         )}
-          {game.highConviction && (
-            <span className="badge bg-success/20 text-success">High conviction</span>
-          )}
         </div>
         <div className="text-right">
           <div className={`text-3xl font-bold font-display ${confidenceColor(game.confidence)}`}>
@@ -103,26 +94,9 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
         <div className="font-display text-2xl font-semibold text-accent-glow">
           {game.recommendedTeam}
         </div>
-        {(game.historicalWinRate != null || game.weeklyTrend) && (
-          <p className="text-xs text-slate-400 mt-2">
-            {game.historicalWinRate != null && (
-              <>
-                Historical: {Math.round(game.historicalWinRate * 100)}% WR
-                {game.historicalRoi != null && ` · ${game.historicalRoi.toFixed(1)}u ROI`}
-              </>
-            )}
-            {game.weeklyTrend && (
-              <>
-                {game.historicalWinRate != null && " · "}
-                4-wk trend {trendArrow(game.weeklyTrend)}
-              </>
-            )}
-          </p>
-        )}
         {game.hasConflict && !game.dualFade?.isDualFade && (
           <p className="text-xs text-slate-400 mt-2">
-            Opposing signals on this game — net edge calculated from historical ROI and
-            cross-signal rules.
+            Multiple signals on this game — resolved by sharp/fade rules.
           </p>
         )}
       </div>
@@ -130,36 +104,14 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
       {game.dualFade?.isDualFade && !game.dualFade.isOpposingNoBet && (
         <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-3">
           <div className="text-xs text-warning uppercase tracking-wide mb-1">
-            Dual-fade dynamic
+            Same-side dual fade
           </div>
           <p className="text-sm text-slate-200 leading-relaxed">
-            Book Needs fade{" "}
+            Book Needs + Square Top both fade{" "}
             <span className="font-medium text-white">{game.dualFade.bookNeedsFadeTeam}</span>
-            {" + "}
-            Square fade{" "}
-            <span className="font-medium text-white">{game.dualFade.squareFadeTeam}</span>
-            {" → "}
-            archive trend:{" "}
+            {" → bet "}
             <span className="font-medium text-accent-glow">{game.recommendedTeam}</span>
-            {game.dualFade.archiveWinRate != null && (
-              <>
-                {" "}
-                (~{Math.round(game.dualFade.archiveWinRate * 100)}%
-                {game.dualFade.historicalSample
-                  ? ` · ${game.dualFade.historicalSample.label}`
-                  : null}
-                )
-              </>
-            )}
           </p>
-          {game.dualFade.strongerFadeColumn && (
-            <p className="text-xs text-slate-400 mt-1">
-              Dominant column:{" "}
-              {game.dualFade.strongerFadeColumn === "book_needs_fade"
-                ? "Book Needs (more negative ROI tracker)"
-                : "Square Top (more negative ROI tracker)"}
-            </p>
-          )}
         </div>
       )}
 
@@ -179,7 +131,7 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
       {game.confidenceBreakdown?.length > 0 && (
         <details className="mb-3 group">
           <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
-            Net edge breakdown ({game.confidenceBreakdown.length} factors)
+            Signal breakdown ({game.confidenceBreakdown.length} rules)
           </summary>
           <ul className="mt-2 space-y-1.5 text-xs">
             {game.confidenceBreakdown.map((item) => (

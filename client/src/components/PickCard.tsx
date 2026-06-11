@@ -36,18 +36,6 @@ function confidenceColor(c: number) {
   return "text-warning";
 }
 
-function trendArrow(t?: "up" | "down" | "flat") {
-  if (t === "up") return "↑";
-  if (t === "down") return "↓";
-  return "→";
-}
-
-function trendLabel(t?: "up" | "down" | "flat") {
-  if (t === "up") return "improving";
-  if (t === "down") return "declining";
-  return "stable";
-}
-
 function impactSign(n: number) {
   return n >= 0 ? `+${n}` : `${n}`;
 }
@@ -71,9 +59,6 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
           </span>
           {rec.gameConflict && (
             <span className="badge bg-warning/20 text-warning">Game conflict</span>
-          )}
-          {rec.highConviction && (
-            <span className="badge bg-success/20 text-success">High conviction</span>
           )}
         </div>
         <div className="text-right">
@@ -136,7 +121,7 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
             )}
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            This fade signal loses historically — bet the opponent.
+            Fade rule — bet the opponent, not the listed public side.
           </p>
         </div>
       )}
@@ -159,17 +144,6 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-500 mb-3">
         <span className="text-accent-muted">{rec.edgeLabel}</span>
-        {rec.historicalWinRate != null && (
-          <span>
-            Hist. {Math.round(rec.historicalWinRate * 100)}% WR
-            {rec.historicalRoi != null && ` · ${rec.historicalRoi.toFixed(1)}u ROI`}
-          </span>
-        )}
-        {rec.weeklyTrend && (
-          <span title={`4-week trend: ${trendLabel(rec.weeklyTrend)}`}>
-            {trendArrow(rec.weeklyTrend)} {trendLabel(rec.weeklyTrend)}
-          </span>
-        )}
         {rec.gameTime && <span>Time: {rec.gameTime}</span>}
         {rec.postingTime && <span>Posted: {rec.postingTime}</span>}
       </div>
@@ -177,7 +151,7 @@ export function PickCard({ rec }: { rec: MatchedRecommendation }) {
       {rec.confidenceBreakdown?.length > 0 && (
         <details className="mb-3 group">
           <summary className="text-sm text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
-            Confidence breakdown ({rec.confidenceBreakdown.length} factors)
+            Confidence breakdown ({rec.confidenceBreakdown.length} rules)
           </summary>
           <ul className="mt-2 space-y-1.5 text-xs">
             {rec.confidenceBreakdown.map((item) => (

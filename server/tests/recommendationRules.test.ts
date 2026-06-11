@@ -6,9 +6,10 @@ import assert from "node:assert/strict";
 import {
   buildGameKey,
   collectFadeTargetsForGame,
-  computeConfidence,
+  computePickRules,
   resolveGameConflicts,
-} from "../services/confidenceEngine.js";
+  RULE_CONFIDENCE,
+} from "../services/betRulesEngine.js";
 import { isOpposingDualFade, resolveDualFadeMatch } from "../services/dualFadeStats.js";
 import { buildHistoricalStats } from "../services/historicalStats.js";
 import type { CalendarGame, MatchedRecommendation, SheetPick } from "../types.js";
@@ -212,6 +213,28 @@ const sharpPick: SheetPick = {
   signalCol: 2,
 };
 
+const sameSideBookPick: SheetPick = {
+  id: "book-same",
+  league: "MLB",
+  signalType: "book_needs_fade",
+  pick: "WHITE SOX",
+  opponent: "ATLANTA",
+  rawRow: 25,
+  gameSlot: 1,
+  signalCol: 4,
+};
+
+const sameSideSquarePick: SheetPick = {
+  id: "square-same",
+  league: "MLB",
+  signalType: "square_fade",
+  pick: "WHITE SOX",
+  opponent: "ATLANTA",
+  rawRow: 25,
+  gameSlot: 1,
+  signalCol: 6,
+};
+
 const stats = buildHistoricalStats([], [], 0, "");
 
 function makeRec(
@@ -219,10 +242,9 @@ function makeRec(
   matchedGame?: CalendarGame,
   slatePicks: SheetPick[] = [bookPick, squarePick, sharpPick]
 ): MatchedRecommendation {
-  const result = computeConfidence({
+  const result = computePickRules({
     pick,
     matchedGame,
-    stats,
     slatePicks,
   });
 
@@ -305,10 +327,9 @@ function main() {
     "Opposing fades detected even when sheet rows differ"
   );
 
-  const bookConf = computeConfidence({
+  const bookConf = computePickRules({
     pick: bookPick,
     matchedGame: GAME,
-    stats,
     slatePicks: [bookPick, squarePick],
   });
   assert.equal(bookConf.signalPolarity, "inverted");
@@ -316,15 +337,11 @@ function main() {
     bookConf.opponentPick?.toUpperCase().includes("CUBS"),
     "Book Needs COLORADO → bet CUBS"
   );
-  assert.ok(
-    !bookConf.edgeLabel.toLowerCase().includes("profitable"),
-    "Fade pick must not show profitable edge on listed team"
-  );
+  assert.equal(bookConf.confidence, RULE_CONFIDENCE.singleFade);
 
-  const squareConf = computeConfidence({
+  const squareConf = computePickRules({
     pick: squarePick,
     matchedGame: GAME,
-    stats,
     slatePicks: [bookPick, squarePick],
   });
   assert.equal(squareConf.signalPolarity, "inverted");
@@ -333,10 +350,9 @@ function main() {
     "Square Top CUBS → bet COLORADO"
   );
 
-  const bookOnlyConf = computeConfidence({
+  const bookOnlyConf = computePickRules({
     pick: bookOnlyPick,
     matchedGame: WHITE_SOX_GAME,
-    stats,
     slatePicks: [bookOnlyPick],
   });
   assert.equal(bookOnlyConf.signalPolarity, "inverted");
@@ -345,10 +361,9 @@ function main() {
     "Single book fade WHITE SOX → bet ATLANTA"
   );
 
-  const squareOnlyConf = computeConfidence({
+  const squareOnlyConf = computePickRules({
     pick: squareOnlyPick,
     matchedGame: WHITE_SOX_GAME,
-    stats,
     slatePicks: [squareOnlyPick],
   });
   assert.equal(squareOnlyConf.signalPolarity, "inverted");
@@ -357,13 +372,12 @@ function main() {
     "Single square fade ATLANTA → bet WHITE SOX"
   );
 
-  const sharpConf = computeConfidence({
+  const sharpConf = computePickRules({
     pick: sharpPick,
-    stats,
     slatePicks: [sharpPick],
   });
   assert.equal(sharpConf.signalPolarity, "positive");
-  assert.ok(sharpConf.confidence >= 78, "Sharp Money gets high confidence");
+  assert.equal(sharpConf.confidence, RULE_CONFIDENCE.sharp);
   assert.ok(!sharpConf.opponentPick, "Sharp Money does not invert");
 
   const dualResolution = resolveDualFadeMatch(
@@ -436,13 +450,26 @@ function main() {
   assert.equal(oddsOnlyCard!.confidence, 0);
   assert.ok(oddsOnlyCard!.dualFade?.isOpposingNoBet, "Opposing dual-fade flag set");
   assert.ok(
-    !oddsOnlyCard!.highConviction,
-    "No bet card must not show high conviction"
-  );
-  assert.ok(
     oddsOnlyCard!.confidenceBreakdown.some((b) => b.label === "No bet"),
     "Breakdown shows no-bet, not misleading edge totals"
   );
+
+  const sameSideSlate = [sameSideBookPick, sameSideSquarePick];
+  const { gameRecommendations: sameSideCards } = resolveGameConflicts(
+    [
+      makeRec(sameSideBookPick, WHITE_SOX_GAME, sameSideSlate),
+      makeRec(sameSideSquarePick, WHITE_SOX_GAME, sameSideSlate),
+    ],
+    stats,
+    { slatePicks: sameSideSlate }
+  );
+  const sameSideCard = sameSideCards.find((g) => g.matchedGame?.id === WHITE_SOX_GAME.id);
+  assert.ok(sameSideCard, "Same-side dual fade produces game card");
+  assert.ok(
+    sameSideCard!.recommendedTeam.toUpperCase().includes("ATLANTA"),
+    "Same-side book+square fade WHITE SOX → bet ATLANTA"
+  );
+  assert.equal(sameSideCard!.confidence, RULE_CONFIDENCE.sameSideDualFade);
 
   const { gameRecommendations: bookOnlyCards } = resolveGameConflicts(
     [makeRec(bookOnlyPick, WHITE_SOX_GAME, [bookOnlyPick])],

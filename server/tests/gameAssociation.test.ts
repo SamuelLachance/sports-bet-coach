@@ -9,9 +9,9 @@ import { parseDailyPicksCsv } from "../parsers/dailyPicks.js";
 import { validateRecommendedTeam, pickBelongsToGame } from "../services/calendar.js";
 import {
   buildGameKey,
+  computePickRules,
   resolveGameConflicts,
-  computeConfidence,
-} from "../services/confidenceEngine.js";
+} from "../services/betRulesEngine.js";
 import { findDualFadePair } from "../services/dualFadeStats.js";
 import { buildHistoricalStats } from "../services/historicalStats.js";
 import { buildDualFadeStats } from "../services/dualFadeStats.js";
@@ -158,10 +158,9 @@ async function main() {
           ? CUBS_ROCKIES
           : undefined;
 
-    const result = computeConfidence({
+    const result = computePickRules({
       pick,
       matchedGame,
-      stats,
       slatePicks: picks,
     });
 
@@ -230,7 +229,7 @@ async function main() {
   }
 
   for (const card of gameRecommendations) {
-    if (!card.matchedGame) continue;
+    if (!card.matchedGame || card.noBet) continue;
     assertRecommendedInGame(
       card.matchedGame,
       card.recommendedTeam,
