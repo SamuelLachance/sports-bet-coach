@@ -54,6 +54,17 @@ const SKY_MYSTICS: CalendarGame = {
   status: "Scheduled",
 };
 
+const SKY_FEVER: CalendarGame = {
+  id: "401856980",
+  league: "WNBA",
+  homeTeam: "Indiana Fever",
+  awayTeam: "Chicago Sky",
+  homeAbbr: "IND",
+  awayAbbr: "CHI",
+  startTime: "2026-06-11T23:00:00Z",
+  status: "Scheduled",
+};
+
 function main() {
   assert.ok(
     pickBelongsToGame("CUBS", "COLORADO", CUBS_ROCKIES),
@@ -100,6 +111,14 @@ function main() {
     matchPickToGame("CHICAGO SKY", undefined, allGames)?.league,
     "WNBA",
     "Chicago Sky matches WNBA schedule when available"
+  );
+  assert.ok(
+    pickBelongsToGame("SKY +10.5", undefined, SKY_FEVER),
+    "SKY +10.5 belongs to Sky @ Fever"
+  );
+  assert.ok(
+    pickBelongsToGame("FEVER -9.5", undefined, SKY_FEVER),
+    "FEVER -9.5 belongs to Sky @ Fever"
   );
 
   console.log("✓ All team matching tests passed");

@@ -28,6 +28,13 @@ function isVisiblePick(rec: MatchedRecommendation): boolean {
   return !rec.dratingsBlocked && !rec.sportsOddsBlocked;
 }
 
+function eventKeyForGame(game: GameConsolidatedRecommendation["matchedGame"]): string | null {
+  if (!game) return null;
+  const away = game.awayTeam.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+  const home = game.homeTeam.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+  return `${game.league}:${[away, home].sort().join("|")}`;
+}
+
 export function DailyPicks({ recommendations, gameRecommendations = [], leagues }: DailyPicksProps) {
   const [leagueFilter, setLeagueFilter] = useState("ALL");
   const [signalFilter, setSignalFilter] = useState("all");
@@ -56,13 +63,46 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
   const visibleGameRecs = useMemo(() => {
     if (!gameRecommendations.length) return [];
     const filteredIds = new Set(filtered.map((r) => r.id));
-    return gameRecommendations
-      .filter(
-        (g) =>
-          isActionableGameRec(g) &&
-          (g.sportsOddsForced || g.pickIds.some((id) => filteredIds.has(id)))
-      )
-      .sort((a, b) => b.confidence - a.confidence);
+    const candidates = gameRecommendations.filter(
+      (g) =>
+        isActionableGameRec(g) &&
+        (g.sportsOddsForced || g.pickIds.some((id) => filteredIds.has(id)))
+    );
+
+    const actionableByEvent = new Map<string, GameConsolidatedRecommendation[]>();
+    for (const game of candidates) {
+      const key = eventKeyForGame(game.matchedGame);
+      if (!key) continue;
+      const bucket = actionableByEvent.get(key) ?? [];
+      bucket.push(game);
+      actionableByEvent.set(key, bucket);
+    }
+
+    const suppressedEvents = new Set<string>();
+    for (const [key, games] of actionableByEvent) {
+      if (games.length > 1) suppressedEvents.add(key);
+    }
+
+    if (suppressedEvents.size === 0) {
+      return candidates.sort((a, b) => b.confidence - a.confidence);
+    }
+
+    const resolved: GameConsolidatedRecommendation[] = [];
+    for (const game of gameRecommendations) {
+      const key = eventKeyForGame(game.matchedGame);
+      if (!key || !suppressedEvents.has(key)) continue;
+      if (!game.noBet) continue;
+      if (game.sportsOddsForced || game.pickIds.some((id) => filteredIds.has(id))) {
+        resolved.push(game);
+      }
+    }
+
+    const safe = candidates.filter((game) => {
+      const key = eventKeyForGame(game.matchedGame);
+      return !key || !suppressedEvents.has(key);
+    });
+
+    return [...resolved, ...safe].sort((a, b) => b.confidence - a.confidence);
   }, [gameRecommendations, filtered]);
 
   const visiblePicks = useMemo(

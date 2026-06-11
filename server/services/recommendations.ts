@@ -29,6 +29,7 @@ import {
   sportsOddsTrendLabel,
   sportsOddsValueBet,
   sportsOddsValueTrendLabel,
+  canonicalEventKeyForGame,
   teamSideForBet,
   type SportsOddsGamePrediction,
 } from "./sportsOddsAlgo.js";
@@ -449,9 +450,7 @@ const EVENT_CONFLICT_REASON =
   "Conflicting recommendations on different teams for the same game — no bet.";
 
 function eventKeyForGame(game: CalendarGame): string {
-  return game.id
-    ? `${game.league}:espn-${game.id}`
-    : buildSportsOddsGameKey(game.league, game.awayTeam, game.homeTeam);
+  return canonicalEventKeyForGame(game);
 }
 
 function isActionableGameRecommendation(
@@ -525,12 +524,16 @@ export function applyEventTeamConflictFilter(result: {
   gameRecommendations: GameConsolidatedRecommendation[];
 } {
   const sidesByEvent = new Map<string, Set<"away" | "home">>();
-  const pickIdsByEvent = new Map<string, string[]>();
+  const pickIdsByEvent = new Map<string, Set<string>>();
+  const actionableGameRecsByEvent = new Map<
+    string,
+    GameConsolidatedRecommendation[]
+  >();
 
   const notePick = (game: CalendarGame, pickId: string) => {
     const key = eventKeyForGame(game);
-    const ids = pickIdsByEvent.get(key) ?? [];
-    ids.push(pickId);
+    const ids = pickIdsByEvent.get(key) ?? new Set<string>();
+    ids.add(pickId);
     pickIdsByEvent.set(key, ids);
   };
 
@@ -545,9 +548,13 @@ export function applyEventTeamConflictFilter(result: {
     if (!isActionableGameRecommendation(rec) || !rec.recommendedBet || !rec.matchedGame) {
       continue;
     }
+    const key = eventKeyForGame(rec.matchedGame);
+    const bucket = actionableGameRecsByEvent.get(key) ?? [];
+    bucket.push(rec);
+    actionableGameRecsByEvent.set(key, bucket);
+
     const side = teamSideForBet(rec.recommendedBet, rec.matchedGame);
-    if (!side) continue;
-    noteSide(rec.matchedGame, side);
+    if (side) noteSide(rec.matchedGame, side);
     for (const id of rec.pickIds) notePick(rec.matchedGame, id);
   }
 
@@ -555,12 +562,14 @@ export function applyEventTeamConflictFilter(result: {
     if (!isActionablePickRecommendation(rec) || !rec.matchedGame) continue;
     const bet = impliedBetForRec(rec)!;
     const side = teamSideForBet(bet, rec.matchedGame);
-    if (!side) continue;
-    noteSide(rec.matchedGame, side);
+    if (side) noteSide(rec.matchedGame, side);
     notePick(rec.matchedGame, rec.id);
   }
 
   const conflictedEvents = new Set<string>();
+  for (const [eventKey, recs] of actionableGameRecsByEvent) {
+    if (recs.length > 1) conflictedEvents.add(eventKey);
+  }
   for (const [eventKey, sides] of sidesByEvent) {
     if (sides.size > 1) conflictedEvents.add(eventKey);
   }
@@ -581,7 +590,6 @@ export function applyEventTeamConflictFilter(result: {
   });
 
   const gameRecommendations: GameConsolidatedRecommendation[] = [];
-  const handledEvents = new Set<string>();
 
   for (const rec of result.gameRecommendations) {
     if (!rec.matchedGame) {
@@ -591,24 +599,35 @@ export function applyEventTeamConflictFilter(result: {
     const key = eventKeyForGame(rec.matchedGame);
     if (!conflictedEvents.has(key)) {
       gameRecommendations.push(rec);
-      continue;
     }
-    if (handledEvents.has(key)) continue;
-    handledEvents.add(key);
-    gameRecommendations.push(
-      toEventConflictNoBet(rec, pickIdsByEvent.get(key) ?? [])
-    );
   }
 
   for (const eventKey of conflictedEvents) {
-    if (handledEvents.has(eventKey)) continue;
-    const pickIds = pickIdsByEvent.get(eventKey) ?? [];
-    const sample = result.recommendations.find(
-      (rec) => rec.matchedGame && eventKeyForGame(rec.matchedGame) === eventKey
-    );
-    if (!sample?.matchedGame) continue;
-    handledEvents.add(eventKey);
-    gameRecommendations.push(buildEventConflictNoBetCard(sample.matchedGame, pickIds));
+    const conflictingRecs = actionableGameRecsByEvent.get(eventKey) ?? [];
+    const pickIds = [...(pickIdsByEvent.get(eventKey) ?? new Set<string>())];
+    for (const rec of conflictingRecs) {
+      for (const id of rec.pickIds) {
+        if (!pickIds.includes(id)) pickIds.push(id);
+      }
+    }
+
+    const template =
+      conflictingRecs[0] ??
+      result.gameRecommendations.find(
+        (rec) => rec.matchedGame && eventKeyForGame(rec.matchedGame) === eventKey
+      );
+
+    const sampleGame =
+      template?.matchedGame ??
+      result.recommendations.find(
+        (rec) => rec.matchedGame && eventKeyForGame(rec.matchedGame) === eventKey
+      )?.matchedGame;
+
+    if (template && template.matchedGame) {
+      gameRecommendations.push(toEventConflictNoBet(template, pickIds));
+    } else if (sampleGame) {
+      gameRecommendations.push(buildEventConflictNoBetCard(sampleGame, pickIds));
+    }
   }
 
   return { recommendations, gameRecommendations };

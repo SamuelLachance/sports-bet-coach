@@ -13,6 +13,7 @@ import {
   matchPredictionToCalendarGame,
   sportsOddsAgreesWithBet,
   sportsOddsStatusForBet,
+  teamSideForBet,
   type SportsOddsGamePrediction,
 } from "../services/sportsOddsAlgo.js";
 import type { CalendarGame, GameConsolidatedRecommendation, ParsedBet } from "../types.js";
@@ -235,5 +236,71 @@ assert.equal(dualSideConflict.length, 1);
 assert.equal(dualSideConflict[0]?.noBet, true);
 assert.ok(dualSideConflict[0]?.pickIds.includes("pick-1"));
 assert.ok(dualSideConflict[0]?.pickIds.includes("pick-2"));
+
+const SKY_FEVER_GAME: CalendarGame = {
+  id: "401856980",
+  league: "WNBA",
+  homeTeam: "Indiana Fever",
+  awayTeam: "Chicago Sky",
+  homeAbbr: "IND",
+  awayAbbr: "CHI",
+  startTime: "2026-06-11T23:00:00Z",
+  status: "Scheduled",
+};
+
+const feverSpreadBet: ParsedBet = {
+  betType: "spread",
+  team: "FEVER",
+  rawText: "FEVER -9.5",
+  spread: -9.5,
+  displayText: "Fever -9.5",
+};
+
+const skySpreadBet: ParsedBet = {
+  betType: "spread",
+  team: "SKY",
+  rawText: "SKY +10.5",
+  spread: 10.5,
+  displayText: "Sky +10.5",
+};
+
+assert.equal(teamSideForBet(feverSpreadBet, SKY_FEVER_GAME), "home");
+assert.equal(teamSideForBet(skySpreadBet, SKY_FEVER_GAME), "away");
+
+const feverGameRec: GameConsolidatedRecommendation = {
+  gameKey: "wnba:espn-401856980",
+  league: "WNBA",
+  awayTeam: SKY_FEVER_GAME.awayTeam,
+  homeTeam: SKY_FEVER_GAME.homeTeam,
+  recommendedTeam: "Fever -9.5",
+  recommendedBet: feverSpreadBet,
+  betType: "spread",
+  confidence: 85,
+  confidenceBreakdown: [],
+  hasConflict: false,
+  pickIds: ["fever-pick"],
+  reasoning: "Sharp on Fever",
+  matchedGame: SKY_FEVER_GAME,
+  sportsOddsForced: true,
+};
+
+const skyGameRec: GameConsolidatedRecommendation = {
+  ...feverGameRec,
+  gameKey: "wnba:sky|fever",
+  recommendedTeam: "Sky +10.5",
+  recommendedBet: skySpreadBet,
+  pickIds: ["sky-pick"],
+  sportsOddsForced: true,
+};
+
+const skyFeverConflict = applyEventTeamConflictFilter({
+  recommendations: [],
+  gameRecommendations: [feverGameRec, skyGameRec],
+}).gameRecommendations;
+
+assert.equal(skyFeverConflict.length, 1);
+assert.equal(skyFeverConflict[0]?.noBet, true);
+assert.ok(skyFeverConflict[0]?.pickIds.includes("fever-pick"));
+assert.ok(skyFeverConflict[0]?.pickIds.includes("sky-pick"));
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");

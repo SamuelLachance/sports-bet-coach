@@ -13,7 +13,7 @@ import {
   isSportsOddsEnabled,
   sportsOddsForceMinEdge,
 } from "../config.js";
-import { resolveBetDisplay } from "../parsers/pickBetParser.js";
+import { parsePickBet, resolveBetDisplay } from "../parsers/pickBetParser.js";
 import type { CalendarGame, LeagueCode, ParsedBet } from "../types.js";
 import { resolveGameTeamDisplay } from "./calendar.js";
 
@@ -279,16 +279,34 @@ export function matchPredictionToCalendarGame(
   );
 }
 
+export function canonicalEventKeyForGame(game: CalendarGame): string {
+  return buildSportsOddsGameKey(game.league, game.awayTeam, game.homeTeam);
+}
+
 export function teamSideForBet(
   ourBet: ParsedBet,
   game: CalendarGame
 ): "away" | "home" | null {
   if (ourBet.betType === "total") return null;
-  const team = ourBet.team ?? ourBet.displayText;
-  const resolved = resolveGameTeamDisplay(team, game);
-  if (!resolved) return null;
-  if (normalizeKeyTeam(resolved) === normalizeKeyTeam(game.awayTeam)) return "away";
-  if (normalizeKeyTeam(resolved) === normalizeKeyTeam(game.homeTeam)) return "home";
+
+  const candidates = new Set<string>();
+  if (ourBet.team) candidates.add(ourBet.team);
+  if (ourBet.displayText) candidates.add(ourBet.displayText);
+  if (ourBet.rawText) candidates.add(ourBet.rawText);
+
+  for (const text of candidates) {
+    const parsed = parsePickBet(text);
+    const team = parsed?.team ?? text;
+    const resolved = resolveGameTeamDisplay(team, game);
+    if (!resolved) continue;
+    if (normalizeKeyTeam(resolved) === normalizeKeyTeam(game.awayTeam)) {
+      return "away";
+    }
+    if (normalizeKeyTeam(resolved) === normalizeKeyTeam(game.homeTeam)) {
+      return "home";
+    }
+  }
+
   return null;
 }
 
