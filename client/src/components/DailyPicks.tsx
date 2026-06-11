@@ -52,14 +52,19 @@ export function DailyPicks({ recommendations, gameRecommendations = [], leagues 
   const visibleGameRecs = useMemo(() => {
     if (!gameRecommendations.length) return [];
     const filteredIds = new Set(filtered.map((r) => r.id));
-    return gameRecommendations.filter(
-      (g) =>
-        isActionableGameRec(g) && g.pickIds.some((id) => filteredIds.has(id))
-    );
+    return gameRecommendations
+      .filter(
+        (g) =>
+          isActionableGameRec(g) && g.pickIds.some((id) => filteredIds.has(id))
+      )
+      .sort((a, b) => b.confidence - a.confidence);
   }, [gameRecommendations, filtered]);
 
   const visiblePicks = useMemo(
-    () => filtered.filter((r) => !noBetPickIds.has(r.id)),
+    () =>
+      filtered
+        .filter((r) => !noBetPickIds.has(r.id))
+        .sort((a, b) => b.confidence - a.confidence),
     [filtered, noBetPickIds]
   );
 
