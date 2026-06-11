@@ -268,6 +268,39 @@ const sameSideSquarePick: SheetPick = {
   signalCol: 6,
 };
 
+const VEGAS_CAROLINA_GAME: CalendarGame = {
+  id: "401567890",
+  league: "NHL",
+  homeTeam: "Carolina Hurricanes",
+  awayTeam: "Vegas Golden Knights",
+  homeAbbr: "CAR",
+  awayAbbr: "VGK",
+  startTime: "2026-06-11T23:00:00Z",
+  status: "Scheduled",
+};
+
+const sharpCarolinaPick: SheetPick = {
+  id: "sharp-car",
+  league: "NHL",
+  signalType: "sharp_money",
+  pick: "CAROLINA -145",
+  opponent: "VEGAS",
+  rawRow: 50,
+  gameSlot: 1,
+  signalCol: 2,
+};
+
+const squareCarolinaPick: SheetPick = {
+  id: "square-car",
+  league: "NHL",
+  signalType: "square_fade",
+  pick: "CAROLINA -155",
+  opponent: "VEGAS",
+  rawRow: 50,
+  gameSlot: 1,
+  signalCol: 6,
+};
+
 const stats = buildHistoricalStats([], [], 0, "");
 
 function makeRec(
@@ -674,6 +707,37 @@ function main() {
     pitModelCard!.confidence,
     RULE_CONFIDENCE.sameSideDualFade,
     "Same-side book + model fade uses multi-fade confidence"
+  );
+
+  // Sharp + square fade same target team → no bet (signals cancel)
+  const carolinaSlate = [sharpCarolinaPick, squareCarolinaPick];
+  const { gameRecommendations: carolinaCards } = resolveGameConflicts(
+    [
+      makeRec(sharpCarolinaPick, VEGAS_CAROLINA_GAME, carolinaSlate),
+      makeRec(squareCarolinaPick, VEGAS_CAROLINA_GAME, carolinaSlate),
+    ],
+    stats,
+    { slatePicks: carolinaSlate, dualStats: emptyDualStats }
+  );
+  const carolinaCard = carolinaCards.find((g) => g.matchedGame?.id === VEGAS_CAROLINA_GAME.id);
+  assert.ok(carolinaCard, "Sharp + square on Carolina produces consolidated game card");
+  assert.ok(carolinaCard!.noBet, "Sharp CAROLINA + square fade CAROLINA → no bet");
+  assert.equal(
+    carolinaCard!.recommendedTeam,
+    "",
+    "No bet must have empty recommendedTeam"
+  );
+  assert.ok(
+    !carolinaCard!.recommendedTeam.toUpperCase().includes("VEGAS"),
+    "Must NOT recommend Vegas when sharp and fade cancel"
+  );
+  assert.ok(
+    !carolinaCard!.recommendedTeam.toUpperCase().includes("CAROLINA"),
+    "Must NOT recommend Carolina when sharp and fade cancel"
+  );
+  assert.ok(
+    carolinaCard!.noBetReason?.includes("no bet"),
+    "No bet reason should explain signal cancellation"
   );
 
   console.log("✓ All recommendation rule tests passed");
