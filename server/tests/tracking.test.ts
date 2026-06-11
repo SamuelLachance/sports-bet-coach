@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { fadeParsedBet, parsePickBet } from "../parsers/pickBetParser.js";
 import {
   buildTrackingResponse,
+  calculateUnits,
+  DEFAULT_JUICE,
   gradeBet,
   recordRecommendations,
+  resolveAmericanOdds,
   type TrackedBet,
   type TrackingStore,
 } from "../services/tracking.js";
@@ -170,7 +173,7 @@ function spreadBetFromParsed(
 
   const win = gradeBet(bet, finalResult("away"));
   assert.equal(win.status, "win");
-  assert.equal(win.units, 1);
+  assert.equal(win.units, calculateUnits(1, DEFAULT_JUICE, "win"));
 
   const loss = gradeBet(bet, finalResult("home"));
   assert.equal(loss.status, "loss");
@@ -396,9 +399,175 @@ function spreadBetFromParsed(
   store.bets[0] = gradeBet(store.bets[0], finalResult("away"));
   const response = buildTrackingResponse(store);
   assert.equal(response.summary.wins, 1);
-  assert.equal(response.summary.totalUnits, 1);
+  assert.equal(
+    response.summary.totalUnits,
+    calculateUnits(1, DEFAULT_JUICE, "win")
+  );
   assert.equal(response.weekly.length, 1);
   assert.equal(response.monthly.length, 1);
+}
+
+// Odds-based unit calculation
+{
+  assert.equal(calculateUnits(1, 140, "win"), 1.4);
+  assert.equal(calculateUnits(1, 140, "loss"), -1);
+  assert.equal(
+    Math.round(calculateUnits(1, -110, "win") * 1000) / 1000,
+    0.909
+  );
+  assert.equal(calculateUnits(1, -110, "loss"), -1);
+  assert.equal(calculateUnits(1, -110, "push"), 0);
+}
+
+// ML +140 win / loss
+{
+  const pitMl = parsePickBet("PITTSBURGH +140");
+  assert.ok(pitMl);
+  const bet: TrackedBet = {
+    id: "ml-plus-140",
+    date: "2026-06-11",
+    gameKey: "mlb:pit",
+    league: "MLB",
+    awayTeam: "Los Angeles Dodgers",
+    homeTeam: "Pittsburgh Pirates",
+    recommendedTeam: pitMl.displayText,
+    betType: "moneyline",
+    odds: 140,
+    americanOdds: 140,
+    recommendedBet: pitMl,
+    confidence: 72,
+    signalTypes: ["sharp_money"],
+    signalLabels: ["Sharp Money"],
+    status: "pending",
+    units: 0,
+    stakeUnits: 1,
+    recordedAt: new Date().toISOString(),
+  };
+
+  const win = gradeBet(bet, {
+    ...finalResult("home"),
+    awayTeam: "Los Angeles Dodgers",
+    homeTeam: "Pittsburgh Pirates",
+    homeScore: 5,
+    awayScore: 2,
+    winnerTeam: "Pittsburgh Pirates",
+  });
+  assert.equal(win.status, "win");
+  assert.equal(win.units, 1.4);
+
+  const loss = gradeBet(bet, {
+    ...finalResult("away"),
+    awayTeam: "Los Angeles Dodgers",
+    homeTeam: "Pittsburgh Pirates",
+    awayScore: 5,
+    homeScore: 2,
+    winnerTeam: "Los Angeles Dodgers",
+  });
+  assert.equal(loss.status, "loss");
+  assert.equal(loss.units, -1);
+}
+
+// ML -110 win uses juice profit
+{
+  const bet: TrackedBet = {
+    id: "ml-minus-110",
+    date: "2026-06-11",
+    gameKey: "mlb:ws",
+    league: "MLB",
+    awayTeam: "Chicago White Sox",
+    homeTeam: "Boston Red Sox",
+    recommendedTeam: "Chicago White Sox",
+    betType: "moneyline",
+    americanOdds: -110,
+    recommendedBet: {
+      betType: "moneyline",
+      team: "Chicago White Sox",
+      odds: -110,
+      rawText: "WHITE SOX -110",
+      displayText: "Chicago White Sox -110",
+    },
+    confidence: 72,
+    signalTypes: ["sharp_money"],
+    signalLabels: ["Sharp Money"],
+    status: "pending",
+    units: 0,
+    stakeUnits: 1,
+    recordedAt: new Date().toISOString(),
+  };
+
+  const win = gradeBet(bet, {
+    ...finalResult("away"),
+    awayTeam: "Chicago White Sox",
+    homeTeam: "Boston Red Sox",
+    winnerTeam: "Chicago White Sox",
+  });
+  assert.equal(win.status, "win");
+  assert.equal(Math.round(win.units * 1000) / 1000, 0.909);
+}
+
+// Spread -110 default, push → 0u
+{
+  const dallasSpread = parsePickBet("DALLAS -6");
+  assert.ok(dallasSpread);
+  const bet = spreadBetFromParsed(dallasSpread);
+  assert.equal(resolveAmericanOdds(bet), DEFAULT_JUICE);
+
+  const push = gradeBet(bet, nbaDallasPortlandResult(90, 84));
+  assert.equal(push.status, "push");
+  assert.equal(push.units, 0);
+  assert.equal(push.americanOdds, DEFAULT_JUICE);
+}
+
+// Under -110 win
+{
+  const underBet: TrackedBet = {
+    id: "under-juice",
+    date: "2026-06-11",
+    gameKey: "nba:under-juice",
+    league: "NBA",
+    awayTeam: "San Antonio Spurs",
+    homeTeam: "Los Angeles Lakers",
+    recommendedTeam: "Under 217.5",
+    betType: "total",
+    totalLine: 217.5,
+    totalDirection: "under",
+    americanOdds: DEFAULT_JUICE,
+    recommendedBet: {
+      betType: "total",
+      team: "SAN ANTONIO",
+      rawText: "SAN ANTONIO UNDER 217.5",
+      totalDirection: "under",
+      totalLine: 217.5,
+      odds: DEFAULT_JUICE,
+      displayText: "San Antonio Under 217.5",
+    },
+    confidence: 75,
+    signalTypes: ["book_needs_fade"],
+    signalLabels: ["Book Needs (Fade)"],
+    status: "pending",
+    units: 0,
+    stakeUnits: 1,
+    recordedAt: new Date().toISOString(),
+  };
+
+  const underHit: GameResult = {
+    id: "espn-under-juice",
+    league: "NBA",
+    awayTeam: "San Antonio Spurs",
+    homeTeam: "Los Angeles Lakers",
+    awayAbbr: "SAS",
+    homeAbbr: "LAL",
+    startTime: "2026-06-11T23:00:00Z",
+    status: "Final",
+    isFinal: true,
+    awayScore: 100,
+    homeScore: 110,
+    winnerTeam: "Los Angeles Lakers",
+  };
+
+  const win = gradeBet(underBet, underHit);
+  assert.equal(win.status, "win");
+  assert.equal(Math.round(win.units * 1000) / 1000, 0.909);
 }
 
 console.log("tracking.test.ts: all assertions passed");

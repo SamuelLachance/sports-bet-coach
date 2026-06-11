@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   betKey,
   classifyNumericSuffix,
+  DEFAULT_JUICE,
   fadeParsedBet,
   parsePickBet,
   parsePickCell,
@@ -72,18 +73,28 @@ function main() {
   assert.equal(cell.parsedBet?.betType, "spread");
   assert.equal(cell.pick, "PORTLAND +9.5");
 
-  // Fade OVER → UNDER
+  // Fade OVER → UNDER at -110 juice
   const faded = fadeParsedBet(torontoOver!);
   assert.equal(faded?.betType, "total");
   assert.equal(faded?.totalDirection, "under");
   assert.equal(faded?.totalLine, 167.5);
+  assert.equal(faded?.odds, DEFAULT_JUICE);
   assert.ok(faded?.displayText.toUpperCase().includes("UNDER"));
 
-  // Fade spread → opponent inverse spread
+  // Fade spread → opponent inverse spread at -110 juice
   const spreadFade = fadeParsedBet(dallasSpread!, "PORTLAND");
   assert.equal(spreadFade?.betType, "spread");
   assert.equal(spreadFade?.team, "PORTLAND");
   assert.equal(spreadFade?.spread, 6);
+  assert.equal(spreadFade?.odds, DEFAULT_JUICE);
+
+  // Fade ML +140 → opponent at implied -140
+  const pitListed = parsePickBet("PITTSBURGH +140");
+  assert.ok(pitListed);
+  const mlFade = fadeParsedBet(pitListed, "DODGERS");
+  assert.equal(mlFade?.betType, "moneyline");
+  assert.equal(mlFade?.team, "DODGERS");
+  assert.equal(mlFade?.odds, -140);
 
   // Bet keys differ for conflicting sides
   assert.notEqual(betKey(torontoOver!), betKey(faded!));

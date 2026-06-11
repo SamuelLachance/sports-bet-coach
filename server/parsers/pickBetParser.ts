@@ -35,6 +35,22 @@ export function classifyNumericSuffix(value: number): "spread" | "moneyline" {
   return Math.abs(value) >= 100 ? "moneyline" : "spread";
 }
 
+/** Standard -110 consensus juice for spreads/totals when odds are not listed. */
+export const DEFAULT_JUICE = -110;
+
+/** No-vig mirror of listed moneyline odds for the faded opponent side. */
+export function impliedOpponentAmericanOdds(listedOdds: number): number {
+  const pListed =
+    listedOdds > 0
+      ? 100 / (listedOdds + 100)
+      : Math.abs(listedOdds) / (Math.abs(listedOdds) + 100);
+  const pOpp = 1 - pListed;
+  if (pOpp >= 0.5) {
+    return Math.round(-100 * (pOpp / (1 - pOpp)));
+  }
+  return Math.round(100 * ((1 - pOpp) / pOpp));
+}
+
 function parseTotalFromText(
   text: string,
   rawText: string
@@ -203,6 +219,7 @@ export function fadeParsedBet(
       rawText: bet.rawText,
       totalDirection: nextDirection,
       totalLine: bet.totalLine,
+      odds: DEFAULT_JUICE,
       displayText: formatTotalDisplay(nextDirection, bet.totalLine, team),
     };
   }
@@ -216,17 +233,24 @@ export function fadeParsedBet(
       team: opp,
       rawText: bet.rawText,
       spread: invertedSpread,
+      odds: DEFAULT_JUICE,
       displayText: formatSpreadDisplay(opp, invertedSpread),
     };
   }
 
   if (bet.team && opponent) {
     const opp = resolve(opponent);
+    const fadedOdds =
+      bet.odds != null ? impliedOpponentAmericanOdds(bet.odds) : undefined;
     return {
       betType: "moneyline",
       team: opp,
       rawText: bet.rawText,
-      displayText: titleCaseTeam(opp),
+      odds: fadedOdds,
+      displayText:
+        fadedOdds != null
+          ? formatOddsDisplay(opp, fadedOdds)
+          : titleCaseTeam(opp),
     };
   }
 

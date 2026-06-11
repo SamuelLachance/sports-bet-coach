@@ -229,6 +229,19 @@ function RollupChart({ rollups }: { rollups: PeriodRollup[] }) {
   );
 }
 
+function formatAmericanOdds(odds: number): string {
+  return `${odds > 0 ? "+" : ""}${odds}`;
+}
+
+function effectiveAmericanOdds(bet: TrackedBet): number | undefined {
+  return bet.americanOdds ?? bet.odds ?? bet.recommendedBet?.odds;
+}
+
+function formatUnits(units: number): string {
+  const rounded = Math.round(units * 100) / 100;
+  return `${rounded > 0 ? "+" : ""}${rounded.toFixed(2)}u`;
+}
+
 function betTypeLabel(bet: TrackedBet): string {
   if (bet.betType === "spread" && bet.spread != null) {
     return `Spread ${bet.spread > 0 ? "+" : ""}${bet.spread}`;
@@ -264,7 +277,7 @@ function BetLogRow({ bet }: { bet: TrackedBet }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs">
         <div>
           <span className="text-slate-500">Bet type</span>
           <div className="text-slate-200 font-medium">{betTypeLabel(bet)}</div>
@@ -276,14 +289,26 @@ function BetLogRow({ bet }: { bet: TrackedBet }) {
               ? `${bet.spread > 0 ? "+" : ""}${bet.spread}`
               : bet.totalLine != null
                 ? String(bet.totalLine)
-                : bet.odds != null
-                  ? `${bet.odds > 0 ? "+" : ""}${bet.odds}`
-                  : "—"}
+                : "—"}
           </div>
         </div>
         <div>
-          <span className="text-slate-500">Result</span>
-          <div className="text-slate-200 font-medium capitalize">{bet.status}</div>
+          <span className="text-slate-500">Odds</span>
+          <div className="text-slate-200 font-medium">
+            {effectiveAmericanOdds(bet) != null
+              ? formatAmericanOdds(effectiveAmericanOdds(bet)!)
+              : "—"}
+          </div>
+        </div>
+        <div>
+          <span className="text-slate-500">Units</span>
+          <div className="text-slate-200 font-medium">
+            {bet.status === "pending"
+              ? "—"
+              : bet.status === "push"
+                ? "0u"
+                : formatUnits(bet.units)}
+          </div>
         </div>
       </div>
 
@@ -321,8 +346,7 @@ function ResultBadge({
     <span
       className={`badge ${win ? "bg-success/20 text-success" : "bg-danger/20 text-danger"}`}
     >
-      {win ? "Win" : "Loss"} {units > 0 ? "+" : ""}
-      {units.toFixed(2)}u
+      {win ? "Win" : "Loss"} {formatUnits(units)}
     </span>
   );
 }

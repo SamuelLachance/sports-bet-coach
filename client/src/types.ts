@@ -195,6 +195,7 @@ export interface TrackedBet {
   betType?: BetType;
   spread?: number;
   odds?: number;
+  americanOdds?: number;
   totalLine?: number;
   totalDirection?: TotalDirection;
   confidence: number;

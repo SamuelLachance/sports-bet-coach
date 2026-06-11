@@ -19,9 +19,49 @@ import {
   resolveGameTeamDisplay,
   type GameResult,
 } from "./calendar.js";
+import { DEFAULT_JUICE } from "../parsers/pickBetParser.js";
 import { SIGNAL_LABELS } from "./signalMapping.js";
 
 export type BetResult = "pending" | "win" | "loss" | "push";
+
+export { DEFAULT_JUICE };
+
+/** Profit/loss in units for a 1u bet at American odds. Push returns 0. */
+export function calculateUnits(
+  stake: number,
+  americanOdds: number,
+  result: "win" | "loss" | "push"
+): number {
+  if (result === "push") return 0;
+  if (result === "loss") return -stake;
+  if (americanOdds > 0) return stake * (americanOdds / 100);
+  return stake * (100 / Math.abs(americanOdds));
+}
+
+function betTypeForBet(bet: {
+  betType?: BetType;
+  recommendedBet?: ParsedBet;
+}): BetType {
+  return bet.betType ?? bet.recommendedBet?.betType ?? "moneyline";
+}
+
+/** Resolve consensus American odds used for unit grading. */
+export function resolveAmericanOdds(bet: TrackedBet): number {
+  if (bet.americanOdds != null) return bet.americanOdds;
+  if (bet.odds != null) return bet.odds;
+  if (bet.recommendedBet?.odds != null) return bet.recommendedBet.odds;
+  const betType = betTypeForBet(bet);
+  if (betType === "spread" || betType === "total") return DEFAULT_JUICE;
+  return DEFAULT_JUICE;
+}
+
+function resolveAmericanOddsForRec(rec: GameConsolidatedRecommendation): number {
+  const betMeta = rec.recommendedBet;
+  if (betMeta?.odds != null) return betMeta.odds;
+  const betType = betMeta?.betType ?? rec.betType ?? "moneyline";
+  if (betType === "spread" || betType === "total") return DEFAULT_JUICE;
+  return DEFAULT_JUICE;
+}
 
 export interface TrackedBet {
   id: string;
@@ -36,6 +76,8 @@ export interface TrackedBet {
   betType?: BetType;
   spread?: number;
   odds?: number;
+  /** Resolved American odds used for unit grading (pick, fade, or -110 default). */
+  americanOdds?: number;
   totalLine?: number;
   totalDirection?: TotalDirection;
   confidence: number;
@@ -154,6 +196,7 @@ export function recordRecommendations(
       existing.betType = rec.recommendedBet?.betType ?? rec.betType;
       existing.spread = rec.recommendedBet?.spread;
       existing.odds = rec.recommendedBet?.odds;
+      existing.americanOdds = resolveAmericanOddsForRec(rec);
       existing.totalLine = rec.recommendedBet?.totalLine;
       existing.totalDirection = rec.recommendedBet?.totalDirection;
       if (rec.matchedGame?.id) existing.espnGameId = rec.matchedGame.id;
@@ -173,6 +216,7 @@ export function recordRecommendations(
       betType: betMeta?.betType ?? rec.betType,
       spread: betMeta?.spread,
       odds: betMeta?.odds,
+      americanOdds: resolveAmericanOddsForRec(rec),
       totalLine: betMeta?.totalLine,
       totalDirection: betMeta?.totalDirection,
       confidence: rec.confidence,
@@ -287,6 +331,7 @@ export function gradeBet(bet: TrackedBet, result: GameResult): TrackedBet {
   if (result.homeScore == null || result.awayScore == null) return bet;
 
   const stake = bet.stakeUnits;
+  const americanOdds = resolveAmericanOdds(bet);
   let status: BetResult = "pending";
   let units = 0;
   const betType = betTypeForGrading(bet);
@@ -309,13 +354,15 @@ export function gradeBet(bet: TrackedBet, result: GameResult): TrackedBet {
     return bet;
   }
 
-  if (status === "win") units = stake;
-  else if (status === "loss") units = -stake;
+  if (status === "win" || status === "loss" || status === "push") {
+    units = calculateUnits(stake, americanOdds, status);
+  }
 
   return {
     ...bet,
     status,
     units,
+    americanOdds,
     gradedAt: new Date().toISOString(),
     espnGameId: result.id,
     finalScore: `${result.awayTeam} ${result.awayScore} – ${result.homeTeam} ${result.homeScore}`,
@@ -417,6 +464,7 @@ function buildSummary(bets: TrackedBet[]): TrackingSummary {
   let pushes = 0;
   let pending = 0;
   let totalUnits = 0;
+  let totalStaked = 0;
 
   for (const bet of bets) {
     totalUnits += bet.units;
@@ -424,11 +472,13 @@ function buildSummary(bets: TrackedBet[]): TrackingSummary {
     else if (bet.status === "loss") losses += 1;
     else if (bet.status === "push") pushes += 1;
     else pending += 1;
+
+    if (bet.status === "win" || bet.status === "loss" || bet.status === "push") {
+      totalStaked += bet.stakeUnits;
+    }
   }
 
-  const settled = wins + losses + pushes;
-  const staked = wins + losses;
-  const roiPercent = staked > 0 ? (totalUnits / staked) * 100 : 0;
+  const roiPercent = totalStaked > 0 ? (totalUnits / totalStaked) * 100 : 0;
 
   const settledSorted = bets
     .filter((b) => b.status === "win" || b.status === "loss")
