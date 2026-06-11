@@ -35,6 +35,7 @@ import {
   teamSideForBet,
   type SportsOddsGamePrediction,
 } from "./sportsOddsAlgo.js";
+import { DEFAULT_JUICE } from "../parsers/pickBetParser.js";
 import { SIGNAL_LABELS } from "./signalMapping.js";
 import { todayDisplayDate } from "./calendar.js";
 
@@ -115,11 +116,18 @@ function withBookConsensus(
     sportsOddsConsensusForBet(rec.recommendedBet, rec.matchedGame, prediction);
 
   if (fromMarket) {
+    const betType = rec.recommendedBet.betType;
+    const consensusOdds =
+      betType === "spread" || betType === "total"
+        ? (rec.recommendedBet.odds ?? DEFAULT_JUICE)
+        : fromMarket.moneyline;
+
     return {
       ...rec,
       bookProvider: fromMarket.provider,
-      consensusOdds: fromMarket.moneyline,
+      consensusOdds,
       consensusSpread: fromMarket.spread,
+      consensusTotal: fromMarket.total,
       consensusLabel: fromMarket.label,
     };
   }

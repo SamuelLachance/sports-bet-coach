@@ -209,6 +209,11 @@ export interface TrackedBet {
   spread?: number;
   odds?: number;
   americanOdds?: number;
+  consensusLabel?: string;
+  consensusOdds?: number;
+  consensusSpread?: number;
+  consensusTotal?: number;
+  bookProvider?: string;
   totalLine?: number;
   totalDirection?: TotalDirection;
   confidence: number;

@@ -45,22 +45,48 @@ function betTypeForBet(bet: {
   return bet.betType ?? bet.recommendedBet?.betType ?? "moneyline";
 }
 
-/** Resolve consensus American odds used for unit grading. */
+/** Book consensus American odds (juice or moneyline) used for unit P/L. */
 export function resolveAmericanOdds(bet: TrackedBet): number {
+  const betType = betTypeForBet(bet);
+  if (betType === "spread" || betType === "total") {
+    return (
+      bet.consensusOdds ??
+      bet.odds ??
+      bet.recommendedBet?.odds ??
+      bet.americanOdds ??
+      DEFAULT_JUICE
+    );
+  }
+  if (bet.consensusOdds != null) return bet.consensusOdds;
   if (bet.americanOdds != null) return bet.americanOdds;
   if (bet.odds != null) return bet.odds;
   if (bet.recommendedBet?.odds != null) return bet.recommendedBet.odds;
-  const betType = betTypeForBet(bet);
-  if (betType === "spread" || betType === "total") return DEFAULT_JUICE;
   return DEFAULT_JUICE;
 }
 
 function resolveAmericanOddsForRec(rec: GameConsolidatedRecommendation): number {
   const betMeta = rec.recommendedBet;
-  if (betMeta?.odds != null) return betMeta.odds;
   const betType = betMeta?.betType ?? rec.betType ?? "moneyline";
-  if (betType === "spread" || betType === "total") return DEFAULT_JUICE;
+  if (betType === "spread" || betType === "total") {
+    return rec.consensusOdds ?? betMeta?.odds ?? DEFAULT_JUICE;
+  }
+  if (rec.consensusOdds != null && Number.isFinite(rec.consensusOdds)) {
+    return rec.consensusOdds;
+  }
+  if (betMeta?.odds != null) return betMeta.odds;
   return DEFAULT_JUICE;
+}
+
+/** Spread line from book consensus when available; otherwise the sheet pick line. */
+export function resolveGradingSpread(bet: TrackedBet): number | undefined {
+  if (bet.consensusSpread != null) return bet.consensusSpread;
+  return bet.spread ?? bet.recommendedBet?.spread;
+}
+
+/** Total line from book consensus when available; otherwise the sheet pick line. */
+export function resolveGradingTotal(bet: TrackedBet): number | undefined {
+  if (bet.consensusTotal != null) return bet.consensusTotal;
+  return bet.totalLine ?? bet.recommendedBet?.totalLine;
 }
 
 export interface TrackedBet {
@@ -78,6 +104,13 @@ export interface TrackedBet {
   odds?: number;
   /** Resolved American odds used for unit grading (pick, fade, or -110 default). */
   americanOdds?: number;
+  /** Book consensus display (e.g. +103 or -9.5 (-110)). */
+  consensusLabel?: string;
+  consensusOdds?: number;
+  /** Book spread/total line used for win-loss grading. */
+  consensusSpread?: number;
+  consensusTotal?: number;
+  bookProvider?: string;
   totalLine?: number;
   totalDirection?: TotalDirection;
   confidence: number;
@@ -197,6 +230,11 @@ export function recordRecommendations(
       existing.spread = rec.recommendedBet?.spread;
       existing.odds = rec.recommendedBet?.odds;
       existing.americanOdds = resolveAmericanOddsForRec(rec);
+      existing.consensusLabel = rec.consensusLabel;
+      existing.consensusOdds = rec.consensusOdds;
+      existing.consensusSpread = rec.consensusSpread;
+      existing.consensusTotal = rec.consensusTotal;
+      existing.bookProvider = rec.bookProvider;
       existing.totalLine = rec.recommendedBet?.totalLine;
       existing.totalDirection = rec.recommendedBet?.totalDirection;
       if (rec.matchedGame?.id) existing.espnGameId = rec.matchedGame.id;
@@ -217,6 +255,11 @@ export function recordRecommendations(
       spread: betMeta?.spread,
       odds: betMeta?.odds,
       americanOdds: resolveAmericanOddsForRec(rec),
+      consensusLabel: rec.consensusLabel,
+      consensusOdds: rec.consensusOdds,
+      consensusSpread: rec.consensusSpread,
+      consensusTotal: rec.consensusTotal,
+      bookProvider: rec.bookProvider,
       totalLine: betMeta?.totalLine,
       totalDirection: betMeta?.totalDirection,
       confidence: rec.confidence,
@@ -250,11 +293,11 @@ function findMatchingResult(bet: TrackedBet, results: GameResult[]): GameResult 
 }
 
 function betSpread(bet: TrackedBet): number | undefined {
-  return bet.spread ?? bet.recommendedBet?.spread;
+  return resolveGradingSpread(bet);
 }
 
 function betTotalLine(bet: TrackedBet): number | undefined {
-  return bet.totalLine ?? bet.recommendedBet?.totalLine;
+  return resolveGradingTotal(bet);
 }
 
 function betTotalDirection(bet: TrackedBet): TotalDirection | undefined {
@@ -389,6 +432,50 @@ export async function gradePendingBets(store: TrackingStore): Promise<TrackingSt
       const result = findMatchingResult(bet, results);
       if (!result) continue;
       const graded = gradeBet(bet, result);
+      const idx = store.bets.findIndex((b) => b.id === bet.id);
+      if (idx >= 0) store.bets[idx] = graded;
+    }
+  }
+
+  return store;
+}
+
+/** Recompute units for already-settled bets when consensus odds change. */
+export function refreshSettledUnits(store: TrackingStore): TrackingStore {
+  store.bets = store.bets.map((bet) => {
+    if (bet.status !== "win" && bet.status !== "loss" && bet.status !== "push") {
+      return bet;
+    }
+    const americanOdds = resolveAmericanOdds(bet);
+    const units = calculateUnits(bet.stakeUnits, americanOdds, bet.status);
+    if (units === bet.units && bet.americanOdds === americanOdds) return bet;
+    return { ...bet, units, americanOdds };
+  });
+  return store;
+}
+
+/** Re-grade settled bets using latest consensus spread/total lines and odds. */
+export async function regradeSettledBets(store: TrackingStore): Promise<TrackingStore> {
+  const settled = store.bets.filter(
+    (b) => b.status === "win" || b.status === "loss" || b.status === "push"
+  );
+  if (settled.length === 0) return store;
+
+  const byDate = new Map<string, TrackedBet[]>();
+  for (const bet of settled) {
+    const list = byDate.get(bet.date) ?? [];
+    list.push(bet);
+    byDate.set(bet.date, list);
+  }
+
+  for (const [date, bets] of byDate) {
+    const leagues = [...new Set(bets.map((b) => b.league))] as LeagueCode[];
+    const results = await fetchResultsForDate(leagues, displayDateToEspnKey(date));
+
+    for (const bet of bets) {
+      const result = findMatchingResult(bet, results);
+      if (!result?.isFinal) continue;
+      const graded = gradeBet({ ...bet, status: "pending", units: 0 }, result);
       const idx = store.bets.findIndex((b) => b.id === bet.id);
       if (idx >= 0) store.bets[idx] = graded;
     }
@@ -544,6 +631,8 @@ export async function updateTracking(
   let store = await loadStore();
   store = recordRecommendations(store, gameRecommendations, recommendations, date);
   store = await gradePendingBets(store);
+  store = await regradeSettledBets(store);
+  store = refreshSettledUnits(store);
   await saveStore(store);
   return buildTrackingResponse(store);
 }
@@ -551,6 +640,8 @@ export async function updateTracking(
 export async function getTracking(): Promise<TrackingResponse> {
   let store = await loadStore();
   store = await gradePendingBets(store);
+  store = await regradeSettledBets(store);
+  store = refreshSettledUnits(store);
   await saveStore(store);
   return buildTrackingResponse(store);
 }
@@ -559,5 +650,7 @@ export async function getTracking(): Promise<TrackingResponse> {
 export async function refreshTrackingGrades(): Promise<void> {
   let store = await loadStore();
   store = await gradePendingBets(store);
+  store = await regradeSettledBets(store);
+  store = refreshSettledUnits(store);
   await saveStore(store);
 }

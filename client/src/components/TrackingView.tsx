@@ -234,7 +234,34 @@ function formatAmericanOdds(odds: number): string {
 }
 
 function effectiveAmericanOdds(bet: TrackedBet): number | undefined {
-  return bet.americanOdds ?? bet.odds ?? bet.recommendedBet?.odds;
+  if (bet.betType === "spread" || bet.betType === "total") {
+    return (
+      bet.consensusOdds ??
+      bet.odds ??
+      bet.americanOdds ??
+      bet.recommendedBet?.odds ??
+      -110
+    );
+  }
+  return (
+    bet.consensusOdds ??
+    bet.americanOdds ??
+    bet.odds ??
+    bet.recommendedBet?.odds
+  );
+}
+
+function consensusOddsDisplay(bet: TrackedBet): string {
+  if (bet.betType === "moneyline" && bet.consensusLabel) {
+    return bet.consensusLabel;
+  }
+  if (bet.betType === "spread") {
+    const juice = effectiveAmericanOdds(bet);
+    if (juice != null) return formatAmericanOdds(juice);
+  }
+  if (bet.consensusLabel) return bet.consensusLabel;
+  const odds = effectiveAmericanOdds(bet);
+  return odds != null ? formatAmericanOdds(odds) : "—";
 }
 
 function formatUnits(units: number): string {
@@ -285,20 +312,22 @@ function BetLogRow({ bet }: { bet: TrackedBet }) {
         <div>
           <span className="text-slate-500">Line</span>
           <div className="text-slate-200 font-medium">
-            {bet.spread != null
-              ? `${bet.spread > 0 ? "+" : ""}${bet.spread}`
-              : bet.totalLine != null
-                ? String(bet.totalLine)
-                : "—"}
+            {bet.consensusSpread != null
+              ? `${bet.consensusSpread > 0 ? "+" : ""}${bet.consensusSpread}`
+              : bet.spread != null
+                ? `${bet.spread > 0 ? "+" : ""}${bet.spread}`
+                : bet.consensusTotal != null
+                  ? String(bet.consensusTotal)
+                  : bet.totalLine != null
+                    ? String(bet.totalLine)
+                    : "—"}
           </div>
         </div>
         <div>
-          <span className="text-slate-500">Odds</span>
-          <div className="text-slate-200 font-medium">
-            {effectiveAmericanOdds(bet) != null
-              ? formatAmericanOdds(effectiveAmericanOdds(bet)!)
-              : "—"}
-          </div>
+          <span className="text-slate-500">
+            {bet.bookProvider ? `Odds · ${bet.bookProvider}` : "Consensus odds"}
+          </span>
+          <div className="text-slate-200 font-medium">{consensusOddsDisplay(bet)}</div>
         </div>
         <div>
           <span className="text-slate-500">Units</span>

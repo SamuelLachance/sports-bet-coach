@@ -6,7 +6,9 @@ import {
   DEFAULT_JUICE,
   gradeBet,
   recordRecommendations,
+  refreshSettledUnits,
   resolveAmericanOdds,
+  resolveGradingSpread,
   type TrackedBet,
   type TrackingStore,
 } from "../services/tracking.js";
@@ -131,6 +133,59 @@ function spreadBetFromParsed(
   assert.equal(store.bets.length, 1);
   assert.equal(store.bets[0].status, "pending");
   assert.deepEqual(store.bets[0].signalTypes, ["sharp_money"]);
+}
+
+// Record book consensus odds on tracked bets
+{
+  let store = emptyStore();
+  store = recordRecommendations(
+    store,
+    [
+      sampleGameRec({
+        recommendedTeam: "Chicago White Sox",
+        consensusLabel: "+103",
+        consensusOdds: 103,
+        bookProvider: "ESPN",
+        betType: "moneyline",
+      }),
+    ],
+    [sampleRec()],
+    "2026-06-11"
+  );
+  assert.equal(store.bets[0].consensusLabel, "+103");
+  assert.equal(store.bets[0].consensusOdds, 103);
+  assert.equal(store.bets[0].americanOdds, 103);
+  assert.equal(store.bets[0].bookProvider, "ESPN");
+}
+
+// Record consensus spread line for spread grading
+{
+  let store = emptyStore();
+  store = recordRecommendations(
+    store,
+    [
+      sampleGameRec({
+        recommendedTeam: "Las Vegas Aces -9.5",
+        betType: "spread",
+        recommendedBet: {
+          betType: "spread",
+          team: "Las Vegas Aces",
+          rawText: "PORTLAND +9.5",
+          spread: -9.5,
+          odds: -110,
+          displayText: "Las Vegas Aces -9.5",
+        },
+        consensusSpread: -10.5,
+        consensusOdds: -110,
+        consensusLabel: "-10.5 (-110)",
+        bookProvider: "DraftKings",
+      }),
+    ],
+    [sampleRec()],
+    "2026-06-11"
+  );
+  assert.equal(store.bets[0].consensusSpread, -10.5);
+  assert.equal(resolveGradingSpread(store.bets[0]), -10.5);
 }
 
 // Skip no-bet games
@@ -518,6 +573,71 @@ function spreadBetFromParsed(
   assert.equal(push.americanOdds, DEFAULT_JUICE);
 }
 
+// Spread graded on consensus line, not sheet pick line
+{
+  const dallasSpread = parsePickBet("DALLAS -6");
+  assert.ok(dallasSpread);
+  const bet = spreadBetFromParsed(dallasSpread, {
+    consensusSpread: -7,
+    consensusOdds: -110,
+    consensusLabel: "-7 (-110)",
+    bookProvider: "DraftKings",
+  });
+  // Dallas 90, Portland 84 → margin 6: pick -6 pushes, consensus -7 loses
+  const pickLine = gradeBet(spreadBetFromParsed(dallasSpread), nbaDallasPortlandResult(90, 84));
+  assert.equal(pickLine.status, "push");
+
+  const consensusLine = gradeBet(bet, nbaDallasPortlandResult(90, 84));
+  assert.equal(consensusLine.status, "loss");
+  assert.equal(consensusLine.units, -1);
+  assert.equal(consensusLine.americanOdds, DEFAULT_JUICE);
+}
+
+// Moneyline units use consensus odds (+141), not sheet pick
+{
+  const bet: TrackedBet = {
+    id: "ml-consensus-141",
+    date: "2026-06-11",
+    gameKey: "mlb:pit",
+    league: "MLB",
+    awayTeam: "Los Angeles Dodgers",
+    homeTeam: "Pittsburgh Pirates",
+    recommendedTeam: "PIT",
+    betType: "moneyline",
+    odds: 140,
+    consensusOdds: 141,
+    consensusLabel: "+141",
+    bookProvider: "DraftKings",
+    recommendedBet: {
+      betType: "moneyline",
+      team: "Pittsburgh Pirates",
+      rawText: "PIT",
+      odds: 140,
+      displayText: "PIT",
+    },
+    confidence: 92,
+    signalTypes: ["sharp_money"],
+    signalLabels: ["Sharp Money"],
+    status: "pending",
+    units: 0,
+    stakeUnits: 1,
+    recordedAt: new Date().toISOString(),
+  };
+  assert.equal(resolveAmericanOdds(bet), 141);
+
+  const win = gradeBet(bet, {
+    ...finalResult("home"),
+    awayTeam: "Los Angeles Dodgers",
+    homeTeam: "Pittsburgh Pirates",
+    homeScore: 5,
+    awayScore: 2,
+    winnerTeam: "Pittsburgh Pirates",
+  });
+  assert.equal(win.status, "win");
+  assert.equal(win.units, 1.41);
+  assert.equal(win.americanOdds, 141);
+}
+
 // Under -110 win
 {
   const underBet: TrackedBet = {
@@ -568,6 +688,34 @@ function spreadBetFromParsed(
   const win = gradeBet(underBet, underHit);
   assert.equal(win.status, "win");
   assert.equal(Math.round(win.units * 1000) / 1000, 0.909);
+}
+
+{
+  const store: TrackingStore = {
+    version: 1,
+    bets: [
+      {
+        id: "legacy-win",
+        date: "2026-06-11",
+        gameKey: "MLB:legacy",
+        league: "MLB",
+        awayTeam: "A",
+        homeTeam: "B",
+        recommendedTeam: "B -105",
+        confidence: 75,
+        signalTypes: ["book_needs_fade"],
+        signalLabels: ["Book Needs (Fade)"],
+        status: "win",
+        units: 1,
+        stakeUnits: 1,
+        americanOdds: -105,
+        betType: "moneyline",
+        odds: -105,
+      },
+    ],
+  };
+  const refreshed = refreshSettledUnits(store);
+  assert.equal(Math.round(refreshed.bets[0].units * 1000) / 1000, 0.952);
 }
 
 console.log("tracking.test.ts: all assertions passed");

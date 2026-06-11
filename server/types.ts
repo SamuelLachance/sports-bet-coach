@@ -173,6 +173,7 @@ export interface GameConsolidatedRecommendation {
   bookProvider?: string;
   consensusOdds?: number;
   consensusSpread?: number;
+  consensusTotal?: number;
   consensusLabel?: string;
 }
 
