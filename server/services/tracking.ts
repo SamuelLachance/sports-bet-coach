@@ -205,49 +205,69 @@ function findMatchingResult(bet: TrackedBet, results: GameResult[]): GameResult 
   );
 }
 
+function betSpread(bet: TrackedBet): number | undefined {
+  return bet.spread ?? bet.recommendedBet?.spread;
+}
+
+function betTotalLine(bet: TrackedBet): number | undefined {
+  return bet.totalLine ?? bet.recommendedBet?.totalLine;
+}
+
+function betTotalDirection(bet: TrackedBet): TotalDirection | undefined {
+  return bet.totalDirection ?? bet.recommendedBet?.totalDirection;
+}
+
+function betTypeForGrading(bet: TrackedBet): BetType {
+  return bet.betType ?? bet.recommendedBet?.betType ?? "moneyline";
+}
+
+function teamNameForGrading(bet: TrackedBet): string | undefined {
+  const raw = bet.recommendedBet?.team ?? bet.recommendedTeam;
+  return raw?.trim() || undefined;
+}
+
 function teamScoreForBet(bet: TrackedBet, result: GameResult): {
   teamScore: number;
   opponentScore: number;
 } | null {
-  const teamName = bet.recommendedBet?.team ?? bet.recommendedTeam;
+  const teamName = teamNameForGrading(bet);
   if (!teamName || result.homeScore == null || result.awayScore == null) return null;
 
   const resolved = resolveGameTeamDisplay(teamName, result);
+  if (!resolved) return null;
+
   if (resolved === result.homeTeam) {
     return { teamScore: result.homeScore, opponentScore: result.awayScore };
   }
-  if (resolved === result.awayTeam) {
-    return { teamScore: result.awayScore, opponentScore: result.homeScore };
-  }
-  if (pickTeamInGame(teamName, result)) {
-    return { teamScore: result.homeScore, opponentScore: result.awayScore };
-  }
-  return null;
+  return { teamScore: result.awayScore, opponentScore: result.homeScore };
 }
 
 function gradeSpreadBet(
   bet: TrackedBet,
   result: GameResult
 ): BetResult | null {
-  if (bet.spread == null) return null;
+  const spread = betSpread(bet);
+  if (spread == null) return null;
   const scores = teamScoreForBet(bet, result);
   if (!scores) return null;
 
-  const adjusted = scores.teamScore + bet.spread;
+  const adjusted = scores.teamScore + spread;
   if (adjusted === scores.opponentScore) return "push";
   return adjusted > scores.opponentScore ? "win" : "loss";
 }
 
 function gradeTotalBet(bet: TrackedBet, result: GameResult): BetResult | null {
-  if (bet.totalLine == null || !bet.totalDirection) return null;
+  const totalLine = betTotalLine(bet);
+  const totalDirection = betTotalDirection(bet);
+  if (totalLine == null || !totalDirection) return null;
   if (result.homeScore == null || result.awayScore == null) return null;
 
   const gameTotal = result.homeScore + result.awayScore;
-  if (gameTotal === bet.totalLine) return "push";
-  if (bet.totalDirection === "over") {
-    return gameTotal > bet.totalLine ? "win" : "loss";
+  if (gameTotal === totalLine) return "push";
+  if (totalDirection === "over") {
+    return gameTotal > totalLine ? "win" : "loss";
   }
-  return gameTotal < bet.totalLine ? "win" : "loss";
+  return gameTotal < totalLine ? "win" : "loss";
 }
 
 function recommendedSideWon(recommendedTeam: string, result: GameResult): boolean {
@@ -269,7 +289,7 @@ export function gradeBet(bet: TrackedBet, result: GameResult): TrackedBet {
   const stake = bet.stakeUnits;
   let status: BetResult = "pending";
   let units = 0;
-  const betType = bet.betType ?? "moneyline";
+  const betType = betTypeForGrading(bet);
 
   if (betType === "spread") {
     const spreadResult = gradeSpreadBet(bet, result);
@@ -282,7 +302,8 @@ export function gradeBet(bet: TrackedBet, result: GameResult): TrackedBet {
   } else if (result.homeScore === result.awayScore) {
     status = "push";
   } else if (result.winnerTeam) {
-    const teamName = bet.recommendedBet?.team ?? bet.recommendedTeam;
+    const teamName = teamNameForGrading(bet);
+    if (!teamName) return bet;
     status = recommendedSideWon(teamName, result) ? "win" : "loss";
   } else {
     return bet;

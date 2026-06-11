@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { fadeParsedBet, parsePickBet } from "../parsers/pickBetParser.js";
 import {
   buildTrackingResponse,
   gradeBet,
   recordRecommendations,
+  type TrackedBet,
   type TrackingStore,
 } from "../services/tracking.js";
 import type { GameConsolidatedRecommendation, MatchedRecommendation } from "../types.js";
@@ -60,6 +62,57 @@ function finalResult(winner: "home" | "away"): GameResult {
     awayScore: winner === "away" ? 5 : 2,
     homeScore: winner === "home" ? 4 : 1,
     winnerTeam: winner === "away" ? "New York Yankees" : "Boston Red Sox",
+  };
+}
+
+function nbaDallasPortlandResult(
+  awayScore: number,
+  homeScore: number
+): GameResult {
+  return {
+    id: "espn-nba-dal-por",
+    league: "NBA",
+    awayTeam: "Dallas Wings",
+    homeTeam: "Portland Fire",
+    awayAbbr: "DAL",
+    homeAbbr: "POR",
+    startTime: "2026-06-11T23:00:00Z",
+    status: "Final",
+    isFinal: true,
+    awayScore,
+    homeScore,
+    winnerTeam:
+      awayScore > homeScore
+        ? "Dallas Wings"
+        : homeScore > awayScore
+          ? "Portland Fire"
+          : undefined,
+  };
+}
+
+function spreadBetFromParsed(
+  parsed: NonNullable<ReturnType<typeof parsePickBet>>,
+  overrides: Partial<TrackedBet> = {}
+): TrackedBet {
+  return {
+    id: overrides.id ?? "spread-test",
+    date: overrides.date ?? "2026-06-11",
+    gameKey: overrides.gameKey ?? "nba:spread",
+    league: overrides.league ?? "NBA",
+    awayTeam: overrides.awayTeam ?? "Dallas Wings",
+    homeTeam: overrides.homeTeam ?? "Portland Fire",
+    recommendedTeam: parsed.displayText,
+    betType: "spread",
+    spread: parsed.spread,
+    recommendedBet: parsed,
+    confidence: 75,
+    signalTypes: ["sharp_money"],
+    signalLabels: ["Sharp Money"],
+    status: "pending",
+    units: 0,
+    stakeUnits: 1,
+    recordedAt: new Date().toISOString(),
+    ...overrides,
   };
 }
 
@@ -124,79 +177,193 @@ function finalResult(winner: "home" | "away"): GameResult {
   assert.equal(loss.units, -1);
 }
 
-// Grade spread cover
+// Dallas -6 spread edge cases (Dallas away)
 {
-  const spreadBet = {
-    id: "spread-test",
+  const dallasSpread = parsePickBet("DALLAS -6");
+  assert.ok(dallasSpread);
+  assert.equal(dallasSpread.spread, -6);
+
+  const bet = spreadBetFromParsed(dallasSpread);
+
+  // Dallas wins 90-82 (win by 8) → cover win
+  assert.equal(gradeBet(bet, nbaDallasPortlandResult(90, 82)).status, "win");
+
+  // Dallas wins 90-86 (win by 4) → loss
+  assert.equal(gradeBet(bet, nbaDallasPortlandResult(90, 86)).status, "loss");
+
+  // Dallas wins 90-84 (win by 6) → push
+  assert.equal(gradeBet(bet, nbaDallasPortlandResult(90, 84)).status, "push");
+  assert.equal(gradeBet(bet, nbaDallasPortlandResult(90, 84)).units, 0);
+}
+
+// Portland +9.5 cover (Portland home, loses 95-90 = lose by 5)
+{
+  const portlandSpread = parsePickBet("PORTLAND +9.5");
+  assert.ok(portlandSpread);
+  assert.equal(portlandSpread.spread, 9.5);
+
+  const bet = spreadBetFromParsed(portlandSpread);
+  // Dallas away 95, Portland home 90
+  assert.equal(gradeBet(bet, nbaDallasPortlandResult(95, 90)).status, "win");
+}
+
+// Fade DALLAS -6 → Portland +6 grades opponent spread correctly
+{
+  const listed = parsePickBet("DALLAS -6");
+  assert.ok(listed);
+  const faded = fadeParsedBet(listed, "PORTLAND");
+  assert.ok(faded);
+  assert.equal(faded.team, "PORTLAND");
+  assert.equal(faded.spread, 6);
+  assert.ok(faded.displayText.includes("+6"), "display shows inverted spread");
+
+  const bet = spreadBetFromParsed(faded, {
+    signalTypes: ["book_needs_fade"],
+    signalLabels: ["Book Needs (Fade)"],
+  });
+  assert.equal(bet.spread, 6);
+  assert.equal(bet.recommendedBet?.spread, 6);
+  assert.equal(bet.recommendedTeam, faded.displayText);
+
+  // Portland home 90, Dallas away 95 — Portland +6 covers (96 > 95)
+  assert.equal(gradeBet(bet, nbaDallasPortlandResult(95, 90)).status, "win");
+
+  // Portland home 84, Dallas away 95 — Portland +6 does not cover (90 < 95)
+  assert.equal(gradeBet(bet, nbaDallasPortlandResult(95, 84)).status, "loss");
+}
+
+// Grading uses recommendedBet.spread when top-level spread is unset
+{
+  const listed = parsePickBet("DALLAS -6");
+  assert.ok(listed);
+  const bet = spreadBetFromParsed(listed);
+  delete (bet as { spread?: number }).spread;
+  assert.equal(gradeBet(bet, nbaDallasPortlandResult(90, 82)).status, "win");
+}
+
+// Under 217.5
+{
+  const underBet: TrackedBet = {
+    id: "total-under",
     date: "2026-06-11",
-    gameKey: "nba:spread",
-    league: "NBA" as const,
-    awayTeam: "Dallas Wings",
-    homeTeam: "Portland Fire",
-    recommendedTeam: "Dallas Wings -6",
-    betType: "spread" as const,
-    spread: -6,
+    gameKey: "nba:total-under",
+    league: "NBA",
+    awayTeam: "San Antonio Spurs",
+    homeTeam: "Los Angeles Lakers",
+    recommendedTeam: "Under 217.5",
+    betType: "total",
+    totalLine: 217.5,
+    totalDirection: "under",
     recommendedBet: {
-      betType: "spread" as const,
-      team: "Dallas Wings",
-      rawText: "DALLAS -6",
-      spread: -6,
-      displayText: "Dallas Wings -6",
+      betType: "total",
+      team: "SAN ANTONIO",
+      rawText: "SAN ANTONIO UNDER 217.5",
+      totalDirection: "under",
+      totalLine: 217.5,
+      displayText: "San Antonio Under 217.5",
     },
     confidence: 75,
-    signalTypes: ["sharp_money" as const],
-    signalLabels: ["Sharp Money"],
-    status: "pending" as const,
+    signalTypes: ["book_needs_fade"],
+    signalLabels: ["Book Needs (Fade)"],
+    status: "pending",
     units: 0,
     stakeUnits: 1,
     recordedAt: new Date().toISOString(),
   };
 
-  const coverWin: GameResult = {
-    id: "espn-spread",
+  const underHit: GameResult = {
+    id: "espn-under",
     league: "NBA",
-    awayTeam: "Dallas Wings",
-    homeTeam: "Portland Fire",
-    awayAbbr: "DAL",
-    homeAbbr: "POR",
+    awayTeam: "San Antonio Spurs",
+    homeTeam: "Los Angeles Lakers",
+    awayAbbr: "SAS",
+    homeAbbr: "LAL",
     startTime: "2026-06-11T23:00:00Z",
     status: "Final",
     isFinal: true,
     awayScore: 100,
-    homeScore: 90,
-    winnerTeam: "Dallas Wings",
+    homeScore: 110,
+    winnerTeam: "Los Angeles Lakers",
   };
-  assert.equal(gradeBet(spreadBet, coverWin).status, "win");
+  assert.equal(gradeBet(underBet, underHit).status, "win");
 
-  const coverLoss: GameResult = { ...coverWin, awayScore: 95, homeScore: 90 };
-  assert.equal(gradeBet(spreadBet, coverLoss).status, "loss");
+  const underMiss: GameResult = { ...underHit, awayScore: 115, homeScore: 105 };
+  assert.equal(gradeBet(underBet, underMiss).status, "loss");
 }
 
-// Grade over/under
+// Cubs Over 11 — team prefix is context; grades game total (6-5 = 11 push)
 {
-  const underBet = {
+  const cubsOver = parsePickBet("CUBS OVER 11");
+  assert.ok(cubsOver);
+  assert.equal(cubsOver.totalLine, 11);
+  assert.equal(cubsOver.totalDirection, "over");
+
+  const overBet: TrackedBet = {
+    id: "total-over-push",
+    date: "2026-06-11",
+    gameKey: "mlb:cubs-over",
+    league: "MLB",
+    awayTeam: "Chicago Cubs",
+    homeTeam: "St. Louis Cardinals",
+    recommendedTeam: cubsOver.displayText,
+    betType: "total",
+    totalLine: cubsOver.totalLine,
+    totalDirection: cubsOver.totalDirection,
+    recommendedBet: cubsOver,
+    confidence: 75,
+    signalTypes: ["sharp_money"],
+    signalLabels: ["Sharp Money"],
+    status: "pending",
+    units: 0,
+    stakeUnits: 1,
+    recordedAt: new Date().toISOString(),
+  };
+
+  const pushResult: GameResult = {
+    id: "espn-cubs",
+    league: "MLB",
+    awayTeam: "Chicago Cubs",
+    homeTeam: "St. Louis Cardinals",
+    awayAbbr: "CHC",
+    homeAbbr: "STL",
+    startTime: "2026-06-11T23:00:00Z",
+    status: "Final",
+    isFinal: true,
+    awayScore: 6,
+    homeScore: 5,
+    winnerTeam: "Chicago Cubs",
+  };
+  assert.equal(gradeBet(overBet, pushResult).status, "push");
+
+  const overWin: GameResult = { ...pushResult, awayScore: 7, homeScore: 5 };
+  assert.equal(gradeBet(overBet, overWin).status, "win");
+}
+
+// Grade over/under (fade UNDER from TORONTO OVER)
+{
+  const underBet: TrackedBet = {
     id: "total-test",
     date: "2026-06-11",
     gameKey: "nba:total",
-    league: "NBA" as const,
+    league: "NBA",
     awayTeam: "Toronto Raptors",
     homeTeam: "Boston Celtics",
     recommendedTeam: "Under 167.5",
-    betType: "total" as const,
+    betType: "total",
     totalLine: 167.5,
-    totalDirection: "under" as const,
+    totalDirection: "under",
     recommendedBet: {
-      betType: "total" as const,
+      betType: "total",
       team: "Toronto",
       rawText: "TORONTO OVER 167.5",
-      totalDirection: "under" as const,
+      totalDirection: "under",
       totalLine: 167.5,
       displayText: "Toronto Under 167.5",
     },
     confidence: 75,
-    signalTypes: ["book_needs_fade" as const],
+    signalTypes: ["book_needs_fade"],
     signalLabels: ["Book Needs (Fade)"],
-    status: "pending" as const,
+    status: "pending",
     units: 0,
     stakeUnits: 1,
     recordedAt: new Date().toISOString(),
