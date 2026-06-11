@@ -732,7 +732,8 @@ function contributionForRec(
   } else if (rec.signalPolarity === "inverted") {
     const boost = rec.opponentConfidence ?? invertBoostForSignal(stats, rec.signalType);
     edge = boost * weight;
-    note = `${SIGNAL_LABELS[rec.signalType]} fade → ${team.teamDisplay} (+${Math.round(edge)})`;
+    const fadeTarget = displayTeamName(rec.pick);
+    note = `Fade target: ${fadeTarget} (negative EV) → Bet: ${team.teamDisplay} (+${Math.round(edge)})`;
   } else if (rec.signalPolarity === "positive") {
     edge = rec.confidence * 0.55 * weight;
     note = `${SIGNAL_LABELS[rec.signalType]} → ${team.teamDisplay} (+${Math.round(edge)})`;
@@ -754,10 +755,16 @@ function contributionForRec(
 function applyGameCrossSignalRules(
   contributions: TeamEdgeContribution[],
   fadeTargets: Set<string>
-): { edgeDelta: Map<string, number>; notes: string[]; dampenConfidence: boolean } {
+): {
+  edgeDelta: Map<string, number>;
+  notes: string[];
+  dampenConfidence: boolean;
+  forceNoBet: boolean;
+} {
   const edgeDelta = new Map<string, number>();
   const notes: string[] = [];
   let dampenConfidence = false;
+  let forceNoBet = false;
 
   const signals = new Set(contributions.map((c) => c.signalType));
   const hasBook = signals.has("book_needs_fade");
@@ -767,6 +774,7 @@ function applyGameCrossSignalRules(
   if (hasBook && hasSquare && teamsSupported.size > 1) {
     notes.push("Book Needs + Square Top on opposite sides — no bet");
     dampenConfidence = true;
+    forceNoBet = true;
   }
 
   const sharpTypes: SignalType[] = ["sharp_money", "mega_sharps"];
@@ -789,7 +797,7 @@ function applyGameCrossSignalRules(
     }
   }
 
-  return { edgeDelta, notes: [...new Set(notes)], dampenConfidence };
+  return { edgeDelta, notes: [...new Set(notes)], dampenConfidence, forceNoBet };
 }
 
 function applyFadeTargetPenalties(
@@ -903,28 +911,75 @@ function clampWinnerToGame(
   return { display: winnerDisplay, norm: winnerNorm };
 }
 
-function matchedRecToSheetPick(rec: MatchedRecommendation): SheetPick {
+function matchedRecToSheetPick(
+  rec: MatchedRecommendation,
+  slatePicks?: SheetPick[]
+): SheetPick {
+  const fromSlate = slatePicks?.find((p) => p.id === rec.id);
+  const opponent = rec.opponent ?? rec.opponentPick ?? fromSlate?.opponent;
   return {
     id: rec.id,
     league: rec.league,
     signalType: rec.signalType,
     pick: rec.pick,
-    opponent: rec.opponent,
-    rawRow: 0,
-    signalCol: 0,
+    opponent,
+    line: rec.line,
+    rawRow: fromSlate?.rawRow ?? 0,
+    signalCol: fromSlate?.signalCol ?? 0,
+    gameSlot: fromSlate?.gameSlot,
   };
 }
 
+function fadeTargetNormFromRec(rec: MatchedRecommendation): string | null {
+  if (!FADE_SIGNALS.has(rec.signalType) || rec.line) return null;
+  return normalizeTeamName(rec.pick);
+}
+
+/** Book Needs + Square Top listing different fade targets on the same game → no bet */
 function findOpposingFadeRecPair(
-  recs: MatchedRecommendation[]
+  recs: MatchedRecommendation[],
+  slatePicks?: SheetPick[]
 ): { book: MatchedRecommendation; square: MatchedRecommendation } | null {
   const books = recs.filter((r) => r.signalType === "book_needs_fade" && !r.line);
   const squares = recs.filter((r) => r.signalType === "square_fade" && !r.line);
 
   for (const book of books) {
     for (const square of squares) {
-      if (isOpposingDualFade(matchedRecToSheetPick(book), matchedRecToSheetPick(square))) {
-        return { book, square };
+      const bookFade = fadeTargetNormFromRec(book);
+      const squareFade = fadeTargetNormFromRec(square);
+      if (!bookFade || !squareFade || bookFade === squareFade) continue;
+      return { book, square };
+    }
+  }
+
+  return null;
+}
+
+function resolveOpposingFadeSheetPair(
+  recs: MatchedRecommendation[],
+  slatePicks: SheetPick[] | undefined,
+  matchedGame: CalendarGame | undefined,
+  fadeTargets: Map<string, string>
+): { book: SheetPick; square: SheetPick } | null {
+  const recPair = findOpposingFadeRecPair(recs, slatePicks);
+  if (recPair) {
+    return {
+      book: matchedRecToSheetPick(recPair.book, slatePicks),
+      square: matchedRecToSheetPick(recPair.square, slatePicks),
+    };
+  }
+
+  if (slatePicks?.length && matchedGame && fadeTargets.size >= 2) {
+    const league = sportLeagueFromRec(recs[0]);
+    const pair = findDualFadePair(slatePicks, league, {
+      homeTeam: matchedGame.homeTeam,
+      awayTeam: matchedGame.awayTeam,
+    });
+    if (pair.book && pair.square) {
+      const bookFade = normalizeTeamName(pair.book.pick);
+      const squareFade = normalizeTeamName(pair.square.pick);
+      if (bookFade !== squareFade) {
+        return { book: pair.book, square: pair.square };
       }
     }
   }
@@ -939,44 +994,20 @@ function buildOpposingDualFadeNoBet(
   squarePick: SheetPick,
   matchedGame?: CalendarGame
 ): { consolidated: GameConsolidatedRecommendation; updatedRecs: MatchedRecommendation[] } {
-  const resolution =
-    resolveDualFadeMatch(bookPick, squarePick, {
-      computedAt: "",
-      archiveDays: 0,
-      historicalSample: {
-        weeks: 0,
-        months: 0,
-        archiveDays: 0,
-        recentDualActiveDays: 0,
-        totalPicksTracked: 0,
-        totalDataPoints: 0,
-      },
-      tracker: {
-        bookNeedsAllTimeRoi: 0,
-        squareAllTimeRoi: 0,
-        bookNeedsBlendedRoi: 0,
-        squareBlendedRoi: 0,
-        roiGap: 0,
-      },
-      coOccurrence: {
-        dualActiveDays: 0,
-        dualPositiveDays: 0,
-        dualNegativeDays: 0,
-        combinedWinRate: 0.5,
-        bookOutperformedSquareDays: 0,
-        squareOutperformedBookDays: 0,
-      },
-      archiveTrend: {
-        bookInverseWinRate: 0.5,
-        squareInverseWinRate: 0.5,
-        resolutionRule: "",
-        sampleSize: 0,
-      },
-      byLeague: {},
-    }, sportLeagueFromRec(recs[0]))!;
+  const bookFadeTeam = displayTeamName(bookPick.pick);
+  const squareFadeTeam = displayTeamName(squarePick.pick);
+  const bookNeedsInverse = bookPick.opponent
+    ? displayTeamName(bookPick.opponent)
+    : squareFadeTeam;
+  const squareInverse = squarePick.opponent
+    ? displayTeamName(squarePick.opponent)
+    : bookFadeTeam;
+
+  const noBetReason =
+    `Book Needs lists ${bookFadeTeam} (→ ${bookNeedsInverse}) and Square Top lists ${squareFadeTeam} (→ ${squareInverse}). ` +
+    `Both teams appear on opposite sides — conflicting signals, no bet.`;
 
   const { awayTeam, homeTeam } = matchupLabels(recs);
-  const noBetReason = resolution.reasoning;
 
   const consolidated: GameConsolidatedRecommendation = {
     gameKey,
@@ -993,7 +1024,21 @@ function buildOpposingDualFadeNoBet(
         label: "No bet",
         value: 0,
         impact: 0,
-        detail: noBetReason,
+        detail: `${bookFadeTeam} vs ${squareFadeTeam} — opposing fades cancel`,
+      },
+      {
+        key: "book_fade_target",
+        label: "Book Needs fade target",
+        value: 0,
+        impact: 0,
+        detail: `${bookFadeTeam} (negative EV) → would bet ${bookNeedsInverse}`,
+      },
+      {
+        key: "square_fade_target",
+        label: "Square Top fade target",
+        value: 0,
+        impact: 0,
+        detail: `${squareFadeTeam} (negative EV) → would bet ${squareInverse}`,
       },
     ],
     hasConflict: true,
@@ -1003,9 +1048,10 @@ function buildOpposingDualFadeNoBet(
     dualFade: {
       isDualFade: true,
       isOpposingNoBet: true,
-      bookNeedsFadeTeam: resolution.bookNeedsFadeTeam,
-      squareFadeTeam: resolution.squareFadeTeam,
+      bookNeedsFadeTeam: bookFadeTeam,
+      squareFadeTeam: squareFadeTeam,
     },
+    highConviction: false,
   };
 
   const updatedRecs = recs.map((rec) => ({
@@ -1032,13 +1078,22 @@ function resolveSingleGame(
 
   const matchedGame = recs.find((r) => r.matchedGame)?.matchedGame;
 
-  const recPair = findOpposingFadeRecPair(recs);
+  const fadeTargets = collectFadeTargetsForGame(recs, slatePicks, matchedGame);
+
+  if (fadeTargets.size >= 2) {
+    const pair = resolveOpposingFadeSheetPair(recs, slatePicks, matchedGame, fadeTargets);
+    if (pair) {
+      return buildOpposingDualFadeNoBet(gameKey, recs, pair.book, pair.square, matchedGame);
+    }
+  }
+
+  const recPair = findOpposingFadeRecPair(recs, slatePicks);
   if (recPair) {
     return buildOpposingDualFadeNoBet(
       gameKey,
       recs,
-      matchedRecToSheetPick(recPair.book),
-      matchedRecToSheetPick(recPair.square),
+      matchedRecToSheetPick(recPair.book, slatePicks),
+      matchedRecToSheetPick(recPair.square, slatePicks),
       matchedGame
     );
   }
@@ -1049,12 +1104,15 @@ function resolveSingleGame(
       homeTeam: matchedGame.homeTeam,
       awayTeam: matchedGame.awayTeam,
     });
-    if (pair.book && pair.square && isOpposingDualFade(pair.book, pair.square)) {
-      return buildOpposingDualFadeNoBet(gameKey, recs, pair.book, pair.square, matchedGame);
+    if (pair.book && pair.square) {
+      const bookFade = normalizeTeamName(pair.book.pick);
+      const squareFade = normalizeTeamName(pair.square.pick);
+      if (bookFade !== squareFade) {
+        return buildOpposingDualFadeNoBet(gameKey, recs, pair.book, pair.square, matchedGame);
+      }
     }
   }
 
-  const fadeTargets = collectFadeTargetsForGame(recs, slatePicks, matchedGame);
   const fadeTargetNorms = new Set(fadeTargets.keys());
 
   const contributions = recs
@@ -1078,17 +1136,10 @@ function resolveSingleGame(
     if (existing) existing.edge += delta;
   }
 
-  if (cross.dampenConfidence) {
-    const bookRec = recs.find((r) => r.signalType === "book_needs_fade" && !r.line);
-    const squareRec = recs.find((r) => r.signalType === "square_fade" && !r.line);
-    if (bookRec && squareRec) {
-      return buildOpposingDualFadeNoBet(
-        gameKey,
-        recs,
-        matchedRecToSheetPick(bookRec),
-        matchedRecToSheetPick(squareRec),
-        matchedGame
-      );
+  if (cross.forceNoBet || cross.dampenConfidence) {
+    const pair = resolveOpposingFadeSheetPair(recs, slatePicks, matchedGame, fadeTargets);
+    if (pair) {
+      return buildOpposingDualFadeNoBet(gameKey, recs, pair.book, pair.square, matchedGame);
     }
   }
 

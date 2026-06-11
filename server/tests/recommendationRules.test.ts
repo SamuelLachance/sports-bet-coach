@@ -92,6 +92,27 @@ const atlantaSquareSplitRow: SheetPick = {
   rawRow: 32,
 };
 
+/** Production VS layout: odds embedded in pick, opponents not yet linked on sheet pick. */
+const whiteSoxBookOddsOnly: SheetPick = {
+  id: "book-ws-odds",
+  league: "MLB",
+  signalType: "book_needs_fade",
+  pick: "WHITE SOX -101",
+  rawRow: 31,
+  gameSlot: 1,
+  signalCol: 4,
+};
+
+const atlantaSquareOddsOnly: SheetPick = {
+  id: "square-atl-odds",
+  league: "MLB",
+  signalType: "square_fade",
+  pick: "ATLANTA -120",
+  rawRow: 32,
+  gameSlot: 1,
+  signalCol: 6,
+};
+
 const bookOnlyPick: SheetPick = {
   id: "book-only",
   league: "MLB",
@@ -344,6 +365,29 @@ function main() {
   assert.ok(wsSplitCard?.noBet, "Split-row opposing fades → no bet");
   assert.equal(wsSplitCard!.recommendedTeam, "");
   assert.equal(wsSplitCard!.confidence, 0);
+
+  const oddsOnlySlate = [whiteSoxBookOddsOnly, atlantaSquareOddsOnly];
+  const { gameRecommendations: oddsOnlyCards } = resolveGameConflicts(
+    [
+      makeRec(whiteSoxBookOddsOnly, WHITE_SOX_GAME, oddsOnlySlate),
+      makeRec(atlantaSquareOddsOnly, WHITE_SOX_GAME, oddsOnlySlate),
+    ],
+    stats,
+    { slatePicks: oddsOnlySlate, dualStats: emptyDualStats }
+  );
+  const oddsOnlyCard = oddsOnlyCards.find((g) => g.matchedGame?.id === WHITE_SOX_GAME.id);
+  assert.ok(oddsOnlyCard?.noBet, "Odds-only opposing fades (no opponent on sheet) → no bet");
+  assert.equal(oddsOnlyCard!.recommendedTeam, "");
+  assert.equal(oddsOnlyCard!.confidence, 0);
+  assert.ok(oddsOnlyCard!.dualFade?.isOpposingNoBet, "Opposing dual-fade flag set");
+  assert.ok(
+    !oddsOnlyCard!.highConviction,
+    "No bet card must not show high conviction"
+  );
+  assert.ok(
+    oddsOnlyCard!.confidenceBreakdown.some((b) => b.label === "No bet"),
+    "Breakdown shows no-bet, not misleading edge totals"
+  );
 
   const { gameRecommendations: bookOnlyCards } = resolveGameConflicts(
     [makeRec(bookOnlyPick, WHITE_SOX_GAME, [bookOnlyPick])],

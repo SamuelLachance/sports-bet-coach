@@ -605,6 +605,8 @@ export function isOpposingDualFade(
 ): boolean {
   const bookFade = normalizeTeam(bookNeedsPick.pick);
   const squareFade = normalizeTeam(squarePick.pick);
+  if (bookFade === squareFade) return false;
+
   const bookOpp = bookNeedsPick.opponent
     ? normalizeTeam(bookNeedsPick.opponent)
     : "";
@@ -619,10 +621,18 @@ export function isOpposingDualFade(
   if (fullCross) return true;
 
   const partialCross = bookOpp === squareFade || squareOpp === bookFade;
-  if (!partialCross) return false;
+  if (partialCross) {
+    if (bookNeedsPick.rawRow === squarePick.rawRow) return true;
+    if (
+      bookNeedsPick.gameSlot != null &&
+      squarePick.gameSlot != null &&
+      bookNeedsPick.gameSlot === squarePick.gameSlot
+    ) {
+      return true;
+    }
+  }
 
-  // Partial opponent data — require same sheet row to avoid false positives
-  return bookNeedsPick.rawRow === squarePick.rawRow;
+  return false;
 }
 
 export function resolveDualFadeMatch(
@@ -772,7 +782,10 @@ export function findDualFadePair(
 
   for (const book of books) {
     for (const square of squares) {
-      if (!isOpposingDualFade(book, square)) continue;
+      const bookFade = normalizeTeam(book.pick);
+      const squareFade = normalizeTeam(square.pick);
+      if (bookFade === squareFade) continue;
+
       if (gameCtx && !pickBelongsToGame(book.pick, book.opponent, gameCtx)) continue;
       if (gameCtx && !pickBelongsToGame(square.pick, square.opponent, gameCtx)) continue;
       if (
@@ -783,7 +796,9 @@ export function findDualFadePair(
       ) {
         continue;
       }
-      return { book, square };
+      if (isOpposingDualFade(book, square) || bookFade !== squareFade) {
+        return { book, square };
+      }
     }
   }
 
