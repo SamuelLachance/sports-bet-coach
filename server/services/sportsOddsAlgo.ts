@@ -20,6 +20,7 @@ import {
   resolveBetDisplay,
 } from "../parsers/pickBetParser.js";
 import type { CalendarGame, LeagueCode, ParsedBet } from "../types.js";
+import { oddsEdge } from "../utils/oddsEdge.js";
 import { resolveGameTeamDisplay } from "./calendar.js";
 
 export type SportsOddsAgreementStatus = "agrees" | "disagrees" | "unavailable";
@@ -103,6 +104,8 @@ export interface SportsOddsTopPick {
   edge: number;
   marketOdds: number;
   modelProjection: number;
+  /** Win probability for the picked side (used to revalidate ML edge). */
+  outcomeWinProbability?: number;
   betType?: "spread" | "moneyline" | "total";
   spreadLine?: number;
   spreadOdds?: number;
@@ -302,6 +305,67 @@ function spreadPointEdge(
   return -modelMarginHome - homeSpread;
 }
 
+function sideWinProbabilityFromRemote(
+  raw: RemoteSlateGame,
+  side: "away" | "home" | "draw"
+): number | undefined {
+  const model = raw.model;
+  if (!model) return undefined;
+
+  if (side === "draw") {
+    return model.draw_probability == null
+      ? undefined
+      : Number(model.draw_probability);
+  }
+
+  if (model.threeway) {
+    if (side === "home") {
+      return model.home_win_probability == null
+        ? undefined
+        : Number(model.home_win_probability);
+    }
+    if (side === "away") {
+      return model.away_win_probability == null
+        ? undefined
+        : Number(model.away_win_probability);
+    }
+  }
+
+  const winProb = model.win_probability;
+  const favoriteSide = model.favorite_side;
+  if (winProb == null || !favoriteSide) return undefined;
+  const probability = Number(winProb);
+  return side === favoriteSide ? probability : 100 - probability;
+}
+
+export function outcomeWinProbabilityForPick(
+  prediction: SportsOddsGamePrediction,
+  side: "away" | "home" | "draw"
+): number | undefined {
+  const model = prediction.model;
+
+  if (side === "draw") {
+    return model.drawProbability;
+  }
+
+  if (model.threeway) {
+    if (side === "home") return model.homeWinProbability;
+    if (side === "away") return model.awayWinProbability;
+  }
+
+  return side === model.favoriteSide
+    ? model.winProbability
+    : 100 - model.winProbability;
+}
+
+function computeMoneylineEdge(
+  modelProjection: number,
+  marketOdds: number,
+  modelProbPct: number
+): number {
+  return oddsEdge(modelProjection, marketOdds, modelProbPct);
+}
+
 function validatedSpreadEdge(raw: RemoteSlateGame): number | undefined {
   const pick = raw.top_pick;
   if (pick?.bet_type !== "spread") return undefined;
@@ -357,10 +421,25 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
   const modelMargin =
     pick?.model_margin == null ? undefined : Number(pick.model_margin);
 
+  const marketOdds = Number(pick?.market_odds ?? spreadOdds ?? 0);
+  const modelProjection = Number(pick?.model_projection ?? 0);
+  const outcomeWinProbability = sideWinProbabilityFromRemote(raw, side);
+
   let edge = Number(pick?.edge ?? 0);
   const spreadEdge = validatedSpreadEdge(raw);
   if (spreadEdge != null) {
     edge = spreadEdge;
+  } else if (
+    betType !== "spread" &&
+    marketOdds !== 0 &&
+    modelProjection !== 0 &&
+    outcomeWinProbability != null
+  ) {
+    edge = computeMoneylineEdge(
+      modelProjection,
+      marketOdds,
+      outcomeWinProbability
+    );
   }
   if (edge < sportsOddsForceMinEdge()) return undefined;
 
@@ -368,8 +447,9 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
     side,
     teamName,
     edge,
-    marketOdds: Number(pick?.market_odds ?? spreadOdds ?? 0),
-    modelProjection: Number(pick?.model_projection ?? 0),
+    marketOdds,
+    modelProjection,
+    outcomeWinProbability,
     betType,
     spreadLine,
     spreadOdds,
@@ -382,6 +462,13 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
     strategy: pick?.strategy,
     reason: pick?.reason,
   };
+}
+
+export function mapRemoteSlateGame(
+  raw: RemoteSlateGame
+): SportsOddsGamePrediction | null {
+  const game = mapRemoteGame(raw);
+  return game ? revalidateGamePrediction(game) : null;
 }
 
 function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
@@ -883,8 +970,10 @@ export function sportsOddsValueTrendLabel(
   const pick = prediction.topPick;
   if (!pick) return sportsOddsTrendLabel(prediction);
 
+  const edge = effectiveTopPickEdge(pick, prediction);
+
   if (pick.betType === "spread") {
-    return `${pick.teamName} (+${pick.edge.toFixed(0)} spread edge, ${spreadPickLabel(pick)})`;
+    return `${pick.teamName} (+${edge.toFixed(0)} spread edge, ${spreadPickLabel(pick)})`;
   }
 
   const odds =
@@ -893,18 +982,21 @@ export function sportsOddsValueTrendLabel(
     pick.modelProjection > 0
       ? `+${pick.modelProjection}`
       : `${pick.modelProjection}`;
-  return `${pick.teamName} (+${pick.edge.toFixed(0)} edge, book ${odds} vs model ${model})`;
+  return `${pick.teamName} (+${edge.toFixed(0)} edge, book ${odds} vs model ${model})`;
 }
 
 export function sportsOddsForceConfidence(
   prediction: SportsOddsGamePrediction
 ): number {
   const pick = prediction.topPick;
-  const edge = pick ? effectiveTopPickEdge(pick) : 0;
+  const edge = pick ? effectiveTopPickEdge(pick, prediction) : 0;
   return Math.min(92, Math.round(75 + edge / 10));
 }
 
-function effectiveTopPickEdge(pick: SportsOddsTopPick): number {
+export function effectiveTopPickEdge(
+  pick: SportsOddsTopPick,
+  prediction?: SportsOddsGamePrediction
+): number {
   if (
     pick.betType === "spread" &&
     pick.consensusSpread != null &&
@@ -919,7 +1011,50 @@ function effectiveTopPickEdge(pick: SportsOddsTopPick): number {
     if (pointEdge <= 0) return 0;
     return pointEdge * SPREAD_POINT_TO_EDGE;
   }
-  return pick.edge;
+
+  const { modelProjection, marketOdds } = pick;
+  if (!modelProjection || !marketOdds) return pick.edge;
+
+  const outcomeProb =
+    pick.outcomeWinProbability ??
+    (prediction
+      ? outcomeWinProbabilityForPick(prediction, pick.side)
+      : undefined);
+  if (outcomeProb == null) return pick.edge;
+
+  return computeMoneylineEdge(modelProjection, marketOdds, outcomeProb);
+}
+
+function revalidateGamePrediction(
+  game: SportsOddsGamePrediction
+): SportsOddsGamePrediction {
+  const pick = game.topPick;
+  if (!pick) return game;
+
+  const outcomeWinProbability =
+    pick.outcomeWinProbability ??
+    outcomeWinProbabilityForPick(game, pick.side);
+  const edge = effectiveTopPickEdge(
+    { ...pick, outcomeWinProbability },
+    game
+  );
+
+  if (edge < sportsOddsForceMinEdge()) {
+    return { ...game, topPick: undefined };
+  }
+
+  if (edge === pick.edge && outcomeWinProbability === pick.outcomeWinProbability) {
+    return game;
+  }
+
+  return {
+    ...game,
+    topPick: {
+      ...pick,
+      edge,
+      outcomeWinProbability,
+    },
+  };
 }
 
 export function isSportsOddsForcePick(
@@ -928,7 +1063,7 @@ export function isSportsOddsForcePick(
   if (!prediction || !isSportsOddsEnabled()) return false;
   const pick = prediction.topPick;
   if (!pick) return false;
-  return effectiveTopPickEdge(pick) >= sportsOddsForceMinEdge();
+  return effectiveTopPickEdge(pick, prediction) >= sportsOddsForceMinEdge();
 }
 
 export function sportsOddsForceBreakdownDetail(
@@ -939,8 +1074,10 @@ export function sportsOddsForceBreakdownDetail(
   if (!pick) {
     return `Sports Odds: force pick unavailable — no book edge data`;
   }
+  const edge = effectiveTopPickEdge(pick, prediction);
+
   if (pick.betType === "spread") {
-    return `Sports Odds: force pick — ${pick.teamName} +${pick.edge.toFixed(0)} spread edge (${spreadPickLabel(pick)}) exceeds +${threshold} threshold`;
+    return `Sports Odds: force pick — ${pick.teamName} +${edge.toFixed(0)} spread edge (${spreadPickLabel(pick)}) exceeds +${threshold} threshold`;
   }
 
   const odds =
@@ -949,7 +1086,7 @@ export function sportsOddsForceBreakdownDetail(
     pick.modelProjection > 0
       ? `+${pick.modelProjection}`
       : `${pick.modelProjection}`;
-  return `Sports Odds: force pick — ${pick.teamName} +${pick.edge.toFixed(0)} edge (book ${odds} vs model ${model}) exceeds +${threshold} threshold`;
+  return `Sports Odds: force pick — ${pick.teamName} +${edge.toFixed(0)} edge (book ${odds} vs model ${model}) exceeds +${threshold} threshold`;
 }
 
 export async function fetchSportsOddsSlate(
@@ -982,7 +1119,7 @@ export async function fetchSportsOddsSlate(
     const slate: SportsOddsSlate = {
       fetchedAt: payload.generated_at || new Date().toISOString(),
       date: payload.date_label || displayDate,
-      games,
+      games: games.map(revalidateGamePrediction),
       errors: (payload.errors || []).map(
         (entry) => `${entry.league || "?"} ${entry.game || ""}: ${entry.error || "error"}`.trim()
       ),
@@ -995,7 +1132,11 @@ export async function fetchSportsOddsSlate(
   } catch (error) {
     try {
       const cached = JSON.parse(await fs.readFile(cachePath, "utf8")) as SportsOddsSlate;
-      return { ...cached, source: "cache" };
+      return {
+        ...cached,
+        games: cached.games.map(revalidateGamePrediction),
+        source: "cache",
+      };
     } catch {
       const message = error instanceof Error ? error.message : String(error);
       return {

@@ -119,7 +119,32 @@ declare module "@server/services/sportsOddsAlgo.js" {
       favoriteSide: "away" | "home";
       winProbability: number;
     };
+    topPick?: {
+      edge: number;
+      marketOdds: number;
+      modelProjection: number;
+    };
   }
+  export function effectiveTopPickEdge(
+    pick: NonNullable<SportsOddsGamePrediction["topPick"]>,
+    prediction?: SportsOddsGamePrediction
+  ): number;
+  export function mapRemoteSlateGame(
+    raw: Record<string, unknown>
+  ): SportsOddsGamePrediction | null;
+}
+
+declare module "@server/utils/oddsEdge.js" {
+  export function probabilityToAmerican(probabilityPct: number): number;
+  export function breakevenAmerican(
+    probabilityPct: number,
+    options: { asUnderdog: boolean }
+  ): number;
+  export function oddsEdge(
+    modelProjection: number,
+    marketOdds: number,
+    modelProbPct: number
+  ): number;
 }
 
 declare module "@server/services/mainScreenPicks.js" {

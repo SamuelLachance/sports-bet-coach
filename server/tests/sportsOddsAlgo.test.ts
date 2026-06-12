@@ -9,15 +9,19 @@ import {
 } from "../services/recommendations.js";
 import {
   buildSportsOddsGameKey,
+  effectiveTopPickEdge,
   isSportsOddsForcePick,
+  mapRemoteSlateGame,
   matchPredictionToCalendarGame,
   sportsOddsAgreesWithBet,
   sportsOddsConsensusForBet,
   sportsOddsStatusForBet,
   sportsOddsValueBet,
+  sportsOddsValueTrendLabel,
   teamSideForBet,
   type SportsOddsGamePrediction,
 } from "../services/sportsOddsAlgo.js";
+import { oddsEdge } from "../utils/oddsEdge.js";
 import { pickBelongsToGame, resolveGameTeamDisplay } from "../services/calendar.js";
 import type { CalendarGame, GameConsolidatedRecommendation, ParsedBet } from "../types.js";
 
@@ -133,9 +137,14 @@ assert.equal(disagreed.dualAlgoConfirmed, false);
 const highEdgeTopPick = {
   side: "home" as const,
   teamName: "San Antonio Spurs",
-  edge: 120,
-  marketOdds: -170,
-  modelProjection: -195,
+  edge: 110,
+  marketOdds: -108,
+  modelProjection: 6.3,
+  betType: "spread" as const,
+  spreadLine: -5.5,
+  spreadOdds: -108,
+  consensusSpread: -5.5,
+  modelMargin: 11,
 };
 
 const highValuePrediction: SportsOddsGamePrediction = {
@@ -149,7 +158,11 @@ const highValuePrediction: SportsOddsGamePrediction = {
 
 const lowEdgePrediction: SportsOddsGamePrediction = {
   ...spursPrediction,
-  topPick: { ...highEdgeTopPick, edge: 8 },
+  topPick: {
+    ...highEdgeTopPick,
+    edge: 8,
+    modelMargin: -1.2,
+  },
 };
 
 assert.equal(isSportsOddsForcePick(highValuePrediction), true);
@@ -673,32 +686,89 @@ assert.equal(
 );
 
 // Padres away favorite — cross-sign ML edge is ~+26, not raw +230; below force threshold
-const padresPrediction: SportsOddsGamePrediction = {
+const padresPredictionBase = {
   eventId: "401815712",
-  league: "MLB",
+  league: "MLB" as const,
   awayTeam: "San Diego Padres",
   homeTeam: "Cincinnati Reds",
   model: {
-    favoriteSide: "away",
+    favoriteSide: "away" as const,
     winProbability: 54.79,
     awayProjection: -121,
     homeProjection: 121,
   },
   market: { awayMoneyline: 109, homeMoneyline: -130 },
+};
+
+const padresTopPick = {
+  side: "away" as const,
+  teamName: "San Diego Padres",
+  marketOdds: 109,
+  modelProjection: -121,
+  betType: "moneyline" as const,
+};
+
+const padresPrediction: SportsOddsGamePrediction = {
+  ...padresPredictionBase,
   topPick: {
-    side: "away",
-    teamName: "San Diego Padres",
-    edge: 26.5,
-    marketOdds: 109,
-    modelProjection: -121,
-    betType: "moneyline",
+    ...padresTopPick,
+    edge: oddsEdge(-121, 109, 54.79),
+    outcomeWinProbability: 54.79,
+  },
+};
+
+const padresStaleApiPrediction: SportsOddsGamePrediction = {
+  ...padresPredictionBase,
+  topPick: {
+    ...padresTopPick,
+    edge: 230,
   },
 };
 
 assert.equal(isSportsOddsForcePick(padresPrediction), false);
+assert.equal(isSportsOddsForcePick(padresStaleApiPrediction), false);
+
+const padresRecomputedEdge = effectiveTopPickEdge(
+  padresStaleApiPrediction.topPick!,
+  padresStaleApiPrediction
+);
+assert.ok(padresRecomputedEdge > 20 && padresRecomputedEdge < 40);
+assert.notEqual(padresRecomputedEdge, 230);
+
+const padresTrend = sportsOddsValueTrendLabel(padresStaleApiPrediction);
+assert.ok(padresTrend.includes("+2") || padresTrend.includes("+3"));
+assert.ok(!padresTrend.includes("+230"));
+
 assert.ok((padresPrediction.topPick?.edge ?? 0) < 100);
 assert.ok((padresPrediction.topPick?.edge ?? 0) > 20);
 assert.ok((padresPrediction.topPick?.modelProjection ?? 0) < 0);
 assert.ok((padresPrediction.topPick?.marketOdds ?? 0) > 0);
+
+const padresStaleRemoteSlate = {
+  event_id: "401815712",
+  league: "mlb",
+  matchup: {
+    away: { name: "San Diego Padres" },
+    home: { name: "Cincinnati Reds" },
+  },
+  model: {
+    favorite_side: "away" as const,
+    win_probability: 54.79,
+    away_projection: -121,
+    home_projection: 121,
+  },
+  market: { away_moneyline: 109, home_moneyline: -130 },
+  top_pick: {
+    side: "away" as const,
+    team_name: "San Diego Padres",
+    edge: 230,
+    market_odds: 109,
+    model_projection: -121,
+    bet_type: "moneyline" as const,
+  },
+};
+
+const padresFromStaleSlate = mapRemoteSlateGame(padresStaleRemoteSlate);
+assert.equal(padresFromStaleSlate?.topPick, undefined);
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");
