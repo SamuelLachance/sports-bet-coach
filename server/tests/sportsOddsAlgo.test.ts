@@ -631,4 +631,73 @@ const soccerConflict = applyEventTeamConflictFilter({
 assert.equal(soccerConflict.length, 1);
 assert.equal(soccerConflict[0]?.noBet, true);
 
+// Rays @ Angels — away favorite projections align with favoriteSide (live slate regression)
+const RAYS_GAME: CalendarGame = {
+  id: "401815733",
+  league: "MLB",
+  homeTeam: "Los Angeles Angels",
+  awayTeam: "Tampa Bay Rays",
+  homeAbbr: "LAA",
+  awayAbbr: "TB",
+  startTime: "2026-06-13T01:38:00Z",
+  status: "Scheduled",
+};
+
+const raysPrediction: SportsOddsGamePrediction = {
+  eventId: "401815733",
+  league: "MLB",
+  awayTeam: "Tampa Bay Rays",
+  homeTeam: "Los Angeles Angels",
+  model: {
+    favoriteSide: "away",
+    winProbability: 55.68,
+    awayProjection: -126,
+    homeProjection: 126,
+  },
+  market: { awayMoneyline: -171, homeMoneyline: 141 },
+};
+
+assert.ok((raysPrediction.model.awayProjection ?? 0) < 0);
+assert.ok((raysPrediction.model.homeProjection ?? 0) > 0);
+assert.equal(isSportsOddsForcePick(raysPrediction), false);
+
+const raysMlBet: ParsedBet = {
+  betType: "moneyline",
+  team: "TB",
+  rawText: "TB",
+  displayText: "TB",
+};
+assert.equal(
+  sportsOddsAgreesWithBet(raysMlBet, RAYS_GAME, raysPrediction),
+  true
+);
+
+// Padres away favorite — ML edge passes force threshold without sign inversion
+const padresPrediction: SportsOddsGamePrediction = {
+  eventId: "401815712",
+  league: "MLB",
+  awayTeam: "San Diego Padres",
+  homeTeam: "Cincinnati Reds",
+  model: {
+    favoriteSide: "away",
+    winProbability: 54.79,
+    awayProjection: -121,
+    homeProjection: 121,
+  },
+  market: { awayMoneyline: 109, homeMoneyline: -130 },
+  topPick: {
+    side: "away",
+    teamName: "San Diego Padres",
+    edge: 230,
+    marketOdds: 109,
+    modelProjection: -121,
+    betType: "moneyline",
+  },
+};
+
+assert.equal(isSportsOddsForcePick(padresPrediction), true);
+assert.equal(padresPrediction.topPick?.edge, 230);
+assert.ok((padresPrediction.topPick?.modelProjection ?? 0) < 0);
+assert.ok((padresPrediction.topPick?.marketOdds ?? 0) > 0);
+
 console.log("sportsOddsAlgo.test.ts: all tests passed");
