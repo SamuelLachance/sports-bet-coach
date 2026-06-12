@@ -42,105 +42,6 @@
       "mainScreenGameRec": true
     },
     {
-      "id": "2026-06-12:MLB:espn-401815728",
-      "date": "2026-06-12",
-      "gameKey": "MLB:espn-401815728",
-      "league": "MLB",
-      "awayTeam": "Los Angeles Dodgers",
-      "homeTeam": "Chicago White Sox",
-      "recommendedTeam": "CHW",
-      "recommendedBet": {
-        "betType": "moneyline",
-        "team": "CHW",
-        "rawText": "CHW",
-        "displayText": "CHW"
-      },
-      "betType": "moneyline",
-      "americanOdds": 129,
-      "consensusLabel": "+129",
-      "consensusOdds": 129,
-      "bookProvider": "DraftKings",
-      "confidence": 92,
-      "signalTypes": [
-        "book_needs_fade",
-        "square_fade"
-      ],
-      "signalLabels": [
-        "Book Needs (Fade)",
-        "Square Top (Fade)"
-      ],
-      "status": "pending",
-      "units": 0,
-      "stakeUnits": 1,
-      "espnGameId": "401815728",
-      "recordedAt": "2026-06-12T12:44:04.802Z",
-      "mainScreenGameRec": true
-    },
-    {
-      "id": "2026-06-12:MLB:espn-401815733",
-      "date": "2026-06-12",
-      "gameKey": "MLB:espn-401815733",
-      "league": "MLB",
-      "awayTeam": "Tampa Bay Rays",
-      "homeTeam": "Los Angeles Angels",
-      "recommendedTeam": "LAA",
-      "recommendedBet": {
-        "betType": "moneyline",
-        "team": "LAA",
-        "rawText": "LAA",
-        "displayText": "LAA"
-      },
-      "betType": "moneyline",
-      "americanOdds": 141,
-      "consensusLabel": "+141",
-      "consensusOdds": 141,
-      "bookProvider": "DraftKings",
-      "confidence": 92,
-      "signalTypes": [],
-      "signalLabels": [],
-      "status": "pending",
-      "units": 0,
-      "stakeUnits": 1,
-      "espnGameId": "401815733",
-      "recordedAt": "2026-06-12T12:44:04.802Z",
-      "mainScreenGameRec": true
-    },
-    {
-      "id": "2026-06-12:MLB:espn-401815725",
-      "date": "2026-06-12",
-      "gameKey": "MLB:espn-401815725",
-      "league": "MLB",
-      "awayTeam": "Seattle Mariners",
-      "homeTeam": "Washington Nationals",
-      "recommendedTeam": "WSH",
-      "recommendedBet": {
-        "betType": "moneyline",
-        "team": "WSH",
-        "rawText": "WSH",
-        "displayText": "WSH"
-      },
-      "betType": "moneyline",
-      "americanOdds": 123,
-      "consensusLabel": "+123",
-      "consensusOdds": 123,
-      "bookProvider": "DraftKings",
-      "confidence": 92,
-      "signalTypes": [
-        "sharp_money",
-        "mega_rlm"
-      ],
-      "signalLabels": [
-        "Sharp Money",
-        "Mega RLM (Fade)"
-      ],
-      "status": "pending",
-      "units": 0,
-      "stakeUnits": 1,
-      "espnGameId": "401815725",
-      "recordedAt": "2026-06-12T13:29:37.492Z",
-      "mainScreenGameRec": true
-    },
-    {
       "id": "2026-06-12:WORLDCUP:espn-760416",
       "date": "2026-06-12",
       "gameKey": "WORLDCUP:espn-760416",
@@ -197,6 +98,134 @@
       "espnGameId": "760417",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T14:59:04.953Z"
+    },
+    {
+      "id": "2026-06-12:MLB:espn-401815720",
+      "date": "2026-06-12",
+      "gameKey": "MLB:espn-401815720",
+      "league": "MLB",
+      "awayTeam": "Atlanta Braves",
+      "homeTeam": "New York Mets",
+      "recommendedTeam": "ATL",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "ATL",
+        "rawText": "ATL",
+        "displayText": "ATL"
+      },
+      "betType": "moneyline",
+      "americanOdds": 105,
+      "consensusLabel": "+105",
+      "consensusOdds": 105,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [
+        "book_needs_fade",
+        "square_fade"
+      ],
+      "signalLabels": [
+        "Book Needs (Fade)",
+        "Square Top (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815720",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-12T15:53:31.791Z"
+    },
+    {
+      "id": "2026-06-12:MLB:espn-401815724",
+      "date": "2026-06-12",
+      "gameKey": "MLB:espn-401815724",
+      "league": "MLB",
+      "awayTeam": "San Diego Padres",
+      "homeTeam": "Baltimore Orioles",
+      "recommendedTeam": "SD",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "SD",
+        "rawText": "SD",
+        "displayText": "SD"
+      },
+      "betType": "moneyline",
+      "americanOdds": 109,
+      "consensusLabel": "+109",
+      "consensusOdds": 109,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [
+        "book_needs_fade",
+        "square_fade"
+      ],
+      "signalLabels": [
+        "Book Needs (Fade)",
+        "Square Top (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815724",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-12T15:53:31.791Z"
+    },
+    {
+      "id": "2026-06-12:MLB:espn-401815730",
+      "date": "2026-06-12",
+      "gameKey": "MLB:espn-401815730",
+      "league": "MLB",
+      "awayTeam": "St. Louis Cardinals",
+      "homeTeam": "Minnesota Twins",
+      "recommendedTeam": "STL",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "STL",
+        "rawText": "STL",
+        "displayText": "STL"
+      },
+      "betType": "moneyline",
+      "americanOdds": 114,
+      "consensusLabel": "+114",
+      "consensusOdds": 114,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815730",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-12T15:53:31.791Z"
+    },
+    {
+      "id": "2026-06-12:MLB:espn-401815731",
+      "date": "2026-06-12",
+      "gameKey": "MLB:espn-401815731",
+      "league": "MLB",
+      "awayTeam": "Chicago Cubs",
+      "homeTeam": "San Francisco Giants",
+      "recommendedTeam": "CHC",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "CHC",
+        "rawText": "CHC",
+        "displayText": "CHC"
+      },
+      "betType": "moneyline",
+      "americanOdds": 100,
+      "consensusLabel": "+100",
+      "consensusOdds": 100,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815731",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-12T15:53:31.791Z"
     }
   ]
 }
