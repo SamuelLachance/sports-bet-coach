@@ -1,34 +1,4 @@
 {
   "version": 1,
-  "bets": [
-    {
-      "id": "2026-06-12:WORLDCUP:espn-760416",
-      "date": "2026-06-12",
-      "gameKey": "WORLDCUP:espn-760416",
-      "league": "WORLDCUP",
-      "awayTeam": "Bosnia-Herzegovina",
-      "homeTeam": "Canada",
-      "recommendedTeam": "BIH",
-      "recommendedBet": {
-        "betType": "moneyline",
-        "team": "BIH",
-        "rawText": "BIH",
-        "displayText": "BIH"
-      },
-      "betType": "moneyline",
-      "americanOdds": 380,
-      "consensusLabel": "+380",
-      "consensusOdds": 380,
-      "bookProvider": "DraftKings",
-      "confidence": 88,
-      "signalTypes": [],
-      "signalLabels": [],
-      "status": "pending",
-      "units": 0,
-      "stakeUnits": 1,
-      "espnGameId": "760416",
-      "recordedAt": "2026-06-12T13:45:46.993Z",
-      "mainScreenGameRec": true
-    }
-  ]
+  "bets": []
 }
