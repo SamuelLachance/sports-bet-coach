@@ -159,7 +159,7 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
   const side = pick?.side;
   const teamName = pick?.team_name;
   const edge = Number(pick?.edge ?? 0);
-  if (!side || !teamName || edge <= 0) return undefined;
+  if (!side || !teamName || edge < sportsOddsForceMinEdge()) return undefined;
 
   return {
     side,
