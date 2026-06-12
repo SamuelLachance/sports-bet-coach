@@ -25,6 +25,8 @@ import { resolveGameTeamDisplay } from "./calendar.js";
 export type SportsOddsAgreementStatus = "agrees" | "disagrees" | "unavailable";
 
 export interface SportsOddsModelPrediction {
+  algorithm?: string;
+  blendMode?: string;
   favoriteSide: "away" | "home";
   winProbability: number;
   awayProjection?: number;
@@ -35,6 +37,19 @@ export interface SportsOddsModelPrediction {
   drawProbability?: number;
   awayWinProbability?: number;
   drawProjection?: number;
+  legacy?: {
+    algorithm?: string;
+    totalScore?: number;
+    winProbability?: number;
+    favoriteSide?: "away" | "home";
+  };
+  power?: {
+    algorithm?: string;
+    homePower?: number;
+    awayPower?: number;
+    homeWinProbability?: number;
+    param?: number;
+  };
 }
 
 export interface SportsOddsTopPick {
@@ -97,6 +112,8 @@ interface RemoteSlateGame {
     home?: { name?: string; abbr?: string };
   };
   model?: {
+    algorithm?: string;
+    blend_mode?: string;
     favorite_side?: "away" | "home";
     win_probability?: number;
     away_projection?: number;
@@ -106,6 +123,19 @@ interface RemoteSlateGame {
     draw_probability?: number;
     away_win_probability?: number;
     draw_projection?: number;
+    legacy?: {
+      algorithm?: string;
+      total_score?: number;
+      win_probability?: number;
+      favorite_side?: "away" | "home";
+    };
+    power?: {
+      algorithm?: string;
+      home_power?: number;
+      away_power?: number;
+      home_win_probability?: number;
+      param?: number;
+    };
   };
   top_pick?: {
     side?: "away" | "home" | "draw";
@@ -277,6 +307,8 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
     awayTeam,
     homeTeam,
     model: {
+      algorithm: raw.model?.algorithm,
+      blendMode: raw.model?.blend_mode,
       favoriteSide,
       winProbability: Number(raw.model?.win_probability ?? 0),
       awayProjection: raw.model?.away_projection,
@@ -286,6 +318,23 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
       drawProbability: raw.model?.draw_probability,
       awayWinProbability: raw.model?.away_win_probability,
       drawProjection: raw.model?.draw_projection,
+      legacy: raw.model?.legacy
+        ? {
+            algorithm: raw.model.legacy.algorithm,
+            totalScore: raw.model.legacy.total_score,
+            winProbability: raw.model.legacy.win_probability,
+            favoriteSide: raw.model.legacy.favorite_side,
+          }
+        : undefined,
+      power: raw.model?.power
+        ? {
+            algorithm: raw.model.power.algorithm,
+            homePower: raw.model.power.home_power,
+            awayPower: raw.model.power.away_power,
+            homeWinProbability: raw.model.power.home_win_probability,
+            param: raw.model.power.param,
+          }
+        : undefined,
     },
     topPick: mapRemoteTopPick(raw),
     market: raw.market
@@ -625,7 +674,9 @@ export function sportsOddsTrendLabel(prediction: SportsOddsGamePrediction): stri
     prediction.model.favoriteSide === "home"
       ? prediction.homeTeam
       : prediction.awayTeam;
-  return `${favorite} (${prediction.model.winProbability.toFixed(1)}%)`;
+  const modelTag =
+    prediction.model.algorithm === "Unified" ? "Unified" : "Sports Odds";
+  return `${modelTag}: ${favorite} (${prediction.model.winProbability.toFixed(1)}%)`;
 }
 
 export function sportsOddsFavoriteTeamName(
