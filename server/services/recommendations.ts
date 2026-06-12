@@ -236,10 +236,10 @@ function applySportsOddsToGameRec(
   if (prediction && !sportsOddsModelLayersAgree(prediction)) {
     return blockGameRec(
       rec,
-      "Sports Odds model layers disagree — unanimous 3-layer agreement required",
+      "Sports Odds model layers disagree — all 3 layers must find value",
       "sportsOdds",
       "disagrees",
-      "Sports Odds: 3-layer models do not agree on the same side (no bet)"
+      "Sports Odds: all 3 layers must find value on the same side (no bet)"
     );
   }
 
@@ -359,7 +359,7 @@ function applySportsOddsToPickRec(
         breakdownItem(
           "sportsOdds",
           "Sports Odds",
-          "Sports Odds: 3-layer models do not agree on the same side (no bet)"
+          "Sports Odds: all 3 layers must find value on the same side (no bet)"
         ),
       ],
     });

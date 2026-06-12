@@ -21,7 +21,7 @@ import {
   resolveBetDisplay,
 } from "../parsers/pickBetParser.js";
 import type { CalendarGame, LeagueCode, ParsedBet } from "../types.js";
-import { oddsEdge } from "../utils/oddsEdge.js";
+import { oddsEdge, probabilityToAmerican } from "../utils/oddsEdge.js";
 import { resolveGameTeamDisplay } from "./calendar.js";
 
 export type SportsOddsAgreementStatus = "agrees" | "disagrees" | "unavailable";
@@ -35,6 +35,9 @@ export interface SportsOddsModelAgreement {
   powerSide?: SportsOddsLayerSide;
   thirdSide?: SportsOddsLayerSide;
   thirdSource?: string;
+  agreementMode?: "value";
+  valueSides?: SportsOddsLayerSide[];
+  valueOutcomes?: SportsOddsLayerSide[];
 }
 
 export interface SportsOddsModelPrediction {
@@ -249,6 +252,9 @@ interface RemoteSlateGame {
       power_side?: SportsOddsLayerSide;
       third_side?: SportsOddsLayerSide;
       third_source?: string;
+      agreement_mode?: "value";
+      value_sides?: SportsOddsLayerSide[];
+      value_outcomes?: SportsOddsLayerSide[];
     };
   };
   top_pick?: {
@@ -317,6 +323,22 @@ function coachLeagueFromRemote(league?: string): LeagueCode | null {
 
 const SPREAD_POINT_TO_EDGE = 20;
 
+const LEAGUE_MARGIN_SCALE: Record<string, number> = {
+  nba: 0.14,
+  wnba: 0.12,
+  cbb: 0.16,
+  nfl: 0.22,
+  cfb: 0.18,
+};
+
+const SOCCER_DRAW_BASE: Record<string, number> = {
+  default: 25.0,
+  epl: 24.0,
+  laliga: 26.5,
+  mls: 23.0,
+  worldcup: 25.0,
+};
+
 const THREE_LAYER_BASKETBALL_LEAGUES = ["NBA", "WNBA", "CBB"] as const;
 const THREE_LAYER_BASEBALL_LEAGUES = ["MLB"] as const;
 
@@ -324,19 +346,227 @@ function favoriteSideFromHomeWinProb(homeWinProb: number): SportsOddsLayerSide {
   return homeWinProb >= 50 ? "home" : "away";
 }
 
-function bestThreewayOutcome(
-  home: number,
-  draw: number,
-  away: number
-): SportsOddsLayerSide {
-  const outcomes: Array<[SportsOddsLayerSide, number]> = [
-    ["home", home],
-    ["draw", draw],
-    ["away", away],
-  ];
-  return outcomes.reduce((best, current) =>
-    current[1] > best[1] ? current : best
-  )[0];
+function homeWinProbToTotalScore(homeWinProb: number): number {
+  if (homeWinProb >= 50) return -homeWinProb;
+  return 100 - homeWinProb;
+}
+
+function layerBinaryTotalScore(layer?: {
+  totalScore?: number;
+  homeWinProbability?: number;
+  winProbability?: number;
+  favoriteSide?: "away" | "home";
+}): number | undefined {
+  if (layer?.totalScore != null) return Number(layer.totalScore);
+  if (layer?.homeWinProbability != null) {
+    return homeWinProbToTotalScore(Number(layer.homeWinProbability));
+  }
+  if (layer?.winProbability != null && layer.favoriteSide != null) {
+    const prob = Number(layer.winProbability);
+    return layer.favoriteSide === "home" ? -prob : prob;
+  }
+  return undefined;
+}
+
+function layerSideWinProbs(totalScore: number): { awayProb: number; homeProb: number } {
+  const winProb = Math.abs(totalScore);
+  const homeIsFavorite = totalScore <= 0;
+  const homeProb = homeIsFavorite ? winProb : 100 - winProb;
+  return { awayProb: 100 - homeProb, homeProb };
+}
+
+function modelMoneylines(totalScore: number): { awayProj: number; homeProj: number } {
+  const { awayProb, homeProb } = layerSideWinProbs(totalScore);
+  return {
+    awayProj: probabilityToAmerican(awayProb),
+    homeProj: probabilityToAmerican(homeProb),
+  };
+}
+
+function soccerThreewayProbs(
+  totalScore: number,
+  league: LeagueCode
+): { homeProb: number; drawProb: number; awayProb: number } {
+  const winProb = Math.abs(totalScore);
+  const homeIsFavorite = totalScore <= 0;
+  const homeBinary = homeIsFavorite ? winProb : 100 - winProb;
+  const awayBinary = 100 - homeBinary;
+  const baseDraw =
+    SOCCER_DRAW_BASE[league.toLowerCase()] ?? SOCCER_DRAW_BASE.default;
+  const closeness = 1 - Math.abs(winProb - 50) / 50;
+  const drawProb = Math.min(35, Math.max(18, baseDraw + closeness * 8));
+  const scale = (100 - drawProb) / 100;
+  return {
+    homeProb: homeBinary * scale,
+    drawProb,
+    awayProb: awayBinary * scale,
+  };
+}
+
+function soccerModelMoneylines(
+  homeProb: number,
+  drawProb: number,
+  awayProb: number
+): { awayProj: number; drawProj: number; homeProj: number } {
+  return {
+    awayProj: probabilityToAmerican(awayProb),
+    drawProj: probabilityToAmerican(drawProb),
+    homeProj: probabilityToAmerican(homeProb),
+  };
+}
+
+function modelHomeMargin(totalScore: number, league: LeagueCode): number {
+  const winProb = Math.abs(totalScore);
+  const scale = LEAGUE_MARGIN_SCALE[league.toLowerCase()] ?? 0.14;
+  const margin = (winProb - 50) * scale;
+  return totalScore < 0 ? margin : -margin;
+}
+
+function bestValueSideBinary(
+  totalScore: number,
+  awayMarket?: number,
+  homeMarket?: number
+): SportsOddsLayerSide | undefined {
+  const { awayProb, homeProb } = layerSideWinProbs(totalScore);
+  const { awayProj, homeProj } = modelMoneylines(totalScore);
+  const edges: Array<[SportsOddsLayerSide, number]> = [];
+  if (awayMarket != null) {
+    const edge = oddsEdge(awayProj, awayMarket, awayProb);
+    if (edge > 0) edges.push(["away", edge]);
+  }
+  if (homeMarket != null) {
+    const edge = oddsEdge(homeProj, homeMarket, homeProb);
+    if (edge > 0) edges.push(["home", edge]);
+  }
+  if (!edges.length) return undefined;
+  return edges.reduce((best, current) => (current[1] > best[1] ? current : best))[0];
+}
+
+function bestValueOutcomeThreeway(
+  homeProb: number,
+  drawProb: number,
+  awayProb: number,
+  awayMarket?: number,
+  drawMarket?: number,
+  homeMarket?: number
+): SportsOddsLayerSide | undefined {
+  const { awayProj, drawProj, homeProj } = soccerModelMoneylines(
+    homeProb,
+    drawProb,
+    awayProb
+  );
+  const edges: Array<[SportsOddsLayerSide, number]> = [];
+  if (awayMarket != null) {
+    const edge = oddsEdge(awayProj, awayMarket, awayProb);
+    if (edge > 0) edges.push(["away", edge]);
+  }
+  if (drawMarket != null) {
+    const edge = oddsEdge(drawProj, drawMarket, drawProb);
+    if (edge > 0) edges.push(["draw", edge]);
+  }
+  if (homeMarket != null) {
+    const edge = oddsEdge(homeProj, homeMarket, homeProb);
+    if (edge > 0) edges.push(["home", edge]);
+  }
+  if (!edges.length) return undefined;
+  return edges.reduce((best, current) => (current[1] > best[1] ? current : best))[0];
+}
+
+function layerHasValueOnSideBinary(
+  totalScore: number,
+  side: SportsOddsLayerSide,
+  awayMarket?: number,
+  homeMarket?: number
+): boolean {
+  const { awayProb, homeProb } = layerSideWinProbs(totalScore);
+  const { awayProj, homeProj } = modelMoneylines(totalScore);
+  if (side === "away") {
+    return awayMarket != null && oddsEdge(awayProj, awayMarket, awayProb) > 0;
+  }
+  return homeMarket != null && oddsEdge(homeProj, homeMarket, homeProb) > 0;
+}
+
+function layerHasValueOnOutcomeThreeway(
+  homeProb: number,
+  drawProb: number,
+  awayProb: number,
+  outcome: SportsOddsLayerSide,
+  awayMarket?: number,
+  drawMarket?: number,
+  homeMarket?: number
+): boolean {
+  const { awayProj, drawProj, homeProj } = soccerModelMoneylines(
+    homeProb,
+    drawProb,
+    awayProb
+  );
+  if (outcome === "away") {
+    return awayMarket != null && oddsEdge(awayProj, awayMarket, awayProb) > 0;
+  }
+  if (outcome === "draw") {
+    return drawMarket != null && oddsEdge(drawProj, drawMarket, drawProb) > 0;
+  }
+  return homeMarket != null && oddsEdge(homeProj, homeMarket, homeProb) > 0;
+}
+
+function layerHasSpreadValueOnSide(
+  totalScore: number,
+  league: LeagueCode,
+  side: SportsOddsLayerSide,
+  consensusSpread: number
+): boolean {
+  const margin = modelHomeMargin(totalScore, league);
+  return spreadPointEdge(margin, consensusSpread, side) > 0;
+}
+
+function bestValueSpreadSide(
+  totalScore: number,
+  league: LeagueCode,
+  consensusSpread: number
+): SportsOddsLayerSide | undefined {
+  const margin = modelHomeMargin(totalScore, league);
+  const edges: Array<[SportsOddsLayerSide, number]> = [];
+  for (const side of ["away", "home"] as const) {
+    const pointEdge = spreadPointEdge(margin, consensusSpread, side);
+    if (pointEdge > 0) edges.push([side, pointEdge]);
+  }
+  if (!edges.length) return undefined;
+  return edges.reduce((best, current) => (current[1] > best[1] ? current : best))[0];
+}
+
+function sportsOddsUsesSpreadBets(league: LeagueCode): boolean {
+  return SPORTS_ODDS_SPREAD_LEAGUES.includes(
+    league as (typeof SPORTS_ODDS_SPREAD_LEAGUES)[number]
+  );
+}
+
+function resolveModelAgreement(
+  prediction: SportsOddsGamePrediction
+): SportsOddsModelAgreement {
+  return (
+    prediction.model.modelAgreement ??
+    computeSportsOddsModelAgreement(
+      prediction.model,
+      prediction.league,
+      prediction.market
+    )
+  );
+}
+
+export function sportsOddsEffectiveMinEdge(
+  prediction: SportsOddsGamePrediction
+): number {
+  const agreement = resolveModelAgreement(prediction);
+  if (agreement.required === 3 && agreement.agreed) return 0;
+  return sportsOddsForceMinEdge();
+}
+
+function meetsSportsOddsEdgeThreshold(
+  edge: number,
+  prediction: SportsOddsGamePrediction
+): boolean {
+  const minEdge = sportsOddsEffectiveMinEdge(prediction);
+  return minEdge === 0 ? edge > 0 : edge >= minEdge;
 }
 
 export function sportsOddsRequiresThreeLayerAgreement(league: LeagueCode): boolean {
@@ -364,16 +594,73 @@ function thirdLayerFromModel(
 
 export function computeSportsOddsModelAgreement(
   model: SportsOddsModelPrediction,
-  league: LeagueCode
+  league: LeagueCode,
+  market?: SportsOddsMarketLines,
+  _topPickSide?: SportsOddsLayerSide
 ): SportsOddsModelAgreement {
   if (!sportsOddsRequiresThreeLayerAgreement(league)) {
-    return { required: 0, agreed: true };
+    return { required: 0, agreed: true, agreementMode: "value" };
   }
 
   const legacy = model.legacy;
   const power = model.power;
   const third = thirdLayerFromModel(model);
   const isSoccer = (SOCCER_SCHEDULE_LEAGUES as readonly string[]).includes(league);
+  const awayMarket = market?.awayMoneyline;
+  const homeMarket = market?.homeMoneyline;
+  const drawMarket = market?.drawMoneyline;
+  const consensusSpread = market?.spread;
+  const useSpread =
+    sportsOddsUsesSpreadBets(league) && consensusSpread != null;
+
+  const incompletePayload = (): SportsOddsModelAgreement => {
+    const legacyTotal = layerBinaryTotalScore(legacy);
+    const powerTotal = layerBinaryTotalScore(power);
+    const thirdTotal = layerBinaryTotalScore(third?.payload);
+    if (useSpread && consensusSpread != null) {
+      return {
+        required: 3,
+        agreed: false,
+        legacySide:
+          legacyTotal == null
+            ? undefined
+            : bestValueSpreadSide(legacyTotal, league, consensusSpread),
+        powerSide:
+          powerTotal == null
+            ? undefined
+            : bestValueSpreadSide(powerTotal, league, consensusSpread),
+        thirdSide:
+          thirdTotal == null
+            ? undefined
+            : bestValueSpreadSide(thirdTotal, league, consensusSpread),
+        thirdSource: third?.key,
+        agreementMode: "value",
+        valueSides: [],
+        valueOutcomes: [],
+      };
+    }
+    return {
+      required: 3,
+      agreed: false,
+      legacySide:
+        legacyTotal == null
+          ? undefined
+          : bestValueSideBinary(legacyTotal, awayMarket, homeMarket),
+      powerSide:
+        powerTotal == null
+          ? undefined
+          : bestValueSideBinary(powerTotal, awayMarket, homeMarket),
+      thirdSide:
+        thirdTotal == null
+          ? undefined
+          : bestValueSideBinary(thirdTotal, awayMarket, homeMarket),
+      thirdSource: third?.key,
+      agreementMode: "value",
+      valueSides: [],
+      valueOutcomes: [],
+    };
+  };
+
   const hasThreeLayers =
     model.blendLayers === 3 &&
     third != null &&
@@ -382,20 +669,7 @@ export function computeSportsOddsModelAgreement(
       : Boolean(legacy && power));
 
   if (!hasThreeLayers) {
-    return {
-      required: 3,
-      agreed: false,
-      legacySide: legacy?.favoriteSide,
-      powerSide:
-        power?.homeWinProbability == null
-          ? undefined
-          : favoriteSideFromHomeWinProb(power.homeWinProbability),
-      thirdSide:
-        third?.payload.homeWinProbability == null
-          ? undefined
-          : favoriteSideFromHomeWinProb(third.payload.homeWinProbability),
-      thirdSource: third?.key,
-    };
+    return incompletePayload();
   }
 
   if (isSoccer) {
@@ -403,58 +677,137 @@ export function computeSportsOddsModelAgreement(
     const powerTw = model.powerThreeway;
     const soccerPred = model.soccerPred;
     if (!legacyTw || !powerTw || !soccerPred) {
-      return {
-        required: 3,
-        agreed: false,
-        thirdSource: third.key,
-      };
+      return incompletePayload();
     }
-    const legacySide = bestThreewayOutcome(
-      legacyTw.homeWinProbability ?? 0,
-      legacyTw.drawProbability ?? 0,
-      legacyTw.awayWinProbability ?? 0
-    );
-    const powerSide = bestThreewayOutcome(
-      powerTw.homeWinProbability ?? 0,
-      powerTw.drawProbability ?? 0,
-      powerTw.awayWinProbability ?? 0
-    );
-    const thirdSide = bestThreewayOutcome(
-      soccerPred.homeWinProbability ?? 0,
-      soccerPred.drawProbability ?? 0,
-      soccerPred.awayWinProbability ?? 0
+    const legacyProbs = {
+      home: legacyTw.homeWinProbability ?? 0,
+      draw: legacyTw.drawProbability ?? 0,
+      away: legacyTw.awayWinProbability ?? 0,
+    };
+    const powerProbs = {
+      home: powerTw.homeWinProbability ?? 0,
+      draw: powerTw.drawProbability ?? 0,
+      away: powerTw.awayWinProbability ?? 0,
+    };
+    const thirdProbs = {
+      home: soccerPred.homeWinProbability ?? 0,
+      draw: soccerPred.drawProbability ?? 0,
+      away: soccerPred.awayWinProbability ?? 0,
+    };
+    const valueOutcomes = (["home", "draw", "away"] as const).filter(
+      (outcome) =>
+        layerHasValueOnOutcomeThreeway(
+          legacyProbs.home,
+          legacyProbs.draw,
+          legacyProbs.away,
+          outcome,
+          awayMarket,
+          drawMarket,
+          homeMarket
+        ) &&
+        layerHasValueOnOutcomeThreeway(
+          powerProbs.home,
+          powerProbs.draw,
+          powerProbs.away,
+          outcome,
+          awayMarket,
+          drawMarket,
+          homeMarket
+        ) &&
+        layerHasValueOnOutcomeThreeway(
+          thirdProbs.home,
+          thirdProbs.draw,
+          thirdProbs.away,
+          outcome,
+          awayMarket,
+          drawMarket,
+          homeMarket
+        )
     );
     return {
       required: 3,
-      agreed: legacySide === powerSide && powerSide === thirdSide,
-      legacySide,
-      powerSide,
-      thirdSide,
+      agreed: valueOutcomes.length > 0,
+      legacySide: bestValueOutcomeThreeway(
+        legacyProbs.home,
+        legacyProbs.draw,
+        legacyProbs.away,
+        awayMarket,
+        drawMarket,
+        homeMarket
+      ),
+      powerSide: bestValueOutcomeThreeway(
+        powerProbs.home,
+        powerProbs.draw,
+        powerProbs.away,
+        awayMarket,
+        drawMarket,
+        homeMarket
+      ),
+      thirdSide: bestValueOutcomeThreeway(
+        thirdProbs.home,
+        thirdProbs.draw,
+        thirdProbs.away,
+        awayMarket,
+        drawMarket,
+        homeMarket
+      ),
       thirdSource: third.key,
+      agreementMode: "value",
+      valueOutcomes,
+      valueSides: valueOutcomes,
     };
   }
 
-  const legacySide = legacy.favoriteSide;
-  const powerSide = favoriteSideFromHomeWinProb(power.homeWinProbability ?? 50);
-  const thirdSide = favoriteSideFromHomeWinProb(
-    third.payload.homeWinProbability ?? 50
+  const legacyTotal = layerBinaryTotalScore(legacy);
+  const powerTotal = layerBinaryTotalScore(power);
+  const thirdTotal = layerBinaryTotalScore(third.payload);
+  if (legacyTotal == null || powerTotal == null || thirdTotal == null) {
+    return incompletePayload();
+  }
+
+  if (useSpread && consensusSpread != null) {
+    const valueSides = (["away", "home"] as const).filter(
+      (side) =>
+        layerHasSpreadValueOnSide(legacyTotal, league, side, consensusSpread) &&
+        layerHasSpreadValueOnSide(powerTotal, league, side, consensusSpread) &&
+        layerHasSpreadValueOnSide(thirdTotal, league, side, consensusSpread)
+    );
+    return {
+      required: 3,
+      agreed: valueSides.length > 0,
+      legacySide: bestValueSpreadSide(legacyTotal, league, consensusSpread),
+      powerSide: bestValueSpreadSide(powerTotal, league, consensusSpread),
+      thirdSide: bestValueSpreadSide(thirdTotal, league, consensusSpread),
+      thirdSource: third.key,
+      agreementMode: "value",
+      valueSides,
+      valueOutcomes: valueSides,
+    };
+  }
+
+  const valueSides = (["away", "home"] as const).filter(
+    (side) =>
+      layerHasValueOnSideBinary(legacyTotal, side, awayMarket, homeMarket) &&
+      layerHasValueOnSideBinary(powerTotal, side, awayMarket, homeMarket) &&
+      layerHasValueOnSideBinary(thirdTotal, side, awayMarket, homeMarket)
   );
   return {
     required: 3,
-    agreed: legacySide === powerSide && powerSide === thirdSide,
-    legacySide,
-    powerSide,
-    thirdSide,
+    agreed: valueSides.length > 0,
+    legacySide: bestValueSideBinary(legacyTotal, awayMarket, homeMarket),
+    powerSide: bestValueSideBinary(powerTotal, awayMarket, homeMarket),
+    thirdSide: bestValueSideBinary(thirdTotal, awayMarket, homeMarket),
     thirdSource: third.key,
+    agreementMode: "value",
+    valueSides,
+    valueOutcomes: valueSides,
   };
 }
 
 export function sportsOddsModelLayersAgree(
   prediction: SportsOddsGamePrediction
 ): boolean {
-  const agreement =
-    prediction.model.modelAgreement ??
-    computeSportsOddsModelAgreement(prediction.model, prediction.league);
+  const agreement = resolveModelAgreement(prediction);
   if (agreement.required !== 3) return true;
   return agreement.agreed;
 }
@@ -575,6 +928,13 @@ function buildRemoteModelPayload(raw: RemoteSlateGame): SportsOddsModelPredictio
         powerSide: raw.model.model_agreement.power_side,
         thirdSide: raw.model.model_agreement.third_side,
         thirdSource: raw.model.model_agreement.third_source,
+        agreementMode: raw.model.model_agreement.agreement_mode,
+        valueSides:
+          raw.model.model_agreement.value_sides ??
+          raw.model.model_agreement.value_outcomes,
+        valueOutcomes:
+          raw.model.model_agreement.value_outcomes ??
+          raw.model.model_agreement.value_sides,
       }
     : undefined;
 
@@ -671,7 +1031,11 @@ function buildRemoteModelPayload(raw: RemoteSlateGame): SportsOddsModelPredictio
               winProbability: Number(raw.model?.win_probability ?? 0),
               blendLayers: raw.model?.blend_layers,
               legacy: raw.model?.legacy
-                ? { favoriteSide: raw.model.legacy.favorite_side }
+                ? {
+                    favoriteSide: raw.model.legacy.favorite_side,
+                    totalScore: raw.model.legacy.total_score,
+                    winProbability: raw.model.legacy.win_probability,
+                  }
                 : undefined,
               power: raw.model?.power
                 ? { homeWinProbability: raw.model.power.home_win_probability }
@@ -700,7 +1064,18 @@ function buildRemoteModelPayload(raw: RemoteSlateGame): SportsOddsModelPredictio
               legacyThreeway: raw.model?.legacy_threeway,
               powerThreeway: raw.model?.power_threeway,
             },
-            coachLeagueFromRemote(raw.league)!
+            coachLeagueFromRemote(raw.league)!,
+            raw.market
+              ? {
+                  awayMoneyline: raw.market.away_moneyline,
+                  homeMoneyline: raw.market.home_moneyline,
+                  drawMoneyline: raw.market.draw_moneyline,
+                  spread:
+                    raw.market.spread == null
+                      ? undefined
+                      : Number(raw.market.spread),
+                }
+              : undefined
           )
         : undefined),
   };
@@ -711,12 +1086,22 @@ function remoteModelLayersAgree(raw: RemoteSlateGame): boolean {
   if (!league) return true;
   const awayTeam = raw.matchup?.away?.name ?? "";
   const homeTeam = raw.matchup?.home?.name ?? "";
+  const market = raw.market
+    ? {
+        awayMoneyline: raw.market.away_moneyline,
+        homeMoneyline: raw.market.home_moneyline,
+        drawMoneyline: raw.market.draw_moneyline,
+        spread:
+          raw.market.spread == null ? undefined : Number(raw.market.spread),
+      }
+    : undefined;
   return sportsOddsModelLayersAgree({
     eventId: raw.event_id || "",
     league,
     awayTeam,
     homeTeam,
     model: buildRemoteModelPayload(raw),
+    market,
   });
 }
 
@@ -759,7 +1144,34 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
       outcomeWinProbability
     );
   }
-  if (edge < sportsOddsForceMinEdge()) return undefined;
+  const league = coachLeagueFromRemote(raw.league);
+  const remotePrediction: SportsOddsGamePrediction | undefined =
+    league != null
+      ? {
+          eventId: raw.event_id || "",
+          league,
+          awayTeam: raw.matchup?.away?.name ?? "",
+          homeTeam: raw.matchup?.home?.name ?? "",
+          model: buildRemoteModelPayload(raw),
+          market: raw.market
+            ? {
+                awayMoneyline: raw.market.away_moneyline,
+                homeMoneyline: raw.market.home_moneyline,
+                drawMoneyline: raw.market.draw_moneyline,
+                spread:
+                  raw.market.spread == null
+                    ? undefined
+                    : Number(raw.market.spread),
+              }
+            : undefined,
+        }
+      : undefined;
+  if (
+    remotePrediction &&
+    !meetsSportsOddsEdgeThreshold(edge, remotePrediction)
+  ) {
+    return undefined;
+  }
   if (!remoteModelLayersAgree(raw)) return undefined;
 
   return {
@@ -1274,7 +1686,7 @@ function revalidateGamePrediction(
     game
   );
 
-  if (edge < sportsOddsForceMinEdge() || !sportsOddsModelLayersAgree(game)) {
+  if (!meetsSportsOddsEdgeThreshold(edge, game) || !sportsOddsModelLayersAgree(game)) {
     return { ...game, topPick: undefined };
   }
 
@@ -1299,7 +1711,10 @@ export function isSportsOddsForcePick(
   if (!sportsOddsModelLayersAgree(prediction)) return false;
   const pick = prediction.topPick;
   if (!pick) return false;
-  return effectiveTopPickEdge(pick, prediction) >= sportsOddsForceMinEdge();
+  return meetsSportsOddsEdgeThreshold(
+    effectiveTopPickEdge(pick, prediction),
+    prediction
+  );
 }
 
 export function sportsOddsForceBreakdownDetail(

@@ -48,11 +48,17 @@ const spursPrediction: SportsOddsGamePrediction = {
     favoriteSide: "home",
     winProbability: 64.48,
     blendLayers: 3,
-    legacy: { favoriteSide: "home" },
+    legacy: { favoriteSide: "home", totalScore: -64.48 },
     power: { homeWinProbability: 64 },
     basketballPred: { homeWinProbability: 65 },
+    modelAgreement: {
+      required: 3,
+      agreed: true,
+      agreementMode: "value",
+      valueSides: ["home"],
+    },
   },
-  market: { spread: -5.5 },
+  market: { spread: -5.5, awayMoneyline: 110, homeMoneyline: -130 },
 };
 
 const spursMlBet: ParsedBet = {
@@ -157,10 +163,11 @@ const highEdgeTopPick = {
 const highValuePrediction: SportsOddsGamePrediction = {
   ...spursPrediction,
   model: {
+    ...spursPrediction.model,
     favoriteSide: "home",
     winProbability: 64.48,
     blendLayers: 3,
-    legacy: { favoriteSide: "home" },
+    legacy: { favoriteSide: "home", totalScore: -64.48 },
     power: { homeWinProbability: 64 },
     basketballPred: { homeWinProbability: 65 },
   },
@@ -397,9 +404,15 @@ const whiteSoxPrediction: SportsOddsGamePrediction = {
     favoriteSide: "home",
     winProbability: 55.18,
     blendLayers: 3,
-    legacy: { favoriteSide: "home" },
+    legacy: { favoriteSide: "home", totalScore: -55.18 },
     power: { homeWinProbability: 56 },
     baseballPred: { homeWinProbability: 55 },
+    modelAgreement: {
+      required: 3,
+      agreed: true,
+      agreementMode: "value",
+      valueSides: ["home"],
+    },
   },
   market: {
     provider: "DraftKings",
@@ -566,7 +579,7 @@ const gsStormPrediction: SportsOddsGamePrediction = {
     favoriteSide: "away",
     winProbability: 60.04,
     blendLayers: 3,
-    legacy: { favoriteSide: "away" },
+    legacy: { favoriteSide: "away", totalScore: 60.04 },
     power: { homeWinProbability: 40 },
     basketballPred: { homeWinProbability: 39 },
   },
@@ -833,31 +846,51 @@ const nhlForce50: SportsOddsGamePrediction = {
 assert.equal(isSportsOddsForcePick(nhlForcePrediction), false);
 assert.equal(isSportsOddsForcePick(nhlForce50), true);
 
+const nbaValueMarket = { awayMoneyline: 110, homeMoneyline: -130 };
+
 const threeLayerAgree = computeSportsOddsModelAgreement(
   {
     favoriteSide: "home",
     winProbability: 62,
     blendLayers: 3,
-    legacy: { favoriteSide: "home" },
+    legacy: { favoriteSide: "home", totalScore: -60 },
     power: { homeWinProbability: 64 },
     basketballPred: { homeWinProbability: 63 },
   },
-  "NBA"
+  "NBA",
+  nbaValueMarket
 );
 assert.equal(threeLayerAgree.required, 3);
 assert.equal(threeLayerAgree.agreed, true);
+assert.equal(threeLayerAgree.agreementMode, "value");
 assert.equal(threeLayerAgree.thirdSource, "basketball_pred");
+
+const threeLayerValueOnUnderdog = computeSportsOddsModelAgreement(
+  {
+    favoriteSide: "home",
+    winProbability: 62,
+    blendLayers: 3,
+    legacy: { favoriteSide: "home", totalScore: -60 },
+    power: { homeWinProbability: 42 },
+    basketballPred: { homeWinProbability: 64 },
+  },
+  "NBA",
+  { awayMoneyline: 220, homeMoneyline: -260 }
+);
+assert.equal(threeLayerValueOnUnderdog.agreed, true);
+assert.ok(threeLayerValueOnUnderdog.valueSides?.includes("away"));
 
 const threeLayerDisagree = computeSportsOddsModelAgreement(
   {
     favoriteSide: "home",
     winProbability: 62,
     blendLayers: 3,
-    legacy: { favoriteSide: "home" },
+    legacy: { favoriteSide: "home", totalScore: -60 },
     power: { homeWinProbability: 42 },
     basketballPred: { homeWinProbability: 63 },
   },
-  "NBA"
+  "NBA",
+  { awayMoneyline: 70, homeMoneyline: -110 }
 );
 assert.equal(threeLayerDisagree.agreed, false);
 
@@ -882,10 +915,11 @@ const soccerThreeLayerAgree = computeSportsOddsModelAgreement(
       awayWinProbability: 23,
     },
   },
-  "EPL"
+  "EPL",
+  { awayMoneyline: 280, drawMoneyline: 320, homeMoneyline: 180 }
 );
 assert.equal(soccerThreeLayerAgree.agreed, true);
-assert.equal(soccerThreeLayerAgree.legacySide, "home");
+assert.ok(soccerThreeLayerAgree.valueOutcomes?.includes("home"));
 
 const soccerThreeLayerDisagree = computeSportsOddsModelAgreement(
   {
@@ -908,19 +942,45 @@ const soccerThreeLayerDisagree = computeSportsOddsModelAgreement(
       awayWinProbability: 25,
     },
   },
-  "EPL"
+  "EPL",
+  { awayMoneyline: 120, drawMoneyline: 200, homeMoneyline: 250 }
 );
 assert.equal(soccerThreeLayerDisagree.agreed, false);
-assert.equal(soccerThreeLayerDisagree.thirdSide, "draw");
+
+const valueAgreedLowEdgePrediction: SportsOddsGamePrediction = {
+  ...highValuePrediction,
+  model: {
+    ...highValuePrediction.model,
+    modelAgreement: {
+      required: 3,
+      agreed: true,
+      agreementMode: "value",
+      valueSides: ["home"],
+    },
+  },
+  topPick: {
+    ...highEdgeTopPick,
+    edge: 10,
+    modelMargin: 6,
+    consensusSpread: -5.5,
+  },
+};
+assert.equal(isSportsOddsForcePick(valueAgreedLowEdgePrediction), true);
 
 const disagreeForcePrediction: SportsOddsGamePrediction = {
   ...highValuePrediction,
   model: {
     ...highValuePrediction.model,
     blendLayers: 3,
-    legacy: { favoriteSide: "home" },
+    legacy: { favoriteSide: "home", totalScore: -60 },
     power: { homeWinProbability: 42 },
     basketballPred: { homeWinProbability: 64 },
+    modelAgreement: {
+      required: 3,
+      agreed: false,
+      agreementMode: "value",
+      valueSides: [],
+    },
   },
 };
 assert.equal(sportsOddsModelLayersAgree(disagreeForcePrediction), false);
