@@ -84,7 +84,7 @@ For **MLB, NBA, NHL, NFL, WNBA, CBB, and CFB**, a bet is only recommended when *
 1. **Coach algo** ? sharp-sheet rules engine consolidates signals on the same game
 2. **Sports Odds algo** ? [Sports-Odds-Algorithms](https://github.com/SamuelLachance/Sports-Odds-Algorithms) Algo V2 live model (ESPN schedules + win probability)
 
-If the odds model favors a different side, the game becomes **No bet**. Totals are blocked on these leagues because the odds model is moneyline-focused. Soccer and other unsupported coach leagues still use the coach algo only on the bet-coach app.
+If the odds model favors a different side, the game becomes **No bet**. Totals are blocked on these leagues because the odds model is moneyline-focused. Soccer leagues are not in the dual-algo gate (`SPORTS_ODDS_SUPPORTED_LEAGUES`), but the Sports Odds API consumer accepts 3-way soccer `top_pick` payloads (`side: "draw"`) for future integration.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|

@@ -28,10 +28,16 @@ export interface SportsOddsModelPrediction {
   winProbability: number;
   awayProjection?: number;
   homeProjection?: number;
+  /** Soccer 3-way model probabilities when present on the slate. */
+  threeway?: boolean;
+  homeWinProbability?: number;
+  drawProbability?: number;
+  awayWinProbability?: number;
+  drawProjection?: number;
 }
 
 export interface SportsOddsTopPick {
-  side: "away" | "home";
+  side: "away" | "home" | "draw";
   teamName: string;
   edge: number;
   marketOdds: number;
@@ -50,6 +56,7 @@ export interface SportsOddsMarketLines {
   spread?: number;
   awayMoneyline?: number;
   homeMoneyline?: number;
+  drawMoneyline?: number;
   overUnder?: number;
 }
 
@@ -92,9 +99,14 @@ interface RemoteSlateGame {
     win_probability?: number;
     away_projection?: number;
     home_projection?: number;
+    threeway?: boolean;
+    home_win_probability?: number;
+    draw_probability?: number;
+    away_win_probability?: number;
+    draw_projection?: number;
   };
   top_pick?: {
-    side?: "away" | "home";
+    side?: "away" | "home" | "draw";
     team_name?: string;
     edge?: number;
     market_odds?: number;
@@ -113,6 +125,7 @@ interface RemoteSlateGame {
     spread?: number;
     away_moneyline?: number;
     home_moneyline?: number;
+    draw_moneyline?: number;
     over_under?: number;
   };
 }
@@ -171,6 +184,7 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
   const teamName = pick?.team_name;
   const edge = Number(pick?.edge ?? 0);
   if (!side || !teamName || edge < sportsOddsForceMinEdge()) return undefined;
+  if (side !== "away" && side !== "home" && side !== "draw") return undefined;
 
   const betType = pick?.bet_type;
   const spreadLine =
@@ -218,6 +232,11 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
       winProbability: Number(raw.model?.win_probability ?? 0),
       awayProjection: raw.model?.away_projection,
       homeProjection: raw.model?.home_projection,
+      threeway: raw.model?.threeway,
+      homeWinProbability: raw.model?.home_win_probability,
+      drawProbability: raw.model?.draw_probability,
+      awayWinProbability: raw.model?.away_win_probability,
+      drawProjection: raw.model?.draw_projection,
     },
     topPick: mapRemoteTopPick(raw),
     market: raw.market
@@ -227,6 +246,7 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
             raw.market.spread == null ? undefined : Number(raw.market.spread),
           awayMoneyline: raw.market.away_moneyline,
           homeMoneyline: raw.market.home_moneyline,
+          drawMoneyline: raw.market.draw_moneyline,
           overUnder:
             raw.market.over_under == null
               ? undefined
@@ -253,7 +273,11 @@ export function sportsOddsConsensusForBet(
 
   const provider = market.provider?.trim() || "Consensus";
   const moneyline =
-    side === "home" ? market.homeMoneyline : market.awayMoneyline;
+    side === "home"
+      ? market.homeMoneyline
+      : side === "away"
+        ? market.awayMoneyline
+        : market.drawMoneyline;
 
   if (bet.betType === "spread") {
     const homeSpread =
@@ -365,10 +389,19 @@ function buildSportsOddsMoneylineBet(
 }
 
 function buildSportsOddsSideBet(
-  side: "away" | "home",
+  side: "away" | "home" | "draw",
   game: CalendarGame,
   prediction: SportsOddsGamePrediction
 ): ParsedBet {
+  if (side === "draw") {
+    return {
+      betType: "moneyline",
+      team: "Draw",
+      rawText: "Draw",
+      displayText: "Draw",
+    };
+  }
+
   const pick = prediction.topPick;
   if (pick?.betType === "spread" && pick.consensusSpread != null) {
     return buildSportsOddsSpreadBet(
@@ -425,13 +458,20 @@ export function canonicalEventKeyForGame(game: CalendarGame): string {
 export function teamSideForBet(
   ourBet: ParsedBet,
   game: CalendarGame
-): "away" | "home" | null {
+): "away" | "home" | "draw" | null {
   if (ourBet.betType === "total") return null;
 
   const candidates = new Set<string>();
   if (ourBet.team) candidates.add(ourBet.team);
   if (ourBet.displayText) candidates.add(ourBet.displayText);
   if (ourBet.rawText) candidates.add(ourBet.rawText);
+
+  for (const text of candidates) {
+    const normalized = normalizeKeyTeam(text);
+    if (normalized === "draw" || normalized === "tie") {
+      return "draw";
+    }
+  }
 
   for (const text of candidates) {
     const parsed = parsePickBet(text);
@@ -457,6 +497,12 @@ export function sportsOddsAgreesWithBet(
   if (!ourBet || !game || !prediction) return false;
   const side = teamSideForBet(ourBet, game);
   if (!side) return false;
+  if (side === "draw") {
+    return prediction.topPick?.side === "draw";
+  }
+  if (prediction.topPick?.side === "draw") {
+    return false;
+  }
   return side === prediction.model.favoriteSide;
 }
 

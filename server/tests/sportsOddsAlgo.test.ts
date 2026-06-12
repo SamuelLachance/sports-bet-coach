@@ -442,4 +442,50 @@ const spreadConsensus = sportsOddsConsensusForBet(
 assert.equal(spreadConsensus?.spread, -5.5);
 assert.equal(spreadConsensus?.label, "-5.5 (-108)");
 
+const drawBet: ParsedBet = {
+  betType: "moneyline",
+  team: "Draw",
+  rawText: "Draw",
+  displayText: "Draw",
+};
+
+const soccerDrawPrediction: SportsOddsGamePrediction = {
+  eventId: "760416",
+  league: "NBA",
+  awayTeam: "Brazil",
+  homeTeam: "Spain",
+  model: {
+    favoriteSide: "home",
+    winProbability: 58,
+    threeway: true,
+    homeWinProbability: 42,
+    drawProbability: 28,
+    awayWinProbability: 30,
+    drawProjection: 250,
+  },
+  market: {
+    drawMoneyline: 280,
+  },
+  topPick: {
+    side: "draw",
+    teamName: "Draw",
+    edge: 55,
+    marketOdds: 280,
+    modelProjection: 250,
+    betType: "moneyline",
+  },
+};
+
+assert.equal(teamSideForBet(drawBet, KNICKS_GAME), "draw");
+assert.equal(
+  sportsOddsAgreesWithBet(drawBet, KNICKS_GAME, soccerDrawPrediction),
+  true
+);
+assert.equal(
+  sportsOddsAgreesWithBet(spursMlBet, KNICKS_GAME, soccerDrawPrediction),
+  false
+);
+const drawValueBet = sportsOddsValueBet(soccerDrawPrediction, KNICKS_GAME);
+assert.equal(drawValueBet.displayText, "Draw");
+
 console.log("sportsOddsAlgo.test.ts: all tests passed");
