@@ -16,6 +16,7 @@
     "test:recommendation-rules": "tsx server/tests/recommendationRules.test.ts",
     "test:pick-parser": "tsx server/tests/pickBetParser.test.ts",
     "test:tracking": "tsx server/tests/tracking.test.ts",
+    "test:path-stub": "tsx server/tests/pathStub.test.ts",
     "test:dratings": "tsx server/tests/dratingsTrends.test.ts",
     "start": "tsx server/index.ts"
   },
