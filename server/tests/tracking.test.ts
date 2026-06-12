@@ -9,6 +9,7 @@ import {
   recordRecommendations,
   refreshSettledUnits,
   resolveAmericanOdds,
+  resolveGradingLeague,
   resolveGradingSpread,
   type TrackedBet,
   type TrackingStore,
@@ -153,6 +154,29 @@ function spreadBetFromParsed(
   );
   const merged = mergeStores(dayOne, dayTwo);
   assert.equal(merged.bets.length, 2);
+}
+
+// resolveGradingLeague maps sheet-only leagues via gameKey prefix
+{
+  const modelBet: TrackedBet = {
+    id: "model-wnba",
+    date: "2026-06-11",
+    gameKey: "WNBA:espn-401856980",
+    league: "MODEL",
+    awayTeam: "Chicago Sky",
+    homeTeam: "Indiana Fever",
+    recommendedTeam: "Indiana Fever -9.5",
+    confidence: 75,
+    signalTypes: ["model_best_values"],
+    signalLabels: ["Model Best Values (Fade)"],
+    status: "pending",
+    units: 0,
+    stakeUnits: 1,
+    espnGameId: "401856980",
+    recordedAt: new Date().toISOString(),
+  };
+  assert.equal(resolveGradingLeague(modelBet), "WNBA");
+  assert.equal(resolveGradingLeague({ ...modelBet, league: "MLB", gameKey: "MLB:espn-1" }), "MLB");
 }
 
 // Record actionable recommendations

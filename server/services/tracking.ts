@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { endOfWeek, parseISO, startOfWeek } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
-import { CACHE_DIR, TIMEZONE, TRACKING_STORE_FILE } from "../config.js";
+import { CACHE_DIR, ESPN_LEAGUES, TIMEZONE, TRACKING_STORE_FILE } from "../config.js";
 import type {
   BetType,
   GameConsolidatedRecommendation,
@@ -214,6 +214,33 @@ function betKey(date: string, gameKey: string): string {
   return `${date}:${gameKey}`;
 }
 
+/** ESPN sport league used to fetch scores (MODEL/WHALE picks use gameKey prefix or matched game). */
+export function resolveGradingLeague(bet: TrackedBet): LeagueCode | undefined {
+  if (ESPN_LEAGUES[bet.league]) return bet.league;
+  const prefix = bet.gameKey.split(":")[0];
+  if (ESPN_LEAGUES[prefix]) return prefix as LeagueCode;
+  return undefined;
+}
+
+function gradingLeaguesForBets(bets: TrackedBet[]): LeagueCode[] {
+  const leagues = new Set<LeagueCode>();
+  for (const bet of bets) {
+    const league = resolveGradingLeague(bet);
+    if (league) leagues.add(league);
+  }
+  return [...leagues];
+}
+
+function trackingLeagueForRec(rec: GameConsolidatedRecommendation): LeagueCode {
+  if (ESPN_LEAGUES[rec.league]) return rec.league;
+  if (rec.matchedGame?.league && ESPN_LEAGUES[rec.matchedGame.league]) {
+    return rec.matchedGame.league;
+  }
+  const prefix = rec.gameKey.split(":")[0];
+  if (ESPN_LEAGUES[prefix]) return prefix as LeagueCode;
+  return rec.league;
+}
+
 function isActionable(rec: GameConsolidatedRecommendation): boolean {
   return !rec.noBet && Boolean(rec.recommendedTeam?.trim());
 }
@@ -271,7 +298,7 @@ export function recordRecommendations(
       id: key,
       date,
       gameKey: rec.gameKey,
-      league: rec.league,
+      league: trackingLeagueForRec(rec),
       awayTeam: rec.awayTeam,
       homeTeam: rec.homeTeam,
       recommendedTeam: rec.recommendedTeam,
@@ -309,9 +336,10 @@ function findMatchingResult(bet: TrackedBet, results: GameResult[]): GameResult 
     const byId = results.find((g) => g.id === bet.espnGameId);
     if (byId) return byId;
   }
+  const gradingLeague = resolveGradingLeague(bet);
   return results.find(
     (g) =>
-      g.league === bet.league &&
+      (!gradingLeague || g.league === gradingLeague) &&
       ((pickTeamInGame(bet.homeTeam, g) && pickTeamInGame(bet.awayTeam, g)) ||
         (g.homeTeam === bet.homeTeam && g.awayTeam === bet.awayTeam))
   );
@@ -449,7 +477,7 @@ export async function gradePendingBets(store: TrackingStore): Promise<TrackingSt
   }
 
   for (const [date, bets] of byDate) {
-    const leagues = [...new Set(bets.map((b) => b.league))] as LeagueCode[];
+    const leagues = gradingLeaguesForBets(bets);
     const dateKey = displayDateToEspnKey(date);
     const results = await fetchResultsForDate(leagues, dateKey);
 
@@ -494,7 +522,7 @@ export async function regradeSettledBets(store: TrackingStore): Promise<Tracking
   }
 
   for (const [date, bets] of byDate) {
-    const leagues = [...new Set(bets.map((b) => b.league))] as LeagueCode[];
+    const leagues = gradingLeaguesForBets(bets);
     const results = await fetchResultsForDate(leagues, displayDateToEspnKey(date));
 
     for (const bet of bets) {

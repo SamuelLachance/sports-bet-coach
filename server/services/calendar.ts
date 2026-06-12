@@ -183,6 +183,10 @@ const TEAM_ALIASES: Record<string, string[]> = {
   "chicago white sox": ["white sox", "white", "cws", "chw"],
   "kansas city royals": ["royals", "kc"],
   "philadelphia phillies": ["phillies", "philadelphia", "phi"],
+  "golden state valkyries": ["valkyries", "golden state", "gsv", "gs"],
+  "los angeles angels": ["angels", "laa", "la angels"],
+  "athletics": ["oakland athletics", "oak", "ath"],
+  "tampa bay rays": ["rays", "tb", "tampa bay"],
 };
 
 /** City/region tokens — too broad to match teams on their own */
