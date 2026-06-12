@@ -1470,8 +1470,15 @@ function sportsOddsAgreementSide(
   prediction: SportsOddsGamePrediction,
   game: CalendarGame
 ): "away" | "home" | "draw" {
-  if (prediction.topPick?.side === "draw") {
-    return "draw";
+  const pickSide = prediction.topPick?.side;
+  if (pickSide === "away" || pickSide === "home" || pickSide === "draw") {
+    return pickSide;
+  }
+  const agreement = resolveModelAgreement(prediction);
+  const valueSide =
+    agreement.valueSides?.[0] ?? agreement.valueOutcomes?.[0];
+  if (agreement.agreed && valueSide) {
+    return valueSide;
   }
   if (sportsOddsUsesSpread(game.league) && prediction.topPick?.side) {
     return prediction.topPick.side;
@@ -1536,14 +1543,40 @@ export function sportsOddsBreakdownDetail(
     return "Sports Odds: prediction unavailable — dual algo requires agreement (no bet)";
   }
 
+  const agreement = prediction ? resolveModelAgreement(prediction) : undefined;
+  const valueSide =
+    prediction && game
+      ? sportsOddsAgreementSide(prediction, game)
+      : prediction?.model.favoriteSide;
+  const valueTeam =
+    valueSide === "home"
+      ? prediction?.homeTeam
+      : valueSide === "away"
+        ? prediction?.awayTeam
+        : valueSide === "draw"
+          ? "Draw"
+          : undefined;
   const favorite =
     prediction?.model.favoriteSide === "home"
       ? prediction.homeTeam
       : prediction?.awayTeam;
   const probability = prediction?.model.winProbability?.toFixed(1) ?? "?";
+  const pickEdge = prediction?.topPick
+    ? effectiveTopPickEdge(prediction.topPick, prediction)
+    : undefined;
 
   if (status === "agrees") {
+    if (agreement?.required === 3 && agreement.agreed && valueTeam) {
+      const edgeNote =
+        pickEdge != null && pickEdge > 0
+          ? ` (+${pickEdge.toFixed(0)} edge)`
+          : "";
+      return `Sports Odds: agrees — all 3 layers find value on ${valueTeam}${edgeNote}`;
+    }
     return `Sports Odds: agrees — favors ${favorite} (${probability}% win chance)`;
+  }
+  if (agreement?.required === 3 && valueTeam && valueTeam !== favorite) {
+    return `Sports Odds: disagrees — model value is on ${valueTeam}, not your pick`;
   }
   return `Sports Odds: disagrees — model favors ${favorite} (${probability}% win chance)`;
 }
@@ -1720,15 +1753,20 @@ export function isSportsOddsForcePick(
 export function sportsOddsForceBreakdownDetail(
   prediction: SportsOddsGamePrediction
 ): string {
-  const threshold = sportsOddsForceMinEdge();
+  const threshold = sportsOddsEffectiveMinEdge(prediction);
+  const agreement = resolveModelAgreement(prediction);
   const pick = prediction.topPick;
   if (!pick) {
     return `Sports Odds: force pick unavailable — no book edge data`;
   }
   const edge = effectiveTopPickEdge(pick, prediction);
+  const thresholdNote =
+    threshold === 0 && agreement.required === 3 && agreement.agreed
+      ? "3-layer value agreement"
+      : `+${threshold} edge threshold`;
 
   if (pick.betType === "spread") {
-    return `Sports Odds: force pick — ${pick.teamName} +${edge.toFixed(0)} spread edge (${spreadPickLabel(pick)}) exceeds +${threshold} threshold`;
+    return `Sports Odds: force pick — ${pick.teamName} +${edge.toFixed(0)} spread edge (${spreadPickLabel(pick)}) via ${thresholdNote}`;
   }
 
   const odds =
@@ -1737,7 +1775,7 @@ export function sportsOddsForceBreakdownDetail(
     pick.modelProjection > 0
       ? `+${pick.modelProjection}`
       : `${pick.modelProjection}`;
-  return `Sports Odds: force pick — ${pick.teamName} +${edge.toFixed(0)} edge (book ${odds} vs model ${model}) exceeds +${threshold} threshold`;
+  return `Sports Odds: force pick — ${pick.teamName} +${edge.toFixed(0)} edge (book ${odds} vs model ${model}) via ${thresholdNote}`;
 }
 
 export async function fetchSportsOddsSlate(

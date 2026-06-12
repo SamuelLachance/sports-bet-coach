@@ -874,6 +874,63 @@ const threeLayerValueOnUnderdog = computeSportsOddsModelAgreement(
 assert.equal(threeLayerValueOnUnderdog.agreed, true);
 assert.ok(threeLayerValueOnUnderdog.valueSides?.includes("away"));
 
+const underdogValuePrediction: SportsOddsGamePrediction = {
+  ...spursPrediction,
+  model: {
+    ...spursPrediction.model,
+    favoriteSide: "home",
+    modelAgreement: {
+      required: 3,
+      agreed: true,
+      agreementMode: "value",
+      valueSides: ["away"],
+    },
+  },
+  topPick: {
+    side: "away",
+    teamName: "New York Knicks",
+    edge: 18,
+    marketOdds: 220,
+    modelProjection: 185,
+    outcomeWinProbability: 38,
+    betType: "moneyline",
+  },
+};
+assert.equal(
+  sportsOddsAgreesWithBet(knicksMlBet, KNICKS_GAME, underdogValuePrediction),
+  true
+);
+assert.equal(
+  sportsOddsAgreesWithBet(spursMlBet, KNICKS_GAME, underdogValuePrediction),
+  false
+);
+assert.equal(
+  sportsOddsStatusForBet(knicksMlBet, KNICKS_GAME, underdogValuePrediction),
+  "agrees"
+);
+
+const underdogValueConfirmed = applySportsOddsFilter(
+  {
+    recommendations: [],
+    gameRecommendations: [
+      {
+        ...baseGameRec,
+        recommendedTeam: "Knicks ML",
+        recommendedBet: knicksMlBet,
+      },
+    ],
+  },
+  [underdogValuePrediction],
+  [KNICKS_GAME]
+).gameRecommendations[0];
+assert.equal(underdogValueConfirmed.noBet, undefined);
+assert.equal(underdogValueConfirmed.sportsOddsConfirmed, true);
+assert.ok(
+  underdogValueConfirmed.confidenceBreakdown.some((b) =>
+    b.detail.includes("all 3 layers find value")
+  )
+);
+
 const threeLayerDisagree = computeSportsOddsModelAgreement(
   {
     favoriteSide: "home",
