@@ -31,7 +31,7 @@
       "betType": "moneyline",
       "odds": 145,
       "americanOdds": 145,
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.122Z",
       "finalScore": "St. Louis Cardinals 4 – New York Mets 5"
     },
     {
@@ -62,7 +62,7 @@
         "displayText": "Miami Marlins -105"
       },
       "betType": "moneyline",
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.122Z",
       "finalScore": "Arizona Diamondbacks 0 – Miami Marlins 2",
       "odds": -105,
       "americanOdds": -105
@@ -103,7 +103,7 @@
       "consensusOdds": -110,
       "bookProvider": "DraftKings",
       "consensusSpread": 6.5,
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.122Z",
       "finalScore": "Phoenix Mercury 70 – Dallas Wings 85"
     },
     {
@@ -144,7 +144,7 @@
       "consensusOdds": -110,
       "bookProvider": "DraftKings",
       "consensusSpread": -10.5,
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.122Z",
       "finalScore": "Las Vegas Aces 105 – Portland Fire 89"
     },
     {
@@ -179,7 +179,7 @@
       "spread": -9.5,
       "odds": -110,
       "americanOdds": -110,
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.123Z",
       "finalScore": "Chicago Sky 106 – Indiana Fever 114"
     },
     {
@@ -212,7 +212,7 @@
       "betType": "moneyline",
       "odds": 115,
       "americanOdds": 115,
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.123Z",
       "finalScore": "Texas Rangers 4 – Kansas City Royals 2"
     },
     {
@@ -247,7 +247,7 @@
       "espnGameId": "401815718",
       "recordedAt": "2026-06-11T18:54:06.774Z",
       "americanOdds": -110,
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.123Z",
       "finalScore": "Chicago Cubs 9 – Colorado Rockies 3"
     },
     {
@@ -284,7 +284,7 @@
       "recordedAt": "2026-06-11T18:54:06.774Z",
       "odds": -110,
       "americanOdds": -110,
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.123Z",
       "finalScore": "Chicago Sky 106 – Indiana Fever 114"
     },
     {
@@ -321,7 +321,7 @@
       "recordedAt": "2026-06-11T18:54:06.774Z",
       "odds": -110,
       "americanOdds": -110,
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.123Z",
       "finalScore": "New York Liberty 104 – Atlanta Dream 90"
     },
     {
@@ -395,7 +395,7 @@
       "stakeUnits": 1,
       "espnGameId": "401815712",
       "recordedAt": "2026-06-11T21:27:07.801Z",
-      "gradedAt": "2026-06-12T13:37:05.689Z",
+      "gradedAt": "2026-06-12T13:45:47.123Z",
       "finalScore": "Los Angeles Dodgers 8 – Pittsburgh Pirates 6"
     },
     {
@@ -588,6 +588,34 @@
       "stakeUnits": 1,
       "espnGameId": "401815725",
       "recordedAt": "2026-06-12T13:29:37.492Z"
+    },
+    {
+      "id": "2026-06-12:WORLDCUP:espn-760416",
+      "date": "2026-06-12",
+      "gameKey": "WORLDCUP:espn-760416",
+      "league": "WORLDCUP",
+      "awayTeam": "Bosnia-Herzegovina",
+      "homeTeam": "Canada",
+      "recommendedTeam": "BIH",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "BIH",
+        "rawText": "BIH",
+        "displayText": "BIH"
+      },
+      "betType": "moneyline",
+      "americanOdds": 380,
+      "consensusLabel": "+380",
+      "consensusOdds": 380,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "760416",
+      "recordedAt": "2026-06-12T13:45:46.993Z"
     }
   ]
 }
