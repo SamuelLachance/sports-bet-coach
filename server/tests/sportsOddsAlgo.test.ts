@@ -672,7 +672,7 @@ assert.equal(
   true
 );
 
-// Padres away favorite — ML edge passes force threshold without sign inversion
+// Padres away favorite — cross-sign ML edge is ~+26, not raw +230; below force threshold
 const padresPrediction: SportsOddsGamePrediction = {
   eventId: "401815712",
   league: "MLB",
@@ -688,15 +688,16 @@ const padresPrediction: SportsOddsGamePrediction = {
   topPick: {
     side: "away",
     teamName: "San Diego Padres",
-    edge: 230,
+    edge: 26.5,
     marketOdds: 109,
     modelProjection: -121,
     betType: "moneyline",
   },
 };
 
-assert.equal(isSportsOddsForcePick(padresPrediction), true);
-assert.equal(padresPrediction.topPick?.edge, 230);
+assert.equal(isSportsOddsForcePick(padresPrediction), false);
+assert.ok((padresPrediction.topPick?.edge ?? 0) < 100);
+assert.ok((padresPrediction.topPick?.edge ?? 0) > 20);
 assert.ok((padresPrediction.topPick?.modelProjection ?? 0) < 0);
 assert.ok((padresPrediction.topPick?.marketOdds ?? 0) > 0);
 
