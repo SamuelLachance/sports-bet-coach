@@ -407,12 +407,6 @@ const whiteSoxPrediction: SportsOddsGamePrediction = {
     legacy: { favoriteSide: "home", totalScore: -55.18 },
     power: { homeWinProbability: 56 },
     baseballPred: { homeWinProbability: 55 },
-    modelAgreement: {
-      required: 3,
-      agreed: true,
-      agreementMode: "value",
-      valueSides: ["home"],
-    },
   },
   market: {
     provider: "DraftKings",
