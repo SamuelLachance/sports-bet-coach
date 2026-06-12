@@ -86,7 +86,11 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
           )}
           {game.sportsOddsConfirmed && !game.dualAlgoConfirmed && !game.sportsOddsForced && (
             <span className="badge bg-accent/20 text-accent-glow" title={game.sportsOddsTrendLabel}>
-              {game.sportsOddsTrendLabel?.includes("Unified") ? "Unified algo ✓" : "Odds algo ✓"}
+              {game.sportsOddsTrendLabel?.includes("Unified 3-layer")
+                ? "Unified 3-layer ✓"
+                : game.sportsOddsTrendLabel?.includes("Unified")
+                  ? "Unified algo ✓"
+                  : "Odds algo ✓"}
             </span>
           )}
           {game.dratingsConfirmed && (

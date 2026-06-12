@@ -27,6 +27,7 @@ export type SportsOddsAgreementStatus = "agrees" | "disagrees" | "unavailable";
 export interface SportsOddsModelPrediction {
   algorithm?: string;
   blendMode?: string;
+  blendLayers?: number;
   favoriteSide: "away" | "home";
   winProbability: number;
   awayProjection?: number;
@@ -48,6 +49,15 @@ export interface SportsOddsModelPrediction {
     homePower?: number;
     awayPower?: number;
     homeWinProbability?: number;
+    param?: number;
+  };
+  basketballPred?: {
+    algorithm?: string;
+    source?: string;
+    homeWinProbability?: number;
+    predictedHomeScore?: number;
+    predictedAwayScore?: number;
+    predictedMargin?: number;
     param?: number;
   };
 }
@@ -114,6 +124,7 @@ interface RemoteSlateGame {
   model?: {
     algorithm?: string;
     blend_mode?: string;
+    blend_layers?: number;
     favorite_side?: "away" | "home";
     win_probability?: number;
     away_projection?: number;
@@ -134,6 +145,15 @@ interface RemoteSlateGame {
       home_power?: number;
       away_power?: number;
       home_win_probability?: number;
+      param?: number;
+    };
+    basketball_pred?: {
+      algorithm?: string;
+      source?: string;
+      home_win_probability?: number;
+      predicted_home_score?: number;
+      predicted_away_score?: number;
+      predicted_margin?: number;
       param?: number;
     };
   };
@@ -309,6 +329,7 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
     model: {
       algorithm: raw.model?.algorithm,
       blendMode: raw.model?.blend_mode,
+      blendLayers: raw.model?.blend_layers,
       favoriteSide,
       winProbability: Number(raw.model?.win_probability ?? 0),
       awayProjection: raw.model?.away_projection,
@@ -333,6 +354,17 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
             awayPower: raw.model.power.away_power,
             homeWinProbability: raw.model.power.home_win_probability,
             param: raw.model.power.param,
+          }
+        : undefined,
+      basketballPred: raw.model?.basketball_pred
+        ? {
+            algorithm: raw.model.basketball_pred.algorithm,
+            source: raw.model.basketball_pred.source,
+            homeWinProbability: raw.model.basketball_pred.home_win_probability,
+            predictedHomeScore: raw.model.basketball_pred.predicted_home_score,
+            predictedAwayScore: raw.model.basketball_pred.predicted_away_score,
+            predictedMargin: raw.model.basketball_pred.predicted_margin,
+            param: raw.model.basketball_pred.param,
           }
         : undefined,
     },
@@ -674,8 +706,13 @@ export function sportsOddsTrendLabel(prediction: SportsOddsGamePrediction): stri
     prediction.model.favoriteSide === "home"
       ? prediction.homeTeam
       : prediction.awayTeam;
+  const layers = prediction.model.blendLayers;
   const modelTag =
-    prediction.model.algorithm === "Unified" ? "Unified" : "Sports Odds";
+    prediction.model.algorithm === "Unified"
+      ? layers === 3
+        ? "Unified 3-layer"
+        : "Unified"
+      : "Sports Odds";
   return `${modelTag}: ${favorite} (${prediction.model.winProbability.toFixed(1)}%)`;
 }
 
