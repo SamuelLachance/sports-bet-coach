@@ -13,7 +13,7 @@ interface TrackingViewProps {
 }
 
 export function TrackingView({ tracking }: TrackingViewProps) {
-  const [viewMode, setViewMode] = useState<CalendarViewMode>("month");
+  const [viewMode, setViewMode] = useState<CalendarViewMode>("week");
   const [anchorDate, setAnchorDate] = useState(() => {
     const today = new Date();
     const y = today.getFullYear();
