@@ -36,6 +36,11 @@ export interface SportsOddsTopPick {
   edge: number;
   marketOdds: number;
   modelProjection: number;
+  betType?: "spread" | "moneyline" | "total";
+  spreadLine?: number;
+  spreadOdds?: number;
+  consensusSpread?: number;
+  consensusLabel?: string;
   strategy?: string;
   reason?: string;
 }
@@ -94,6 +99,12 @@ interface RemoteSlateGame {
     edge?: number;
     market_odds?: number;
     model_projection?: number;
+    bet_type?: "spread" | "moneyline" | "total";
+    spread_line?: number;
+    spread_odds?: number;
+    consensus_spread?: number;
+    consensus_odds?: number;
+    consensus_label?: string;
     strategy?: string;
     reason?: string;
   };
@@ -161,12 +172,30 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
   const edge = Number(pick?.edge ?? 0);
   if (!side || !teamName || edge < sportsOddsForceMinEdge()) return undefined;
 
+  const betType = pick?.bet_type;
+  const spreadLine =
+    pick?.spread_line == null ? undefined : Number(pick.spread_line);
+  const spreadOdds =
+    pick?.spread_odds == null
+      ? pick?.consensus_odds == null
+        ? undefined
+        : Number(pick.consensus_odds)
+      : Number(pick.spread_odds);
+
   return {
     side,
     teamName,
     edge,
-    marketOdds: Number(pick?.market_odds ?? 0),
+    marketOdds: Number(pick?.market_odds ?? spreadOdds ?? 0),
     modelProjection: Number(pick?.model_projection ?? 0),
+    betType,
+    spreadLine,
+    spreadOdds,
+    consensusSpread:
+      pick?.consensus_spread == null
+        ? undefined
+        : Number(pick.consensus_spread),
+    consensusLabel: pick?.consensus_label,
     strategy: pick?.strategy,
     reason: pick?.reason,
   };
@@ -226,14 +255,28 @@ export function sportsOddsConsensusForBet(
   const moneyline =
     side === "home" ? market.homeMoneyline : market.awayMoneyline;
 
-  if (bet.betType === "spread" && market.spread != null) {
-    const line = sportsOddsSpreadLineForSide(market.spread, side);
-    const juice = bet.odds ?? DEFAULT_JUICE;
+  if (bet.betType === "spread") {
+    const homeSpread =
+      prediction.topPick?.consensusSpread ?? market.spread ?? undefined;
+    if (homeSpread == null) return undefined;
+
+    const line =
+      bet.spread != null && Number.isFinite(bet.spread)
+        ? bet.spread
+        : sportsOddsSpreadLineForSide(homeSpread, side);
+    const juice =
+      bet.odds ??
+      prediction.topPick?.spreadOdds ??
+      prediction.topPick?.marketOdds ??
+      DEFAULT_JUICE;
+    const label =
+      prediction.topPick?.consensusLabel ??
+      `${formatAmericanOdds(line)} (${formatAmericanOdds(juice)})`;
     return {
       provider,
       moneyline,
       spread: line,
-      label: `${formatAmericanOdds(line)} (${formatAmericanOdds(juice)})`,
+      label,
     };
   }
 
@@ -281,18 +324,24 @@ export function sportsOddsSpreadLineForSide(
 export function buildSportsOddsSpreadBet(
   side: "away" | "home",
   game: CalendarGame,
-  homeSpread: number
+  homeSpread: number,
+  spreadOdds?: number,
+  spreadLine?: number
 ): ParsedBet {
   const team =
     side === "home"
       ? game.homeAbbr || game.homeTeam
       : game.awayAbbr || game.awayTeam;
-  const spread = sportsOddsSpreadLineForSide(homeSpread, side);
+  const spread =
+    spreadLine != null && Number.isFinite(spreadLine)
+      ? spreadLine
+      : sportsOddsSpreadLineForSide(homeSpread, side);
   const bet: ParsedBet = {
     betType: "spread",
     team,
     rawText: `${team} ${spread}`,
     spread,
+    odds: spreadOdds,
     displayText: "",
   };
   bet.displayText = resolveBetDisplay(bet);
@@ -320,6 +369,17 @@ function buildSportsOddsSideBet(
   game: CalendarGame,
   prediction: SportsOddsGamePrediction
 ): ParsedBet {
+  const pick = prediction.topPick;
+  if (pick?.betType === "spread" && pick.consensusSpread != null) {
+    return buildSportsOddsSpreadBet(
+      side,
+      game,
+      pick.consensusSpread,
+      pick.spreadOdds,
+      pick.spreadLine
+    );
+  }
+
   const homeSpread = prediction.market?.spread;
   if (
     sportsOddsUsesSpread(prediction.league) &&
@@ -494,11 +554,18 @@ export function sportsOddsPreferredBetForCoach(
   if (coachBet.betType === "total") return coachBet;
 
   const side = teamSideForBet(coachBet, game);
-  const homeSpread = prediction.market?.spread;
+  const pick = prediction.topPick;
+  const homeSpread = pick?.consensusSpread ?? prediction.market?.spread;
   if (side == null || homeSpread == null || !Number.isFinite(homeSpread)) {
     return coachBet;
   }
-  return buildSportsOddsSpreadBet(side, game, homeSpread);
+  return buildSportsOddsSpreadBet(
+    side,
+    game,
+    homeSpread,
+    pick?.spreadOdds,
+    pick?.spreadLine
+  );
 }
 
 export function sportsOddsValueTrendLabel(

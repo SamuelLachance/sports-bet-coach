@@ -14,6 +14,7 @@ import {
   sportsOddsAgreesWithBet,
   sportsOddsConsensusForBet,
   sportsOddsStatusForBet,
+  sportsOddsValueBet,
   teamSideForBet,
   type SportsOddsGamePrediction,
 } from "../services/sportsOddsAlgo.js";
@@ -411,5 +412,34 @@ const whiteSoxAgreed = applySportsOddsFilter(
 
 assert.equal(whiteSoxAgreed.consensusLabel, "+103");
 assert.equal(whiteSoxAgreed.bookProvider, "DraftKings");
+
+const spreadTopPickPrediction: SportsOddsGamePrediction = {
+  ...spursPrediction,
+  topPick: {
+    side: "home",
+    teamName: "San Antonio Spurs",
+    edge: 62,
+    marketOdds: -108,
+    modelProjection: 6.3,
+    betType: "spread",
+    spreadLine: -5.5,
+    spreadOdds: -108,
+    consensusSpread: -5.5,
+    consensusLabel: "-5.5 (-108)",
+  },
+};
+
+const spreadValueBet = sportsOddsValueBet(spreadTopPickPrediction, KNICKS_GAME);
+assert.equal(spreadValueBet.betType, "spread");
+assert.equal(spreadValueBet.spread, -5.5);
+assert.equal(spreadValueBet.odds, -108);
+
+const spreadConsensus = sportsOddsConsensusForBet(
+  spreadValueBet,
+  KNICKS_GAME,
+  spreadTopPickPrediction
+);
+assert.equal(spreadConsensus?.spread, -5.5);
+assert.equal(spreadConsensus?.label, "-5.5 (-108)");
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");

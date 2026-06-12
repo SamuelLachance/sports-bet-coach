@@ -92,7 +92,7 @@ If the odds model favors a different side, the game becomes **No bet**. Totals a
 | `SPORTS_ODDS_BASE_URL` | GitHub Pages URL | Live FastAPI (`http://127.0.0.1:8000`) or static slate JSON |
 | `SPORTS_ODDS_FORCE_MIN_EDGE` | `50` | Force-recommend when book edge (American odds pts) exceeds threshold (overrides coach) |
 
-NBA, WNBA, CBB, NFL, and CFB recommendations use the **book spread** instead of moneyline when Sports Odds confirms or forces a pick.
+NBA, WNBA, CBB, NFL, and CFB recommendations use the **consensus book spread** from Sports Odds (`spread_line`, `consensus_spread`, `spread_odds` on `top_pick`) instead of moneyline when Sports Odds confirms or forces a pick.
 
 Confirmed picks show a **Dual algo** badge in the UI.
 
