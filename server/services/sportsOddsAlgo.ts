@@ -8,6 +8,7 @@ import path from "node:path";
 import {
   CACHE_DIR,
   SPORTS_ODDS_BASE_URL,
+  SPORTS_ODDS_LEAGUE_TO_COACH,
   SPORTS_ODDS_SPREAD_LEAGUES,
   SPORTS_ODDS_SUPPORTED_LEAGUES,
   isSportsOddsEnabled,
@@ -157,21 +158,11 @@ export function buildSportsOddsGameKey(
   return `${league}:${[away, home].sort().join("|")}`;
 }
 
-const REMOTE_LEAGUE_TO_COACH: Record<string, LeagueCode> = {
-  mlb: "MLB",
-  nba: "NBA",
-  nhl: "NHL",
-  nfl: "NFL",
-  wnba: "WNBA",
-  cbb: "CBB",
-  cfb: "CFB",
-};
-
 function coachLeagueFromRemote(league?: string): LeagueCode | null {
   if (!league) return null;
   const key = league.toLowerCase();
-  if (REMOTE_LEAGUE_TO_COACH[key]) {
-    return REMOTE_LEAGUE_TO_COACH[key];
+  if (SPORTS_ODDS_LEAGUE_TO_COACH[key]) {
+    return SPORTS_ODDS_LEAGUE_TO_COACH[key];
   }
   const upper = league.toUpperCase();
   if (SPORTS_ODDS_SUPPORTED_LEAGUES.includes(upper as (typeof SPORTS_ODDS_SUPPORTED_LEAGUES)[number])) {

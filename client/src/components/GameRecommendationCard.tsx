@@ -120,7 +120,9 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
               ? `${game.recommendedBet?.totalDirection ?? ""} ${game.recommendedBet?.totalLine ?? ""}`.trim()
               : game.betType === "spread" && game.recommendedBet?.spread != null
                 ? `Spread ${game.recommendedBet.spread > 0 ? "+" : ""}${game.recommendedBet.spread}`
-                : game.betType}
+                : game.recommendedBet?.team === "Draw"
+                  ? "Draw (3-way)"
+                  : game.betType}
           </div>
         )}
         {game.consensusLabel && (

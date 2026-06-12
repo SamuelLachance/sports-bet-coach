@@ -133,7 +133,7 @@ assert.equal(disagreed.dualAlgoConfirmed, false);
 const highEdgeTopPick = {
   side: "home" as const,
   teamName: "San Antonio Spurs",
-  edge: 55,
+  edge: 120,
   marketOdds: -170,
   modelProjection: -195,
 };
@@ -470,7 +470,7 @@ const soccerDrawPrediction: SportsOddsGamePrediction = {
   topPick: {
     side: "draw",
     teamName: "Draw",
-    edge: 55,
+    edge: 120,
     marketOdds: 280,
     modelProjection: 250,
     betType: "moneyline",

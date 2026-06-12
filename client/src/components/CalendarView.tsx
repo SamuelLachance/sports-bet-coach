@@ -12,6 +12,21 @@ const LEAGUE_COLORS: Record<string, string> = {
   NFL: "border-green-500/50",
   WNBA: "border-purple-500/50",
   CBB: "border-amber-500/50",
+  CFB: "border-teal-500/50",
+  MLS: "border-emerald-500/50",
+  EPL: "border-emerald-500/50",
+  LALIGA: "border-emerald-500/50",
+  BUNDESLIGA: "border-emerald-500/50",
+  SERIEA: "border-emerald-500/50",
+  LIGUE1: "border-emerald-500/50",
+  WORLDCUP: "border-emerald-500/50",
+  FIFA_FRIENDLIES: "border-emerald-500/50",
+  CONCACAF_WCQ: "border-emerald-500/50",
+  CONCACAF_GOLD: "border-emerald-500/50",
+  CONCACAF_NATIONS: "border-emerald-500/50",
+  UEFA_EURO: "border-emerald-500/50",
+  UEFA_NATIONS: "border-emerald-500/50",
+  COPA_AMERICA: "border-emerald-500/50",
 };
 
 export function CalendarView({ games, date }: CalendarViewProps) {

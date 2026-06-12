@@ -106,7 +106,64 @@ export const SPORTS_ODDS_SUPPORTED_LEAGUES = [
   "WNBA",
   "CBB",
   "CFB",
+  "MLS",
+  "EPL",
+  "LALIGA",
+  "BUNDESLIGA",
+  "SERIEA",
+  "LIGUE1",
+  "WORLDCUP",
+  "FIFA_FRIENDLIES",
+  "CONCACAF_WCQ",
+  "CONCACAF_GOLD",
+  "CONCACAF_NATIONS",
+  "UEFA_EURO",
+  "UEFA_NATIONS",
+  "COPA_AMERICA",
 ] as const;
+
+/** Always fetch ESPN schedules for soccer (algo-driven, not sheet-driven). */
+export const SOCCER_SCHEDULE_LEAGUES = [
+  "MLS",
+  "EPL",
+  "LALIGA",
+  "BUNDESLIGA",
+  "SERIEA",
+  "LIGUE1",
+  "WORLDCUP",
+  "FIFA_FRIENDLIES",
+  "CONCACAF_WCQ",
+  "CONCACAF_GOLD",
+  "CONCACAF_NATIONS",
+  "UEFA_EURO",
+  "UEFA_NATIONS",
+  "COPA_AMERICA",
+] as const;
+
+/** Sports Odds API league id → Sharp Sheet league code. */
+export const SPORTS_ODDS_LEAGUE_TO_COACH: Record<string, import("./types.js").LeagueCode> = {
+  mlb: "MLB",
+  nba: "NBA",
+  nhl: "NHL",
+  nfl: "NFL",
+  wnba: "WNBA",
+  cbb: "CBB",
+  cfb: "CFB",
+  mls: "MLS",
+  epl: "EPL",
+  laliga: "LALIGA",
+  bundesliga: "BUNDESLIGA",
+  seriea: "SERIEA",
+  ligue1: "LIGUE1",
+  worldcup: "WORLDCUP",
+  fifa_friendlies: "FIFA_FRIENDLIES",
+  concacaf_wcq: "CONCACAF_WCQ",
+  concacaf_gold: "CONCACAF_GOLD",
+  concacaf_nations: "CONCACAF_NATIONS",
+  uefa_euro: "UEFA_EURO",
+  uefa_nations: "UEFA_NATIONS",
+  copa_america: "COPA_AMERICA",
+};
 
 /** Basketball and American football — recommend spread instead of moneyline. */
 export const SPORTS_ODDS_SPREAD_LEAGUES = [
@@ -124,14 +181,14 @@ export function isSportsOddsEnabled(): boolean {
   return !/^false|0|no$/i.test(v);
 }
 
-/** Min American-odds edge vs book to force-recommend when coach disagrees. Default: 50. */
+/** Min American-odds edge vs book to force-recommend when coach disagrees. Default: 100. */
 export function sportsOddsForceMinEdge(): number {
   const raw =
     process.env.SPORTS_ODDS_FORCE_MIN_EDGE ??
     process.env.SPORTS_ODDS_FORCE_MIN_WIN_PROB;
-  if (raw == null || raw === "") return 50;
+  if (raw == null || raw === "") return 100;
   const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
 }
 
 export const ESPN_LEAGUES: Record<
@@ -149,4 +206,26 @@ export const ESPN_LEAGUES: Record<
     label: "College basketball",
   },
   CFB: { sport: "football", league: "college-football", label: "College football" },
+  MLS: { sport: "soccer", league: "usa.1", label: "MLS" },
+  EPL: { sport: "soccer", league: "eng.1", label: "Premier League" },
+  LALIGA: { sport: "soccer", league: "esp.1", label: "La Liga" },
+  BUNDESLIGA: { sport: "soccer", league: "ger.1", label: "Bundesliga" },
+  SERIEA: { sport: "soccer", league: "ita.1", label: "Serie A" },
+  LIGUE1: { sport: "soccer", league: "fra.1", label: "Ligue 1" },
+  WORLDCUP: { sport: "soccer", league: "fifa.world", label: "FIFA World Cup" },
+  FIFA_FRIENDLIES: { sport: "soccer", league: "fifa.friendly", label: "FIFA Friendlies" },
+  CONCACAF_WCQ: {
+    sport: "soccer",
+    league: "fifa.worldq.concacaf",
+    label: "CONCACAF WCQ",
+  },
+  CONCACAF_GOLD: { sport: "soccer", league: "concacaf.gold", label: "CONCACAF Gold Cup" },
+  CONCACAF_NATIONS: {
+    sport: "soccer",
+    league: "concacaf.nations.league",
+    label: "CONCACAF Nations League",
+  },
+  UEFA_EURO: { sport: "soccer", league: "uefa.euro", label: "UEFA Euro" },
+  UEFA_NATIONS: { sport: "soccer", league: "uefa.nations", label: "UEFA Nations League" },
+  COPA_AMERICA: { sport: "soccer", league: "conmebol.america", label: "Copa América" },
 };

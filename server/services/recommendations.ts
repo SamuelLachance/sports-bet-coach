@@ -6,7 +6,11 @@ import type {
   MatchedRecommendation,
   ParsedSheets,
 } from "../types.js";
-import { isDratingsEnabled, isSportsOddsEnabled } from "../config.js";
+import {
+  isDratingsEnabled,
+  isSportsOddsEnabled,
+  SOCCER_SCHEDULE_LEAGUES,
+} from "../config.js";
 import { runBetRulesEngine, RULE_CONFIDENCE } from "./betRulesEngine.js";
 import {
   dratingsBreakdownDetail,
@@ -793,6 +797,9 @@ export function getActiveLeagues(sheets: ParsedSheets): LeagueCode[] {
   const leagues = new Set<LeagueCode>();
   for (const pick of sheets.dailyPicks) {
     if (pick.league !== "UNKNOWN") leagues.add(pick.league);
+  }
+  for (const soccer of SOCCER_SCHEDULE_LEAGUES) {
+    leagues.add(soccer);
   }
   return [...leagues];
 }
