@@ -181,14 +181,14 @@ export function isSportsOddsEnabled(): boolean {
   return !/^false|0|no$/i.test(v);
 }
 
-/** Min American-odds edge vs book to force-recommend when coach disagrees. Default: 100. */
+/** Min American-odds edge vs book to force-recommend when coach disagrees. Default: 50. */
 export function sportsOddsForceMinEdge(): number {
   const raw =
     process.env.SPORTS_ODDS_FORCE_MIN_EDGE ??
     process.env.SPORTS_ODDS_FORCE_MIN_WIN_PROB;
-  if (raw == null || raw === "") return 100;
+  if (raw == null || raw === "") return 50;
   const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
 }
 
 export const ESPN_LEAGUES: Record<

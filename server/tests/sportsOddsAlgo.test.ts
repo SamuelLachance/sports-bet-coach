@@ -9,18 +9,21 @@ import {
 } from "../services/recommendations.js";
 import {
   buildSportsOddsGameKey,
+  computeSportsOddsModelAgreement,
   effectiveTopPickEdge,
   isSportsOddsForcePick,
   mapRemoteSlateGame,
   matchPredictionToCalendarGame,
   sportsOddsAgreesWithBet,
   sportsOddsConsensusForBet,
+  sportsOddsModelLayersAgree,
   sportsOddsStatusForBet,
   sportsOddsValueBet,
   sportsOddsValueTrendLabel,
   teamSideForBet,
   type SportsOddsGamePrediction,
 } from "../services/sportsOddsAlgo.js";
+import { sportsOddsForceMinEdge } from "../config.js";
 import { oddsEdge } from "../utils/oddsEdge.js";
 import { pickBelongsToGame, resolveGameTeamDisplay } from "../services/calendar.js";
 import type { CalendarGame, GameConsolidatedRecommendation, ParsedBet } from "../types.js";
@@ -44,6 +47,10 @@ const spursPrediction: SportsOddsGamePrediction = {
   model: {
     favoriteSide: "home",
     winProbability: 64.48,
+    blendLayers: 3,
+    legacy: { favoriteSide: "home" },
+    power: { homeWinProbability: 64 },
+    basketballPred: { homeWinProbability: 65 },
   },
   market: { spread: -5.5 },
 };
@@ -152,6 +159,10 @@ const highValuePrediction: SportsOddsGamePrediction = {
   model: {
     favoriteSide: "home",
     winProbability: 64.48,
+    blendLayers: 3,
+    legacy: { favoriteSide: "home" },
+    power: { homeWinProbability: 64 },
+    basketballPred: { homeWinProbability: 65 },
   },
   topPick: highEdgeTopPick,
 };
@@ -382,7 +393,14 @@ const whiteSoxPrediction: SportsOddsGamePrediction = {
   league: "MLB",
   awayTeam: "Atlanta Braves",
   homeTeam: "Chicago White Sox",
-  model: { favoriteSide: "home", winProbability: 55.18 },
+  model: {
+    favoriteSide: "home",
+    winProbability: 55.18,
+    blendLayers: 3,
+    legacy: { favoriteSide: "home" },
+    power: { homeWinProbability: 56 },
+    baseballPred: { homeWinProbability: 55 },
+  },
   market: {
     provider: "DraftKings",
     spread: 1.5,
@@ -544,7 +562,14 @@ const gsStormPrediction: SportsOddsGamePrediction = {
   league: "WNBA",
   awayTeam: "Golden State Valkyries",
   homeTeam: "Seattle Storm",
-  model: { favoriteSide: "away", winProbability: 60.04 },
+  model: {
+    favoriteSide: "away",
+    winProbability: 60.04,
+    blendLayers: 3,
+    legacy: { favoriteSide: "away" },
+    power: { homeWinProbability: 40 },
+    basketballPred: { homeWinProbability: 39 },
+  },
   market: { spread: 9.5 },
   topPick: {
     side: "home",
@@ -739,7 +764,8 @@ const padresTrend = sportsOddsValueTrendLabel(padresStaleApiPrediction);
 assert.ok(padresTrend.includes("+2") || padresTrend.includes("+3"));
 assert.ok(!padresTrend.includes("+230"));
 
-assert.ok((padresPrediction.topPick?.edge ?? 0) < 100);
+assert.equal(sportsOddsForceMinEdge(), 50);
+assert.ok((padresPrediction.topPick?.edge ?? 0) < 50);
 assert.ok((padresPrediction.topPick?.edge ?? 0) > 20);
 assert.ok((padresPrediction.topPick?.modelProjection ?? 0) < 0);
 assert.ok((padresPrediction.topPick?.marketOdds ?? 0) > 0);
@@ -770,5 +796,151 @@ const padresStaleRemoteSlate = {
 
 const padresFromStaleSlate = mapRemoteSlateGame(padresStaleRemoteSlate);
 assert.equal(padresFromStaleSlate?.topPick, undefined);
+
+const nhlForcePrediction: SportsOddsGamePrediction = {
+  eventId: "401999001",
+  league: "NHL",
+  awayTeam: "Boston Bruins",
+  homeTeam: "Toronto Maple Leafs",
+  model: {
+    favoriteSide: "home",
+    winProbability: 58,
+  },
+  market: { spread: -5.5 },
+  topPick: {
+    side: "home",
+    teamName: "Toronto Maple Leafs",
+    edge: 49,
+    marketOdds: -110,
+    modelProjection: 5,
+    betType: "spread",
+    spreadLine: -5.5,
+    spreadOdds: -110,
+    consensusSpread: -5.5,
+    modelMargin: 7.95,
+  },
+};
+
+const nhlForce50: SportsOddsGamePrediction = {
+  ...nhlForcePrediction,
+  topPick: {
+    ...nhlForcePrediction.topPick!,
+    edge: 50,
+    modelMargin: 8.0,
+  },
+};
+
+assert.equal(isSportsOddsForcePick(nhlForcePrediction), false);
+assert.equal(isSportsOddsForcePick(nhlForce50), true);
+
+const threeLayerAgree = computeSportsOddsModelAgreement(
+  {
+    favoriteSide: "home",
+    winProbability: 62,
+    blendLayers: 3,
+    legacy: { favoriteSide: "home" },
+    power: { homeWinProbability: 64 },
+    basketballPred: { homeWinProbability: 63 },
+  },
+  "NBA"
+);
+assert.equal(threeLayerAgree.required, 3);
+assert.equal(threeLayerAgree.agreed, true);
+assert.equal(threeLayerAgree.thirdSource, "basketball_pred");
+
+const threeLayerDisagree = computeSportsOddsModelAgreement(
+  {
+    favoriteSide: "home",
+    winProbability: 62,
+    blendLayers: 3,
+    legacy: { favoriteSide: "home" },
+    power: { homeWinProbability: 42 },
+    basketballPred: { homeWinProbability: 63 },
+  },
+  "NBA"
+);
+assert.equal(threeLayerDisagree.agreed, false);
+
+const soccerThreeLayerAgree = computeSportsOddsModelAgreement(
+  {
+    favoriteSide: "home",
+    winProbability: 52,
+    blendLayers: 3,
+    legacyThreeway: {
+      homeWinProbability: 52,
+      drawProbability: 24,
+      awayWinProbability: 24,
+    },
+    powerThreeway: {
+      homeWinProbability: 50,
+      drawProbability: 26,
+      awayWinProbability: 24,
+    },
+    soccerPred: {
+      homeWinProbability: 55,
+      drawProbability: 22,
+      awayWinProbability: 23,
+    },
+  },
+  "EPL"
+);
+assert.equal(soccerThreeLayerAgree.agreed, true);
+assert.equal(soccerThreeLayerAgree.legacySide, "home");
+
+const soccerThreeLayerDisagree = computeSportsOddsModelAgreement(
+  {
+    favoriteSide: "home",
+    winProbability: 52,
+    blendLayers: 3,
+    legacyThreeway: {
+      homeWinProbability: 52,
+      drawProbability: 24,
+      awayWinProbability: 24,
+    },
+    powerThreeway: {
+      homeWinProbability: 50,
+      drawProbability: 26,
+      awayWinProbability: 24,
+    },
+    soccerPred: {
+      homeWinProbability: 20,
+      drawProbability: 55,
+      awayWinProbability: 25,
+    },
+  },
+  "EPL"
+);
+assert.equal(soccerThreeLayerDisagree.agreed, false);
+assert.equal(soccerThreeLayerDisagree.thirdSide, "draw");
+
+const disagreeForcePrediction: SportsOddsGamePrediction = {
+  ...highValuePrediction,
+  model: {
+    ...highValuePrediction.model,
+    blendLayers: 3,
+    legacy: { favoriteSide: "home" },
+    power: { homeWinProbability: 42 },
+    basketballPred: { homeWinProbability: 64 },
+  },
+};
+assert.equal(sportsOddsModelLayersAgree(disagreeForcePrediction), false);
+assert.equal(isSportsOddsForcePick(disagreeForcePrediction), false);
+
+const forcedDisagreeLayers = applySportsOddsFilter(
+  {
+    recommendations: [],
+    gameRecommendations: [
+      {
+        ...baseGameRec,
+        recommendedTeam: "Knicks ML",
+        recommendedBet: knicksMlBet,
+      },
+    ],
+  },
+  [disagreeForcePrediction],
+  [KNICKS_GAME]
+).gameRecommendations[0];
+assert.equal(forcedDisagreeLayers.noBet, true);
+assert.equal(forcedDisagreeLayers.sportsOddsBlocked, true);
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");

@@ -7,6 +7,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   CACHE_DIR,
+  SOCCER_SCHEDULE_LEAGUES,
   SPORTS_ODDS_BASE_URL,
   SPORTS_ODDS_LEAGUE_TO_COACH,
   SPORTS_ODDS_SPREAD_LEAGUES,
@@ -24,6 +25,17 @@ import { oddsEdge } from "../utils/oddsEdge.js";
 import { resolveGameTeamDisplay } from "./calendar.js";
 
 export type SportsOddsAgreementStatus = "agrees" | "disagrees" | "unavailable";
+
+export type SportsOddsLayerSide = "away" | "home" | "draw";
+
+export interface SportsOddsModelAgreement {
+  required: number;
+  agreed: boolean;
+  legacySide?: SportsOddsLayerSide;
+  powerSide?: SportsOddsLayerSide;
+  thirdSide?: SportsOddsLayerSide;
+  thirdSource?: string;
+}
 
 export interface SportsOddsModelPrediction {
   algorithm?: string;
@@ -96,6 +108,7 @@ export interface SportsOddsModelPrediction {
     drawProbability?: number;
     awayWinProbability?: number;
   };
+  modelAgreement?: SportsOddsModelAgreement;
 }
 
 export interface SportsOddsTopPick {
@@ -229,6 +242,14 @@ interface RemoteSlateGame {
       draw_probability?: number;
       away_win_probability?: number;
     };
+    model_agreement?: {
+      required?: number;
+      agreed?: boolean;
+      legacy_side?: SportsOddsLayerSide;
+      power_side?: SportsOddsLayerSide;
+      third_side?: SportsOddsLayerSide;
+      third_source?: string;
+    };
   };
   top_pick?: {
     side?: "away" | "home" | "draw";
@@ -295,6 +316,148 @@ function coachLeagueFromRemote(league?: string): LeagueCode | null {
 }
 
 const SPREAD_POINT_TO_EDGE = 20;
+
+const THREE_LAYER_BASKETBALL_LEAGUES = ["NBA", "WNBA", "CBB"] as const;
+const THREE_LAYER_BASEBALL_LEAGUES = ["MLB"] as const;
+
+function favoriteSideFromHomeWinProb(homeWinProb: number): SportsOddsLayerSide {
+  return homeWinProb >= 50 ? "home" : "away";
+}
+
+function bestThreewayOutcome(
+  home: number,
+  draw: number,
+  away: number
+): SportsOddsLayerSide {
+  const outcomes: Array<[SportsOddsLayerSide, number]> = [
+    ["home", home],
+    ["draw", draw],
+    ["away", away],
+  ];
+  return outcomes.reduce((best, current) =>
+    current[1] > best[1] ? current : best
+  )[0];
+}
+
+export function sportsOddsRequiresThreeLayerAgreement(league: LeagueCode): boolean {
+  return (
+    (THREE_LAYER_BASKETBALL_LEAGUES as readonly string[]).includes(league) ||
+    (THREE_LAYER_BASEBALL_LEAGUES as readonly string[]).includes(league) ||
+    (SOCCER_SCHEDULE_LEAGUES as readonly string[]).includes(league)
+  );
+}
+
+function thirdLayerFromModel(
+  model: SportsOddsModelPrediction
+): { key: string; payload: NonNullable<SportsOddsModelPrediction["basketballPred"]> | NonNullable<SportsOddsModelPrediction["baseballPred"]> | NonNullable<SportsOddsModelPrediction["soccerPred"]> } | undefined {
+  if (model.basketballPred) {
+    return { key: "basketball_pred", payload: model.basketballPred };
+  }
+  if (model.baseballPred) {
+    return { key: "baseball_pred", payload: model.baseballPred };
+  }
+  if (model.soccerPred) {
+    return { key: "soccer_pred", payload: model.soccerPred };
+  }
+  return undefined;
+}
+
+export function computeSportsOddsModelAgreement(
+  model: SportsOddsModelPrediction,
+  league: LeagueCode
+): SportsOddsModelAgreement {
+  if (!sportsOddsRequiresThreeLayerAgreement(league)) {
+    return { required: 0, agreed: true };
+  }
+
+  const legacy = model.legacy;
+  const power = model.power;
+  const third = thirdLayerFromModel(model);
+  const isSoccer = (SOCCER_SCHEDULE_LEAGUES as readonly string[]).includes(league);
+  const hasThreeLayers =
+    model.blendLayers === 3 &&
+    third != null &&
+    (isSoccer
+      ? Boolean(model.legacyThreeway && model.powerThreeway)
+      : Boolean(legacy && power));
+
+  if (!hasThreeLayers) {
+    return {
+      required: 3,
+      agreed: false,
+      legacySide: legacy?.favoriteSide,
+      powerSide:
+        power?.homeWinProbability == null
+          ? undefined
+          : favoriteSideFromHomeWinProb(power.homeWinProbability),
+      thirdSide:
+        third?.payload.homeWinProbability == null
+          ? undefined
+          : favoriteSideFromHomeWinProb(third.payload.homeWinProbability),
+      thirdSource: third?.key,
+    };
+  }
+
+  if (isSoccer) {
+    const legacyTw = model.legacyThreeway;
+    const powerTw = model.powerThreeway;
+    const soccerPred = model.soccerPred;
+    if (!legacyTw || !powerTw || !soccerPred) {
+      return {
+        required: 3,
+        agreed: false,
+        thirdSource: third.key,
+      };
+    }
+    const legacySide = bestThreewayOutcome(
+      legacyTw.homeWinProbability ?? 0,
+      legacyTw.drawProbability ?? 0,
+      legacyTw.awayWinProbability ?? 0
+    );
+    const powerSide = bestThreewayOutcome(
+      powerTw.homeWinProbability ?? 0,
+      powerTw.drawProbability ?? 0,
+      powerTw.awayWinProbability ?? 0
+    );
+    const thirdSide = bestThreewayOutcome(
+      soccerPred.homeWinProbability ?? 0,
+      soccerPred.drawProbability ?? 0,
+      soccerPred.awayWinProbability ?? 0
+    );
+    return {
+      required: 3,
+      agreed: legacySide === powerSide && powerSide === thirdSide,
+      legacySide,
+      powerSide,
+      thirdSide,
+      thirdSource: third.key,
+    };
+  }
+
+  const legacySide = legacy.favoriteSide;
+  const powerSide = favoriteSideFromHomeWinProb(power.homeWinProbability ?? 50);
+  const thirdSide = favoriteSideFromHomeWinProb(
+    third.payload.homeWinProbability ?? 50
+  );
+  return {
+    required: 3,
+    agreed: legacySide === powerSide && powerSide === thirdSide,
+    legacySide,
+    powerSide,
+    thirdSide,
+    thirdSource: third.key,
+  };
+}
+
+export function sportsOddsModelLayersAgree(
+  prediction: SportsOddsGamePrediction
+): boolean {
+  const agreement =
+    prediction.model.modelAgreement ??
+    computeSportsOddsModelAgreement(prediction.model, prediction.league);
+  if (agreement.required !== 3) return true;
+  return agreement.agreed;
+}
 
 function spreadPointEdge(
   modelMarginHome: number,
@@ -402,6 +565,161 @@ function spreadPickLabel(pick: SportsOddsTopPick): string {
   return `${line}${juice ? ` (${juice})` : ""}${margin ? ` · ${margin}` : ""}`;
 }
 
+function buildRemoteModelPayload(raw: RemoteSlateGame): SportsOddsModelPrediction {
+  const favoriteSide = raw.model?.favorite_side ?? "home";
+  const modelAgreement = raw.model?.model_agreement
+    ? {
+        required: raw.model.model_agreement.required ?? 3,
+        agreed: Boolean(raw.model.model_agreement.agreed),
+        legacySide: raw.model.model_agreement.legacy_side,
+        powerSide: raw.model.model_agreement.power_side,
+        thirdSide: raw.model.model_agreement.third_side,
+        thirdSource: raw.model.model_agreement.third_source,
+      }
+    : undefined;
+
+  return {
+    algorithm: raw.model?.algorithm,
+    blendMode: raw.model?.blend_mode,
+    blendLayers: raw.model?.blend_layers,
+    favoriteSide,
+    winProbability: Number(raw.model?.win_probability ?? 0),
+    awayProjection: raw.model?.away_projection,
+    homeProjection: raw.model?.home_projection,
+    threeway: raw.model?.threeway,
+    homeWinProbability: raw.model?.home_win_probability,
+    drawProbability: raw.model?.draw_probability,
+    awayWinProbability: raw.model?.away_win_probability,
+    drawProjection: raw.model?.draw_projection,
+    legacy: raw.model?.legacy
+      ? {
+          algorithm: raw.model.legacy.algorithm,
+          totalScore: raw.model.legacy.total_score,
+          winProbability: raw.model.legacy.win_probability,
+          favoriteSide: raw.model.legacy.favorite_side,
+        }
+      : undefined,
+    power: raw.model?.power
+      ? {
+          algorithm: raw.model.power.algorithm,
+          homePower: raw.model.power.home_power,
+          awayPower: raw.model.power.away_power,
+          homeWinProbability: raw.model.power.home_win_probability,
+          param: raw.model.power.param,
+        }
+      : undefined,
+    basketballPred: raw.model?.basketball_pred
+      ? {
+          algorithm: raw.model.basketball_pred.algorithm,
+          source: raw.model.basketball_pred.source,
+          homeWinProbability: raw.model.basketball_pred.home_win_probability,
+          predictedHomeScore: raw.model.basketball_pred.predicted_home_score,
+          predictedAwayScore: raw.model.basketball_pred.predicted_away_score,
+          predictedMargin: raw.model.basketball_pred.predicted_margin,
+          param: raw.model.basketball_pred.param,
+        }
+      : undefined,
+    baseballPred: raw.model?.baseball_pred
+      ? {
+          algorithm: raw.model.baseball_pred.algorithm,
+          source: raw.model.baseball_pred.source,
+          homeWinProbability: raw.model.baseball_pred.home_win_probability,
+          eloExp: raw.model.baseball_pred.elo_exp,
+          homePythagorean: raw.model.baseball_pred.home_pythagorean,
+          awayPythagorean: raw.model.baseball_pred.away_pythagorean,
+          formDiff: raw.model.baseball_pred.form_diff,
+          predictedMargin: raw.model.baseball_pred.predicted_margin,
+          predictedHomeRuns: raw.model.baseball_pred.predicted_home_runs,
+          predictedAwayRuns: raw.model.baseball_pred.predicted_away_runs,
+          param: raw.model.baseball_pred.param,
+        }
+      : undefined,
+    soccerPred: raw.model?.soccer_pred
+      ? {
+          algorithm: raw.model.soccer_pred.algorithm,
+          source: raw.model.soccer_pred.source,
+          homeWinProbability: raw.model.soccer_pred.home_win_probability,
+          drawProbability: raw.model.soccer_pred.draw_probability,
+          awayWinProbability: raw.model.soccer_pred.away_win_probability,
+          expectedHomeGoals: raw.model.soccer_pred.expected_home_goals,
+          expectedAwayGoals: raw.model.soccer_pred.expected_away_goals,
+          eloHome: raw.model.soccer_pred.elo_home,
+          eloAway: raw.model.soccer_pred.elo_away,
+          piExpectedGd: raw.model.soccer_pred.pi_expected_gd,
+        }
+      : undefined,
+    legacyThreeway: raw.model?.legacy_threeway
+      ? {
+          homeWinProbability: raw.model.legacy_threeway.home_win_probability,
+          drawProbability: raw.model.legacy_threeway.draw_probability,
+          awayWinProbability: raw.model.legacy_threeway.away_win_probability,
+        }
+      : undefined,
+    powerThreeway: raw.model?.power_threeway
+      ? {
+          homeWinProbability: raw.model.power_threeway.home_win_probability,
+          drawProbability: raw.model.power_threeway.draw_probability,
+          awayWinProbability: raw.model.power_threeway.away_win_probability,
+        }
+      : undefined,
+    modelAgreement:
+      modelAgreement ??
+      (coachLeagueFromRemote(raw.league)
+        ? computeSportsOddsModelAgreement(
+            {
+              favoriteSide,
+              winProbability: Number(raw.model?.win_probability ?? 0),
+              blendLayers: raw.model?.blend_layers,
+              legacy: raw.model?.legacy
+                ? { favoriteSide: raw.model.legacy.favorite_side }
+                : undefined,
+              power: raw.model?.power
+                ? { homeWinProbability: raw.model.power.home_win_probability }
+                : undefined,
+              basketballPred: raw.model?.basketball_pred
+                ? {
+                    homeWinProbability:
+                      raw.model.basketball_pred.home_win_probability,
+                  }
+                : undefined,
+              baseballPred: raw.model?.baseball_pred
+                ? {
+                    homeWinProbability:
+                      raw.model.baseball_pred.home_win_probability,
+                  }
+                : undefined,
+              soccerPred: raw.model?.soccer_pred
+                ? {
+                    homeWinProbability:
+                      raw.model.soccer_pred.home_win_probability,
+                    drawProbability: raw.model.soccer_pred.draw_probability,
+                    awayWinProbability:
+                      raw.model.soccer_pred.away_win_probability,
+                  }
+                : undefined,
+              legacyThreeway: raw.model?.legacy_threeway,
+              powerThreeway: raw.model?.power_threeway,
+            },
+            coachLeagueFromRemote(raw.league)!
+          )
+        : undefined),
+  };
+}
+
+function remoteModelLayersAgree(raw: RemoteSlateGame): boolean {
+  const league = coachLeagueFromRemote(raw.league);
+  if (!league) return true;
+  const awayTeam = raw.matchup?.away?.name ?? "";
+  const homeTeam = raw.matchup?.home?.name ?? "";
+  return sportsOddsModelLayersAgree({
+    eventId: raw.event_id || "",
+    league,
+    awayTeam,
+    homeTeam,
+    model: buildRemoteModelPayload(raw),
+  });
+}
+
 function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
   const pick = raw.top_pick;
   const side = pick?.side;
@@ -442,6 +760,7 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
     );
   }
   if (edge < sportsOddsForceMinEdge()) return undefined;
+  if (!remoteModelLayersAgree(raw)) return undefined;
 
   return {
     side,
@@ -483,91 +802,7 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
     league,
     awayTeam,
     homeTeam,
-    model: {
-      algorithm: raw.model?.algorithm,
-      blendMode: raw.model?.blend_mode,
-      blendLayers: raw.model?.blend_layers,
-      favoriteSide,
-      winProbability: Number(raw.model?.win_probability ?? 0),
-      awayProjection: raw.model?.away_projection,
-      homeProjection: raw.model?.home_projection,
-      threeway: raw.model?.threeway,
-      homeWinProbability: raw.model?.home_win_probability,
-      drawProbability: raw.model?.draw_probability,
-      awayWinProbability: raw.model?.away_win_probability,
-      drawProjection: raw.model?.draw_projection,
-      legacy: raw.model?.legacy
-        ? {
-            algorithm: raw.model.legacy.algorithm,
-            totalScore: raw.model.legacy.total_score,
-            winProbability: raw.model.legacy.win_probability,
-            favoriteSide: raw.model.legacy.favorite_side,
-          }
-        : undefined,
-      power: raw.model?.power
-        ? {
-            algorithm: raw.model.power.algorithm,
-            homePower: raw.model.power.home_power,
-            awayPower: raw.model.power.away_power,
-            homeWinProbability: raw.model.power.home_win_probability,
-            param: raw.model.power.param,
-          }
-        : undefined,
-      basketballPred: raw.model?.basketball_pred
-        ? {
-            algorithm: raw.model.basketball_pred.algorithm,
-            source: raw.model.basketball_pred.source,
-            homeWinProbability: raw.model.basketball_pred.home_win_probability,
-            predictedHomeScore: raw.model.basketball_pred.predicted_home_score,
-            predictedAwayScore: raw.model.basketball_pred.predicted_away_score,
-            predictedMargin: raw.model.basketball_pred.predicted_margin,
-            param: raw.model.basketball_pred.param,
-          }
-        : undefined,
-      baseballPred: raw.model?.baseball_pred
-        ? {
-            algorithm: raw.model.baseball_pred.algorithm,
-            source: raw.model.baseball_pred.source,
-            homeWinProbability: raw.model.baseball_pred.home_win_probability,
-            eloExp: raw.model.baseball_pred.elo_exp,
-            homePythagorean: raw.model.baseball_pred.home_pythagorean,
-            awayPythagorean: raw.model.baseball_pred.away_pythagorean,
-            formDiff: raw.model.baseball_pred.form_diff,
-            predictedMargin: raw.model.baseball_pred.predicted_margin,
-            predictedHomeRuns: raw.model.baseball_pred.predicted_home_runs,
-            predictedAwayRuns: raw.model.baseball_pred.predicted_away_runs,
-            param: raw.model.baseball_pred.param,
-          }
-        : undefined,
-      soccerPred: raw.model?.soccer_pred
-        ? {
-            algorithm: raw.model.soccer_pred.algorithm,
-            source: raw.model.soccer_pred.source,
-            homeWinProbability: raw.model.soccer_pred.home_win_probability,
-            drawProbability: raw.model.soccer_pred.draw_probability,
-            awayWinProbability: raw.model.soccer_pred.away_win_probability,
-            expectedHomeGoals: raw.model.soccer_pred.expected_home_goals,
-            expectedAwayGoals: raw.model.soccer_pred.expected_away_goals,
-            eloHome: raw.model.soccer_pred.elo_home,
-            eloAway: raw.model.soccer_pred.elo_away,
-            piExpectedGd: raw.model.soccer_pred.pi_expected_gd,
-          }
-        : undefined,
-      legacyThreeway: raw.model?.legacy_threeway
-        ? {
-            homeWinProbability: raw.model.legacy_threeway.home_win_probability,
-            drawProbability: raw.model.legacy_threeway.draw_probability,
-            awayWinProbability: raw.model.legacy_threeway.away_win_probability,
-          }
-        : undefined,
-      powerThreeway: raw.model?.power_threeway
-        ? {
-            homeWinProbability: raw.model.power_threeway.home_win_probability,
-            drawProbability: raw.model.power_threeway.draw_probability,
-            awayWinProbability: raw.model.power_threeway.away_win_probability,
-          }
-        : undefined,
-    },
+    model: buildRemoteModelPayload(raw),
     topPick: mapRemoteTopPick(raw),
     market: raw.market
       ? {
@@ -1039,7 +1274,7 @@ function revalidateGamePrediction(
     game
   );
 
-  if (edge < sportsOddsForceMinEdge()) {
+  if (edge < sportsOddsForceMinEdge() || !sportsOddsModelLayersAgree(game)) {
     return { ...game, topPick: undefined };
   }
 
@@ -1061,6 +1296,7 @@ export function isSportsOddsForcePick(
   prediction: SportsOddsGamePrediction | undefined
 ): boolean {
   if (!prediction || !isSportsOddsEnabled()) return false;
+  if (!sportsOddsModelLayersAgree(prediction)) return false;
   const pick = prediction.topPick;
   if (!pick) return false;
   return effectiveTopPickEdge(pick, prediction) >= sportsOddsForceMinEdge();

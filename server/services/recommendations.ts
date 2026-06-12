@@ -28,6 +28,7 @@ import {
   sportsOddsBreakdownDetail,
   sportsOddsForceBreakdownDetail,
   sportsOddsForceConfidence,
+  sportsOddsModelLayersAgree,
   sportsOddsPreferredBetForCoach,
   sportsOddsStatusForBet,
   sportsOddsTrendLabel,
@@ -101,6 +102,7 @@ function blockGameRec(
   if (filterKey === "sportsOdds") {
     blocked.sportsOddsConfirmed = false;
     blocked.sportsOddsStatus = status;
+    blocked.sportsOddsBlocked = true;
   } else {
     blocked.dratingsConfirmed = false;
     blocked.dratingsStatus = status;
@@ -202,7 +204,11 @@ function shouldForceSportsOddsOverride(
   rec: GameConsolidatedRecommendation,
   prediction: SportsOddsGamePrediction | undefined
 ): boolean {
-  if (!prediction || !rec.matchedGame || !isSportsOddsForcePick(prediction)) {
+  if (
+    !prediction ||
+    !rec.matchedGame ||
+    !isSportsOddsForcePick(prediction)
+  ) {
     return false;
   }
   if (rec.noBet) return true;
@@ -226,6 +232,16 @@ function applySportsOddsToGameRec(
   }
 
   if (rec.noBet || !rec.recommendedBet) return rec;
+
+  if (prediction && !sportsOddsModelLayersAgree(prediction)) {
+    return blockGameRec(
+      rec,
+      "Sports Odds model layers disagree — unanimous 3-layer agreement required",
+      "sportsOdds",
+      "disagrees",
+      "Sports Odds: 3-layer models do not agree on the same side (no bet)"
+    );
+  }
 
   const status = sportsOddsStatusForBet(
     rec.recommendedBet,
@@ -331,6 +347,23 @@ function applySportsOddsToPickRec(
 ): MatchedRecommendation {
   if (!rec.matchedGame || rec.confidence <= 0) return rec;
   if (!sportsOddsAppliesToLeague(rec.matchedGame.league)) return rec;
+
+  if (prediction && !sportsOddsModelLayersAgree(prediction)) {
+    return withDualAlgoFlag({
+      ...rec,
+      sportsOddsConfirmed: false,
+      sportsOddsStatus: "disagrees",
+      sportsOddsBlocked: true,
+      confidenceBreakdown: [
+        ...rec.confidenceBreakdown.filter((b) => b.key !== "sportsOdds"),
+        breakdownItem(
+          "sportsOdds",
+          "Sports Odds",
+          "Sports Odds: 3-layer models do not agree on the same side (no bet)"
+        ),
+      ],
+    });
+  }
 
   const bet = impliedBetForRec(rec);
   const status = sportsOddsStatusForBet(bet, rec.matchedGame, prediction);
