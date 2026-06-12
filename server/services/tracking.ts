@@ -20,6 +20,9 @@ import {
   type GameResult,
 } from "./calendar.js";
 import { DEFAULT_JUICE } from "../parsers/pickBetParser.js";
+import {
+  selectTrackableGameRecommendations,
+} from "./mainScreenPicks.js";
 import { SIGNAL_LABELS } from "./signalMapping.js";
 
 export type BetResult = "pending" | "win" | "loss" | "push";
@@ -123,6 +126,8 @@ export interface TrackedBet {
   espnGameId?: string;
   finalScore?: string;
   highConviction?: boolean;
+  /** Set when bet mirrors a main-screen GameRecommendationCard */
+  mainScreenGameRec?: boolean;
   recordedAt: string;
 }
 
@@ -244,8 +249,21 @@ function trackingLeagueForRec(rec: GameConsolidatedRecommendation): LeagueCode {
   return rec.league;
 }
 
-function isActionable(rec: GameConsolidatedRecommendation): boolean {
-  return !rec.noBet && Boolean(rec.recommendedTeam?.trim());
+/** Drop bets that are not main-screen game recommendations (including legacy log noise). */
+export function filterTrackableBets(bets: TrackedBet[]): TrackedBet[] {
+  return bets.filter((bet) => bet.mainScreenGameRec === true);
+}
+
+function pruneStoreToTrackableBets(
+  store: TrackingStore,
+  date: string,
+  trackableKeys: Set<string>
+): TrackingStore {
+  store.bets = store.bets.filter((bet) => {
+    if (bet.date !== date) return bet.mainScreenGameRec === true;
+    return trackableKeys.has(betKey(bet.date, bet.gameKey));
+  });
+  return store;
 }
 
 function signalInfoForGame(
@@ -266,10 +284,19 @@ export function recordRecommendations(
   date: string
 ): TrackingStore {
   const now = new Date().toISOString();
+  const trackable = selectTrackableGameRecommendations(
+    gameRecommendations,
+    recommendations
+  );
+  const trackableKeys = new Set(trackable.map((rec) => betKey(date, rec.gameKey)));
+
+  store.bets = store.bets.filter(
+    (b) => b.date !== date || trackableKeys.has(betKey(b.date, b.gameKey))
+  );
+
   const index = new Map(store.bets.map((b) => [betKey(b.date, b.gameKey), b]));
 
-  for (const rec of gameRecommendations) {
-    if (!isActionable(rec)) continue;
+  for (const rec of trackable) {
     const key = betKey(date, rec.gameKey);
     const { signalTypes, signalLabels } = signalInfoForGame(rec, recommendations);
     const existing = index.get(key);
@@ -293,6 +320,7 @@ export function recordRecommendations(
       existing.totalLine = rec.recommendedBet?.totalLine;
       existing.totalDirection = rec.recommendedBet?.totalDirection;
       if (rec.matchedGame?.id) existing.espnGameId = rec.matchedGame.id;
+      existing.mainScreenGameRec = true;
       continue;
     }
 
@@ -325,6 +353,7 @@ export function recordRecommendations(
       stakeUnits: 1,
       espnGameId: rec.matchedGame?.id,
       highConviction: rec.highConviction,
+      mainScreenGameRec: true,
       recordedAt: now,
     };
     store.bets.push(bet);
@@ -682,7 +711,7 @@ function buildSummary(bets: TrackedBet[]): TrackingSummary {
 }
 
 export function buildTrackingResponse(store: TrackingStore): TrackingResponse {
-  const sorted = [...store.bets].sort((a, b) => {
+  const sorted = [...filterTrackableBets(store.bets)].sort((a, b) => {
     const dateCmp = b.date.localeCompare(a.date);
     if (dateCmp !== 0) return dateCmp;
     return b.confidence - a.confidence;
@@ -701,8 +730,8 @@ export function buildTrackingResponse(store: TrackingStore): TrackingResponse {
     trackingSince,
     note:
       sorted.length === 0
-        ? "Tracking begins when recommendations are generated. Sync or load Daily Picks to start logging bets."
-        : "Bet log tracks consolidated game recommendations from this app. Historical sheet performance is not backfilled per bet.",
+        ? "Tracking begins when main-screen game recommendations are generated. Sync Daily Picks to start logging bets."
+        : "Bet log tracks main-screen game recommendations only (GameRecommendationCard). Standalone sheet picks and calendar-only items are excluded.",
     timezone: TIMEZONE,
     lastUpdated: new Date().toISOString(),
   };
@@ -713,7 +742,16 @@ export async function updateTracking(
   recommendations: MatchedRecommendation[],
   date: string
 ): Promise<TrackingResponse> {
+  const trackableRecs = selectTrackableGameRecommendations(
+    gameRecommendations,
+    recommendations
+  );
+  const trackableKeys = new Set(
+    trackableRecs.map((rec) => betKey(date, rec.gameKey))
+  );
+
   let store = await loadStore();
+  store = pruneStoreToTrackableBets(store, date, trackableKeys);
   store = recordRecommendations(store, gameRecommendations, recommendations, date);
   store = await gradePendingBets(store);
   store = await regradeSettledBets(store);
@@ -724,6 +762,7 @@ export async function updateTracking(
 
 export async function getTracking(): Promise<TrackingResponse> {
   let store = await loadStore();
+  store = { version: 1, bets: filterTrackableBets(store.bets) };
   store = await gradePendingBets(store);
   store = await regradeSettledBets(store);
   store = refreshSettledUnits(store);
@@ -734,6 +773,7 @@ export async function getTracking(): Promise<TrackingResponse> {
 /** Re-grade all pending bets (e.g. after server restart) */
 export async function refreshTrackingGrades(): Promise<void> {
   let store = await loadStore();
+  store = { version: 1, bets: filterTrackableBets(store.bets) };
   store = await gradePendingBets(store);
   store = await regradeSettledBets(store);
   store = refreshSettledUnits(store);

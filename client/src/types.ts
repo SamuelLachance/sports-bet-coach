@@ -240,6 +240,8 @@ export interface TrackedBet {
   espnGameId?: string;
   finalScore?: string;
   highConviction?: boolean;
+  /** True when bet mirrors a main-screen GameRecommendationCard */
+  mainScreenGameRec?: boolean;
   recordedAt: string;
 }
 
