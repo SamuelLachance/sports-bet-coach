@@ -554,10 +554,8 @@ function resolveModelAgreement(
 }
 
 export function sportsOddsEffectiveMinEdge(
-  prediction: SportsOddsGamePrediction
+  _prediction: SportsOddsGamePrediction
 ): number {
-  const agreement = resolveModelAgreement(prediction);
-  if (agreement.required === 3 && agreement.agreed) return 0;
   return sportsOddsForceMinEdge();
 }
 
@@ -565,8 +563,7 @@ function meetsSportsOddsEdgeThreshold(
   edge: number,
   prediction: SportsOddsGamePrediction
 ): boolean {
-  const minEdge = sportsOddsEffectiveMinEdge(prediction);
-  return minEdge === 0 ? edge > 0 : edge >= minEdge;
+  return edge >= sportsOddsEffectiveMinEdge(prediction);
 }
 
 export function sportsOddsRequiresThreeLayerAgreement(league: LeagueCode): boolean {

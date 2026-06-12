@@ -771,7 +771,7 @@ const padresTrend = sportsOddsValueTrendLabel(padresStaleApiPrediction);
 assert.ok(padresTrend.includes("+2") || padresTrend.includes("+3"));
 assert.ok(!padresTrend.includes("+230"));
 
-assert.equal(sportsOddsForceMinEdge(), 50);
+assert.equal(sportsOddsForceMinEdge(), 40);
 assert.ok((padresPrediction.topPick?.edge ?? 0) < 50);
 assert.ok((padresPrediction.topPick?.edge ?? 0) > 20);
 assert.ok((padresPrediction.topPick?.modelProjection ?? 0) < 0);
@@ -828,17 +828,27 @@ const nhlForcePrediction: SportsOddsGamePrediction = {
   },
 };
 
-const nhlForce50: SportsOddsGamePrediction = {
+const nhlForce39: SportsOddsGamePrediction = {
   ...nhlForcePrediction,
   topPick: {
     ...nhlForcePrediction.topPick!,
-    edge: 50,
-    modelMargin: 8.0,
+    edge: 39,
+    modelMargin: 7.45,
   },
 };
 
-assert.equal(isSportsOddsForcePick(nhlForcePrediction), false);
-assert.equal(isSportsOddsForcePick(nhlForce50), true);
+const nhlForce40: SportsOddsGamePrediction = {
+  ...nhlForcePrediction,
+  topPick: {
+    ...nhlForcePrediction.topPick!,
+    edge: 40,
+    modelMargin: 7.5,
+  },
+};
+
+assert.equal(isSportsOddsForcePick(nhlForce39), false);
+assert.equal(isSportsOddsForcePick(nhlForcePrediction), true);
+assert.equal(isSportsOddsForcePick(nhlForce40), true);
 
 const nbaValueMarket = { awayMoneyline: 110, homeMoneyline: -130 };
 
@@ -1016,7 +1026,17 @@ const valueAgreedLowEdgePrediction: SportsOddsGamePrediction = {
     consensusSpread: -5.5,
   },
 };
-assert.equal(isSportsOddsForcePick(valueAgreedLowEdgePrediction), true);
+assert.equal(isSportsOddsForcePick(valueAgreedLowEdgePrediction), false);
+
+const valueAgreedMinEdgePrediction: SportsOddsGamePrediction = {
+  ...valueAgreedLowEdgePrediction,
+  topPick: {
+    ...valueAgreedLowEdgePrediction.topPick!,
+    edge: 40,
+    modelMargin: 7.6,
+  },
+};
+assert.equal(isSportsOddsForcePick(valueAgreedMinEdgePrediction), true);
 
 const disagreeForcePrediction: SportsOddsGamePrediction = {
   ...highValuePrediction,
