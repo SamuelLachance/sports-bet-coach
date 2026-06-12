@@ -213,9 +213,9 @@
         "displayText": "CHC"
       },
       "betType": "moneyline",
-      "americanOdds": 100,
-      "consensusLabel": "+100",
-      "consensusOdds": 100,
+      "americanOdds": 104,
+      "consensusLabel": "+104",
+      "consensusOdds": 104,
       "bookProvider": "DraftKings",
       "confidence": 92,
       "signalTypes": [],
