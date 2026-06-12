@@ -543,8 +543,27 @@ const gsStormPrediction: SportsOddsGamePrediction = {
     spreadLine: 9.5,
     spreadOdds: -115,
     consensusSpread: 9.5,
+    modelMargin: -1.2,
   },
 };
+
+const staleGsForcePrediction: SportsOddsGamePrediction = {
+  ...gsStormPrediction,
+  topPick: {
+    side: "away",
+    teamName: "Golden State Valkyries",
+    edge: 214,
+    marketOdds: -105,
+    modelProjection: 24,
+    betType: "spread",
+    spreadLine: -9.5,
+    spreadOdds: -105,
+    consensusSpread: 9.5,
+    modelMargin: -1.2,
+  },
+};
+
+assert.equal(isSportsOddsForcePick(staleGsForcePrediction), false);
 
 assert.equal(
   sportsOddsAgreesWithBet(stormSpreadBet, WNBA_GAME, gsStormPrediction),

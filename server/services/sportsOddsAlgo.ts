@@ -46,6 +46,7 @@ export interface SportsOddsTopPick {
   spreadLine?: number;
   spreadOdds?: number;
   consensusSpread?: number;
+  modelMargin?: number;
   consensusLabel?: string;
   strategy?: string;
   reason?: string;
@@ -117,6 +118,7 @@ interface RemoteSlateGame {
     consensus_spread?: number;
     consensus_odds?: number;
     consensus_label?: string;
+    model_margin?: number;
     strategy?: string;
     reason?: string;
   };
@@ -178,12 +180,58 @@ function coachLeagueFromRemote(league?: string): LeagueCode | null {
   return null;
 }
 
+const SPREAD_POINT_TO_EDGE = 20;
+
+function spreadPointEdge(
+  modelMarginHome: number,
+  homeSpread: number,
+  side: "away" | "home"
+): number {
+  if (side === "home") return modelMarginHome + homeSpread;
+  return -modelMarginHome - homeSpread;
+}
+
+function validatedSpreadEdge(raw: RemoteSlateGame): number | undefined {
+  const pick = raw.top_pick;
+  if (pick?.bet_type !== "spread") return undefined;
+  const side = pick.side;
+  if (side !== "away" && side !== "home") return undefined;
+  const modelMargin = pick.model_margin;
+  const consensus = pick.consensus_spread;
+  if (modelMargin == null || consensus == null) return undefined;
+  const pointEdge = spreadPointEdge(Number(modelMargin), Number(consensus), side);
+  if (pointEdge <= 0) return 0;
+  return pointEdge * SPREAD_POINT_TO_EDGE;
+}
+
+function formatSpreadMargin(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return rounded > 0 ? `+${rounded}` : `${rounded}`;
+}
+
+function spreadPickLabel(pick: SportsOddsTopPick): string {
+  const juice =
+    pick.spreadOdds != null
+      ? pick.spreadOdds > 0
+        ? `+${pick.spreadOdds}`
+        : `${pick.spreadOdds}`
+      : "";
+  const line =
+    pick.spreadLine != null ? formatSpreadMargin(pick.spreadLine) : "?";
+  const margin =
+    pick.modelMargin != null
+      ? `model margin ${formatSpreadMargin(
+          pick.side === "home" ? pick.modelMargin : -pick.modelMargin
+        )}`
+      : "";
+  return `${line}${juice ? ` (${juice})` : ""}${margin ? ` · ${margin}` : ""}`;
+}
+
 function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
   const pick = raw.top_pick;
   const side = pick?.side;
   const teamName = pick?.team_name;
-  const edge = Number(pick?.edge ?? 0);
-  if (!side || !teamName || edge < sportsOddsForceMinEdge()) return undefined;
+  if (!side || !teamName) return undefined;
   if (side !== "away" && side !== "home" && side !== "draw") return undefined;
 
   const betType = pick?.bet_type;
@@ -195,6 +243,15 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
         ? undefined
         : Number(pick.consensus_odds)
       : Number(pick.spread_odds);
+  const modelMargin =
+    pick?.model_margin == null ? undefined : Number(pick.model_margin);
+
+  let edge = Number(pick?.edge ?? 0);
+  const spreadEdge = validatedSpreadEdge(raw);
+  if (spreadEdge != null) {
+    edge = spreadEdge;
+  }
+  if (edge < sportsOddsForceMinEdge()) return undefined;
 
   return {
     side,
@@ -209,6 +266,7 @@ function mapRemoteTopPick(raw: RemoteSlateGame): SportsOddsTopPick | undefined {
       pick?.consensus_spread == null
         ? undefined
         : Number(pick.consensus_spread),
+    modelMargin,
     consensusLabel: pick?.consensus_label,
     strategy: pick?.strategy,
     reason: pick?.reason,
@@ -633,6 +691,10 @@ export function sportsOddsValueTrendLabel(
   const pick = prediction.topPick;
   if (!pick) return sportsOddsTrendLabel(prediction);
 
+  if (pick.betType === "spread") {
+    return `${pick.teamName} (+${pick.edge.toFixed(0)} spread edge, ${spreadPickLabel(pick)})`;
+  }
+
   const odds =
     pick.marketOdds > 0 ? `+${pick.marketOdds}` : `${pick.marketOdds}`;
   const model =
@@ -645,16 +707,36 @@ export function sportsOddsValueTrendLabel(
 export function sportsOddsForceConfidence(
   prediction: SportsOddsGamePrediction
 ): number {
-  const edge = prediction.topPick?.edge ?? 0;
+  const pick = prediction.topPick;
+  const edge = pick ? effectiveTopPickEdge(pick) : 0;
   return Math.min(92, Math.round(75 + edge / 10));
+}
+
+function effectiveTopPickEdge(pick: SportsOddsTopPick): number {
+  if (
+    pick.betType === "spread" &&
+    pick.consensusSpread != null &&
+    pick.modelMargin != null &&
+    (pick.side === "away" || pick.side === "home")
+  ) {
+    const pointEdge = spreadPointEdge(
+      pick.modelMargin,
+      pick.consensusSpread,
+      pick.side
+    );
+    if (pointEdge <= 0) return 0;
+    return pointEdge * SPREAD_POINT_TO_EDGE;
+  }
+  return pick.edge;
 }
 
 export function isSportsOddsForcePick(
   prediction: SportsOddsGamePrediction | undefined
 ): boolean {
   if (!prediction || !isSportsOddsEnabled()) return false;
-  const edge = prediction.topPick?.edge ?? 0;
-  return edge >= sportsOddsForceMinEdge();
+  const pick = prediction.topPick;
+  if (!pick) return false;
+  return effectiveTopPickEdge(pick) >= sportsOddsForceMinEdge();
 }
 
 export function sportsOddsForceBreakdownDetail(
@@ -665,6 +747,10 @@ export function sportsOddsForceBreakdownDetail(
   if (!pick) {
     return `Sports Odds: force pick unavailable — no book edge data`;
   }
+  if (pick.betType === "spread") {
+    return `Sports Odds: force pick — ${pick.teamName} +${pick.edge.toFixed(0)} spread edge (${spreadPickLabel(pick)}) exceeds +${threshold} threshold`;
+  }
+
   const odds =
     pick.marketOdds > 0 ? `+${pick.marketOdds}` : `${pick.marketOdds}`;
   const model =
