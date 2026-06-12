@@ -4,6 +4,8 @@ export const TIMEZONE = process.env.TZ || "America/Toronto";
 
 export const CACHE_DIR = path.join(process.cwd(), "data", "cache");
 export const RAW_DIR = path.join(process.cwd(), "data", "raw");
+/** Git-tracked cumulative bet log; survives CI and daily static rebuilds. */
+export const TRACKING_STORE_FILE = path.join(process.cwd(), "data", "tracking.json");
 
 export const SHEET_PUBLISH_ID =
   "2PACX-1vQhcSEQNuCQXAcxhQUeCI0mD0MTxNRkRaY4fm5dJuB8_49x95ecGVrukhe65QIoMtyKSXKogBcNYp8b";

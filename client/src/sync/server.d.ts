@@ -59,8 +59,19 @@ declare module "@server/services/tracking.js" {
     GameConsolidatedRecommendation,
     MatchedRecommendation,
   } from "@server/types.js";
+  export interface TrackedBet {
+    id: string;
+    date: string;
+    gameKey: string;
+    status: string;
+    units: number;
+  }
+  export interface TrackingStore {
+    version: 1;
+    bets: TrackedBet[];
+  }
   export interface TrackingResponse {
-    bets: unknown[];
+    bets: TrackedBet[];
     summary: Record<string, unknown>;
     weekly: unknown[];
     monthly: unknown[];
@@ -69,6 +80,7 @@ declare module "@server/services/tracking.js" {
     timezone: string;
     lastUpdated: string;
   }
+  export function seedTrackingStore(overlay: TrackingStore): Promise<void>;
   export function updateTracking(
     gameRecommendations: GameConsolidatedRecommendation[],
     recommendations: MatchedRecommendation[],

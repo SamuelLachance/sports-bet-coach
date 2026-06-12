@@ -5,6 +5,7 @@ import {
   calculateUnits,
   DEFAULT_JUICE,
   gradeBet,
+  mergeStores,
   recordRecommendations,
   refreshSettledUnits,
   resolveAmericanOdds,
@@ -119,6 +120,39 @@ function spreadBetFromParsed(
     recordedAt: new Date().toISOString(),
     ...overrides,
   };
+}
+
+// Recording a new date keeps prior dates (cumulative bet log)
+{
+  let store = emptyStore();
+  store = recordRecommendations(store, [sampleGameRec()], [sampleRec()], "2026-06-11");
+  store = recordRecommendations(
+    store,
+    [sampleGameRec({ gameKey: "mlb:next-day", homeTeam: "Tampa Bay Rays" })],
+    [sampleRec()],
+    "2026-06-12"
+  );
+  assert.equal(store.bets.length, 2);
+  assert.equal(store.bets.filter((b) => b.date === "2026-06-11").length, 1);
+  assert.equal(store.bets.filter((b) => b.date === "2026-06-12").length, 1);
+}
+
+// mergeStores unions bets without dropping either date
+{
+  const dayOne = recordRecommendations(
+    emptyStore(),
+    [sampleGameRec()],
+    [sampleRec()],
+    "2026-06-11"
+  );
+  const dayTwo = recordRecommendations(
+    emptyStore(),
+    [sampleGameRec({ gameKey: "mlb:next-day", homeTeam: "Tampa Bay Rays" })],
+    [sampleRec()],
+    "2026-06-12"
+  );
+  const merged = mergeStores(dayOne, dayTwo);
+  assert.equal(merged.bets.length, 2);
 }
 
 // Record actionable recommendations

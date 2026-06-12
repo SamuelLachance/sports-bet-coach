@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { endOfWeek, parseISO, startOfWeek } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
-import { CACHE_DIR, TIMEZONE } from "../config.js";
+import { CACHE_DIR, TIMEZONE, TRACKING_STORE_FILE } from "../config.js";
 import type {
   BetType,
   GameConsolidatedRecommendation,
@@ -164,25 +164,50 @@ interface TrackingStore {
   bets: TrackedBet[];
 }
 
-const TRACKING_FILE = path.join(CACHE_DIR, "tracking.json");
+const TRACKING_CACHE_FILE = path.join(CACHE_DIR, "tracking.json");
 
 const MONTH_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
-async function loadStore(): Promise<TrackingStore> {
-  try {
-    const raw = await fs.readFile(TRACKING_FILE, "utf-8");
-    return JSON.parse(raw) as TrackingStore;
-  } catch {
-    return { version: 1, bets: [] };
+/** Union bet stores by date+gameKey; existing entries are never removed. */
+export function mergeStores(base: TrackingStore, overlay: TrackingStore): TrackingStore {
+  const index = new Map(base.bets.map((b) => [betKey(b.date, b.gameKey), b]));
+  for (const bet of overlay.bets) {
+    const key = betKey(bet.date, bet.gameKey);
+    if (!index.has(key)) {
+      index.set(key, bet);
+    }
   }
+  return { version: 1, bets: [...index.values()] };
+}
+
+async function loadStore(): Promise<TrackingStore> {
+  let store: TrackingStore = { version: 1, bets: [] };
+  for (const file of [TRACKING_STORE_FILE, TRACKING_CACHE_FILE]) {
+    try {
+      const raw = await fs.readFile(file, "utf-8");
+      store = mergeStores(store, JSON.parse(raw) as TrackingStore);
+    } catch {
+      // missing or unreadable — try next source
+    }
+  }
+  return store;
 }
 
 async function saveStore(store: TrackingStore): Promise<void> {
+  const payload = JSON.stringify(store, null, 2);
+  await fs.mkdir(path.dirname(TRACKING_STORE_FILE), { recursive: true });
+  await fs.writeFile(TRACKING_STORE_FILE, payload, "utf-8");
   await fs.mkdir(CACHE_DIR, { recursive: true });
-  await fs.writeFile(TRACKING_FILE, JSON.stringify(store, null, 2), "utf-8");
+  await fs.writeFile(TRACKING_CACHE_FILE, payload, "utf-8");
+}
+
+/** Merge baked or remote tracking into the active store (browser sync seed). */
+export async function seedTrackingStore(overlay: TrackingStore): Promise<void> {
+  const store = mergeStores(await loadStore(), overlay);
+  await saveStore(store);
 }
 
 function betKey(date: string, gameKey: string): string {

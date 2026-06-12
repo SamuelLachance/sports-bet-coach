@@ -1,0 +1,549 @@
+{
+  "version": 1,
+  "bets": [
+    {
+      "id": "2026-06-11:MLB:espn-401815715",
+      "date": "2026-06-11",
+      "gameKey": "MLB:espn-401815715",
+      "league": "MLB",
+      "awayTeam": "St. Louis Cardinals",
+      "homeTeam": "New York Mets",
+      "recommendedTeam": "St. Louis Cardinals +145",
+      "confidence": 75,
+      "signalTypes": [
+        "book_needs_fade"
+      ],
+      "signalLabels": [
+        "Book Needs (Fade)"
+      ],
+      "status": "loss",
+      "units": -1,
+      "stakeUnits": 1,
+      "espnGameId": "401815715",
+      "recordedAt": "2026-06-11T18:43:58.852Z",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "St. Louis Cardinals",
+        "rawText": "NY METS -145",
+        "odds": 145,
+        "displayText": "St. Louis Cardinals +145"
+      },
+      "betType": "moneyline",
+      "odds": 145,
+      "americanOdds": 145,
+      "gradedAt": "2026-06-12T12:44:57.444Z",
+      "finalScore": "St. Louis Cardinals 4 – New York Mets 5"
+    },
+    {
+      "id": "2026-06-11:MLB:espn-401815711",
+      "date": "2026-06-11",
+      "gameKey": "MLB:espn-401815711",
+      "league": "MLB",
+      "awayTeam": "Arizona Diamondbacks",
+      "homeTeam": "Miami Marlins",
+      "recommendedTeam": "Miami Marlins -105",
+      "confidence": 75,
+      "signalTypes": [
+        "book_needs_fade"
+      ],
+      "signalLabels": [
+        "Book Needs (Fade)"
+      ],
+      "status": "win",
+      "units": 0.9523809523809523,
+      "stakeUnits": 1,
+      "espnGameId": "401815711",
+      "recordedAt": "2026-06-11T18:43:58.852Z",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "Miami Marlins",
+        "rawText": "ARIZONA +105",
+        "odds": -105,
+        "displayText": "Miami Marlins -105"
+      },
+      "betType": "moneyline",
+      "gradedAt": "2026-06-12T12:44:57.445Z",
+      "finalScore": "Arizona Diamondbacks 0 – Miami Marlins 2",
+      "odds": -105,
+      "americanOdds": -105
+    },
+    {
+      "id": "2026-06-11:WNBA:espn-401856982",
+      "date": "2026-06-11",
+      "gameKey": "WNBA:espn-401856982",
+      "league": "WNBA",
+      "awayTeam": "Phoenix Mercury",
+      "homeTeam": "Dallas Wings",
+      "recommendedTeam": "Phx +6.5",
+      "confidence": 82,
+      "signalTypes": [
+        "sharp_money",
+        "reverse_line_movement"
+      ],
+      "signalLabels": [
+        "Sharp Money",
+        "Reverse Line Movement (Fade)"
+      ],
+      "status": "loss",
+      "units": -1,
+      "stakeUnits": 1,
+      "espnGameId": "401856982",
+      "recordedAt": "2026-06-11T18:43:58.852Z",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "PHX",
+        "rawText": "PHX 6.5",
+        "spread": 6.5,
+        "displayText": "Phx +6.5"
+      },
+      "betType": "spread",
+      "spread": 6.5,
+      "americanOdds": -110,
+      "consensusLabel": "+6.5 (-110)",
+      "consensusOdds": -110,
+      "bookProvider": "DraftKings",
+      "consensusSpread": 6.5,
+      "gradedAt": "2026-06-12T12:44:57.446Z",
+      "finalScore": "Phoenix Mercury 70 – Dallas Wings 85"
+    },
+    {
+      "id": "2026-06-11:WNBA:espn-401856983",
+      "date": "2026-06-11",
+      "gameKey": "WNBA:espn-401856983",
+      "league": "WNBA",
+      "awayTeam": "Las Vegas Aces",
+      "homeTeam": "Portland Fire",
+      "recommendedTeam": "Las Vegas Aces -9.5",
+      "confidence": 85,
+      "signalTypes": [
+        "reverse_line_movement",
+        "sharp_money"
+      ],
+      "signalLabels": [
+        "Reverse Line Movement (Fade)",
+        "Sharp Money"
+      ],
+      "status": "win",
+      "units": 0.9090909090909091,
+      "stakeUnits": 1,
+      "espnGameId": "401856983",
+      "recordedAt": "2026-06-11T18:43:58.852Z",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "Las Vegas Aces",
+        "rawText": "PORTLAND +9.5",
+        "spread": -9.5,
+        "odds": -110,
+        "displayText": "Las Vegas Aces -9.5"
+      },
+      "betType": "spread",
+      "spread": -9.5,
+      "odds": -110,
+      "americanOdds": -110,
+      "consensusLabel": "-10.5 (-110)",
+      "consensusOdds": -110,
+      "bookProvider": "DraftKings",
+      "consensusSpread": -10.5,
+      "gradedAt": "2026-06-12T12:44:57.446Z",
+      "finalScore": "Las Vegas Aces 105 – Portland Fire 89"
+    },
+    {
+      "id": "2026-06-11:MLB:espn-401856980",
+      "date": "2026-06-11",
+      "gameKey": "MLB:espn-401856980",
+      "league": "MODEL",
+      "awayTeam": "Chicago Sky",
+      "homeTeam": "Indiana Fever",
+      "recommendedTeam": "Indiana Fever -9.5",
+      "confidence": 75,
+      "signalTypes": [
+        "model_best_values"
+      ],
+      "signalLabels": [
+        "Model Best Values (Fade)"
+      ],
+      "status": "loss",
+      "units": -1,
+      "stakeUnits": 1,
+      "espnGameId": "401856980",
+      "recordedAt": "2026-06-11T18:43:58.852Z",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "Indiana Fever",
+        "rawText": "CHICAGO SKY +9.5",
+        "spread": -9.5,
+        "odds": -110,
+        "displayText": "Indiana Fever -9.5"
+      },
+      "betType": "spread",
+      "spread": -9.5,
+      "odds": -110,
+      "americanOdds": -110,
+      "gradedAt": "2026-06-12T12:44:57.447Z",
+      "finalScore": "Chicago Sky 106 – Indiana Fever 114"
+    },
+    {
+      "id": "2026-06-11:MLB:espn-401815717",
+      "date": "2026-06-11",
+      "gameKey": "MLB:espn-401815717",
+      "league": "MODEL",
+      "awayTeam": "Texas Rangers",
+      "homeTeam": "Kansas City Royals",
+      "recommendedTeam": "Texas Rangers +115",
+      "confidence": 75,
+      "signalTypes": [
+        "model_best_values"
+      ],
+      "signalLabels": [
+        "Model Best Values (Fade)"
+      ],
+      "status": "win",
+      "units": 1.15,
+      "stakeUnits": 1,
+      "espnGameId": "401815717",
+      "recordedAt": "2026-06-11T18:43:58.852Z",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "Texas Rangers",
+        "rawText": "ROYALS -115",
+        "odds": 115,
+        "displayText": "Texas Rangers +115"
+      },
+      "betType": "moneyline",
+      "odds": 115,
+      "americanOdds": 115,
+      "gradedAt": "2026-06-12T12:44:57.447Z",
+      "finalScore": "Texas Rangers 4 – Kansas City Royals 2"
+    },
+    {
+      "id": "2026-06-11:MLB:espn-401815718",
+      "date": "2026-06-11",
+      "gameKey": "MLB:espn-401815718",
+      "league": "MLB",
+      "awayTeam": "Chicago Cubs",
+      "homeTeam": "Colorado Rockies",
+      "recommendedTeam": "Chicago Cubs Over 11",
+      "recommendedBet": {
+        "betType": "total",
+        "team": "CUBS",
+        "rawText": "CUBS OVER 11",
+        "totalDirection": "over",
+        "totalLine": 11,
+        "displayText": "Cubs Over 11"
+      },
+      "betType": "total",
+      "totalLine": 11,
+      "totalDirection": "over",
+      "confidence": 85,
+      "signalTypes": [
+        "sharp_money"
+      ],
+      "signalLabels": [
+        "Sharp Money"
+      ],
+      "status": "win",
+      "units": 0.9090909090909091,
+      "stakeUnits": 1,
+      "espnGameId": "401815718",
+      "recordedAt": "2026-06-11T18:54:06.774Z",
+      "americanOdds": -110,
+      "gradedAt": "2026-06-12T12:44:57.447Z",
+      "finalScore": "Chicago Cubs 9 – Colorado Rockies 3"
+    },
+    {
+      "id": "2026-06-11:WNBA:espn-401856980",
+      "date": "2026-06-11",
+      "gameKey": "WNBA:espn-401856980",
+      "league": "WNBA",
+      "awayTeam": "Chicago Sky",
+      "homeTeam": "Indiana Fever",
+      "recommendedTeam": "Indiana Fever Over 171.5",
+      "recommendedBet": {
+        "betType": "total",
+        "team": "Indiana Fever",
+        "rawText": "INDIANA UNDER 171.5",
+        "totalDirection": "over",
+        "totalLine": 171.5,
+        "odds": -110,
+        "displayText": "Indiana Fever Over 171.5"
+      },
+      "betType": "total",
+      "totalLine": 171.5,
+      "totalDirection": "over",
+      "confidence": 75,
+      "signalTypes": [
+        "reverse_line_movement"
+      ],
+      "signalLabels": [
+        "Reverse Line Movement (Fade)"
+      ],
+      "status": "win",
+      "units": 0.9090909090909091,
+      "stakeUnits": 1,
+      "espnGameId": "401856980",
+      "recordedAt": "2026-06-11T18:54:06.774Z",
+      "odds": -110,
+      "americanOdds": -110,
+      "gradedAt": "2026-06-12T12:44:57.447Z",
+      "finalScore": "Chicago Sky 106 – Indiana Fever 114"
+    },
+    {
+      "id": "2026-06-11:WNBA:espn-401856981",
+      "date": "2026-06-11",
+      "gameKey": "WNBA:espn-401856981",
+      "league": "WNBA",
+      "awayTeam": "New York Liberty",
+      "homeTeam": "Atlanta Dream",
+      "recommendedTeam": "Atlanta Dream Over 164.5",
+      "recommendedBet": {
+        "betType": "total",
+        "team": "Atlanta Dream",
+        "rawText": "ATLANTA UNDER 164.5",
+        "totalDirection": "over",
+        "totalLine": 164.5,
+        "odds": -110,
+        "displayText": "Atlanta Dream Over 164.5"
+      },
+      "betType": "total",
+      "totalLine": 164.5,
+      "totalDirection": "over",
+      "confidence": 75,
+      "signalTypes": [
+        "reverse_line_movement"
+      ],
+      "signalLabels": [
+        "Reverse Line Movement (Fade)"
+      ],
+      "status": "win",
+      "units": 0.9090909090909091,
+      "stakeUnits": 1,
+      "espnGameId": "401856981",
+      "recordedAt": "2026-06-11T18:54:06.774Z",
+      "odds": -110,
+      "americanOdds": -110,
+      "gradedAt": "2026-06-12T12:44:57.447Z",
+      "finalScore": "New York Liberty 104 – Atlanta Dream 90"
+    },
+    {
+      "id": "2026-06-11:MLB:espn-401815716",
+      "date": "2026-06-11",
+      "gameKey": "MLB:espn-401815716",
+      "league": "MLB",
+      "awayTeam": "Atlanta Braves",
+      "homeTeam": "Chicago White Sox",
+      "recommendedTeam": "CHW",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "CHW",
+        "rawText": "CHW",
+        "displayText": "CHW"
+      },
+      "betType": "moneyline",
+      "americanOdds": 103,
+      "consensusLabel": "+103",
+      "consensusOdds": 103,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [
+        "book_needs_fade",
+        "square_fade",
+        "model_best_values"
+      ],
+      "signalLabels": [
+        "Book Needs (Fade)",
+        "Square Top (Fade)",
+        "Model Best Values (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815716",
+      "recordedAt": "2026-06-11T21:27:07.801Z"
+    },
+    {
+      "id": "2026-06-11:MLB:espn-401815712",
+      "date": "2026-06-11",
+      "gameKey": "MLB:espn-401815712",
+      "league": "MLB",
+      "awayTeam": "Los Angeles Dodgers",
+      "homeTeam": "Pittsburgh Pirates",
+      "recommendedTeam": "PIT",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "PIT",
+        "rawText": "PIT",
+        "displayText": "PIT"
+      },
+      "betType": "moneyline",
+      "americanOdds": 141,
+      "consensusLabel": "+141",
+      "consensusOdds": 141,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [
+        "book_needs_fade",
+        "square_fade",
+        "model_best_values"
+      ],
+      "signalLabels": [
+        "Book Needs (Fade)",
+        "Square Top (Fade)",
+        "Model Best Values (Fade)"
+      ],
+      "status": "loss",
+      "units": -1,
+      "stakeUnits": 1,
+      "espnGameId": "401815712",
+      "recordedAt": "2026-06-11T21:27:07.801Z",
+      "gradedAt": "2026-06-12T12:44:57.448Z",
+      "finalScore": "Los Angeles Dodgers 8 – Pittsburgh Pirates 6"
+    },
+    {
+      "id": "2026-06-12:WNBA:espn-401856985",
+      "date": "2026-06-12",
+      "gameKey": "WNBA:espn-401856985",
+      "league": "WNBA",
+      "awayTeam": "Golden State Valkyries",
+      "homeTeam": "Seattle Storm",
+      "recommendedTeam": "Golden State -8.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "GOLDEN STATE",
+        "rawText": "GOLDEN STATE -8.5",
+        "spread": -8.5,
+        "displayText": "Golden State -8.5"
+      },
+      "betType": "spread",
+      "spread": -8.5,
+      "americanOdds": -110,
+      "consensusLabel": "-8.5 (-110)",
+      "consensusOdds": -110,
+      "consensusSpread": -8.5,
+      "bookProvider": "DraftKings",
+      "confidence": 85,
+      "signalTypes": [
+        "sharp_money"
+      ],
+      "signalLabels": [
+        "Sharp Money"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401856985",
+      "recordedAt": "2026-06-12T12:44:04.802Z"
+    },
+    {
+      "id": "2026-06-12:MLB:espn-401815728",
+      "date": "2026-06-12",
+      "gameKey": "MLB:espn-401815728",
+      "league": "MLB",
+      "awayTeam": "Los Angeles Dodgers",
+      "homeTeam": "Chicago White Sox",
+      "recommendedTeam": "CHW",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "CHW",
+        "rawText": "CHW",
+        "displayText": "CHW"
+      },
+      "betType": "moneyline",
+      "americanOdds": 123,
+      "consensusLabel": "+123",
+      "consensusOdds": 123,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815728",
+      "recordedAt": "2026-06-12T12:44:04.802Z"
+    },
+    {
+      "id": "2026-06-12:MLB:espn-401815729",
+      "date": "2026-06-12",
+      "gameKey": "MLB:espn-401815729",
+      "league": "MLB",
+      "awayTeam": "Philadelphia Phillies",
+      "homeTeam": "Milwaukee Brewers",
+      "recommendedTeam": "PHI",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "PHI",
+        "rawText": "PHI",
+        "displayText": "PHI"
+      },
+      "betType": "moneyline",
+      "americanOdds": 204,
+      "consensusLabel": "+204",
+      "consensusOdds": 204,
+      "bookProvider": "DraftKings",
+      "confidence": 84,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815729",
+      "recordedAt": "2026-06-12T12:44:04.802Z"
+    },
+    {
+      "id": "2026-06-12:MLB:espn-401815733",
+      "date": "2026-06-12",
+      "gameKey": "MLB:espn-401815733",
+      "league": "MLB",
+      "awayTeam": "Tampa Bay Rays",
+      "homeTeam": "Los Angeles Angels",
+      "recommendedTeam": "LAA",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "LAA",
+        "rawText": "LAA",
+        "displayText": "LAA"
+      },
+      "betType": "moneyline",
+      "americanOdds": 149,
+      "consensusLabel": "+149",
+      "consensusOdds": 149,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815733",
+      "recordedAt": "2026-06-12T12:44:04.802Z"
+    },
+    {
+      "id": "2026-06-12:MLB:espn-401815732",
+      "date": "2026-06-12",
+      "gameKey": "MLB:espn-401815732",
+      "league": "MLB",
+      "awayTeam": "Colorado Rockies",
+      "homeTeam": "Athletics",
+      "recommendedTeam": "COL",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "COL",
+        "rawText": "COL",
+        "displayText": "COL"
+      },
+      "betType": "moneyline",
+      "americanOdds": 162,
+      "consensusLabel": "+162",
+      "consensusOdds": 162,
+      "bookProvider": "DraftKings",
+      "confidence": 80,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815732",
+      "recordedAt": "2026-06-12T12:44:04.802Z"
+    }
+  ]
+}

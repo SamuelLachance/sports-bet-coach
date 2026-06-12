@@ -17,9 +17,18 @@ import {
   buildRecommendations,
   getActiveLeagues,
 } from "@server/services/recommendations.js";
-import { updateTracking } from "@server/services/tracking.js";
+import {
+  seedTrackingStore,
+  updateTracking,
+  type TrackingStore,
+} from "@server/services/tracking.js";
 import type { ParsedSheets } from "@server/types.js";
-import type { MatchedRecommendation, StatsResponse, SyncStatus } from "../types";
+import type {
+  MatchedRecommendation,
+  StatsResponse,
+  SyncStatus,
+  TrackingResponse,
+} from "../types";
 import type { ClientSyncSnapshot } from "./types";
 
 export type { ClientSyncSnapshot } from "./types";
@@ -94,6 +103,19 @@ async function loadBakedSportsOddsPredictions(): Promise<
   }
 }
 
+async function loadBakedTracking(): Promise<TrackingStore | null> {
+  try {
+    const base = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
+    const res = await fetch(`${base}api/tracking.json`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as TrackingResponse;
+    if (!data.bets?.length) return null;
+    return { version: 1, bets: data.bets };
+  } catch {
+    return null;
+  }
+}
+
 async function loadBakedDratingsTrends(): Promise<
   import("@server/services/dratingsTrends.js").DratingsGameTrend[] | undefined
 > {
@@ -121,6 +143,12 @@ export async function runClientSync(): Promise<ClientSyncSnapshot> {
     skipSportsOddsFetch: true,
     sportsOddsPredictions,
   });
+
+  const bakedTracking = await loadBakedTracking();
+  if (bakedTracking) {
+    await seedTrackingStore(bakedTracking);
+  }
+
   const tracking = await updateTracking(
     built.gameRecommendations,
     built.recommendations,
