@@ -8,12 +8,10 @@ import {
 } from "./api";
 import { CalendarView } from "./components/CalendarView";
 import { DailyPicks } from "./components/DailyPicks";
-import { HomeView } from "./components/HomeView";
 import { Layout, type Tab } from "./components/Layout";
 import { LeaguesView } from "./components/LeaguesView";
 import { SettingsView } from "./components/SettingsView";
 import { TrackingView } from "./components/TrackingView";
-import { applyTabHash, parseTabFromHash } from "./utils/tabRouting";
 import type {
   CalendarGame,
   MatchedRecommendation,
@@ -22,7 +20,7 @@ import type {
 } from "./types";
 
 function App() {
-  const [tab, setTab] = useState<Tab>(() => parseTabFromHash(window.location.hash));
+  const [tab, setTab] = useState<Tab>("picks");
   const [recommendations, setRecommendations] = useState<MatchedRecommendation[]>(
     []
   );
@@ -79,17 +77,6 @@ function App() {
     return () => clearInterval(interval);
   }, [loadData]);
 
-  useEffect(() => {
-    const onHashChange = () => setTab(parseTabFromHash(window.location.hash));
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
-  const handleTabChange = useCallback((next: Tab) => {
-    setTab(next);
-    applyTabHash(next);
-  }, []);
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -104,7 +91,7 @@ function App() {
   return (
     <Layout
       activeTab={tab}
-      onTabChange={handleTabChange}
+      onTabChange={setTab}
       date={date}
       syncing={syncing}
       onSync={handleSync}
@@ -116,17 +103,6 @@ function App() {
         </div>
       )}
 
-      {tab === "home" && (
-        <HomeView
-          date={date}
-          games={games}
-          recommendations={recommendations}
-          gameRecommendations={gameRecommendations}
-          leagues={leagues}
-          tracking={tracking}
-          onNavigate={handleTabChange}
-        />
-      )}
       {tab === "picks" && (
         <DailyPicks
           recommendations={recommendations}
