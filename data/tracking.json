@@ -56,9 +56,9 @@
         "displayText": "CHW"
       },
       "betType": "moneyline",
-      "americanOdds": 124,
-      "consensusLabel": "+124",
-      "consensusOdds": 124,
+      "americanOdds": 129,
+      "consensusLabel": "+129",
+      "consensusOdds": 129,
       "bookProvider": "DraftKings",
       "confidence": 92,
       "signalTypes": [
@@ -91,9 +91,9 @@
         "displayText": "LAA"
       },
       "betType": "moneyline",
-      "americanOdds": 144,
-      "consensusLabel": "+144",
-      "consensusOdds": 144,
+      "americanOdds": 141,
+      "consensusLabel": "+141",
+      "consensusOdds": 141,
       "bookProvider": "DraftKings",
       "confidence": 92,
       "signalTypes": [],
@@ -159,7 +159,7 @@
       "consensusLabel": "+380",
       "consensusOdds": 380,
       "bookProvider": "DraftKings",
-      "confidence": 92,
+      "confidence": 88,
       "signalTypes": [],
       "signalLabels": [],
       "status": "pending",
@@ -168,6 +168,35 @@
       "espnGameId": "760416",
       "recordedAt": "2026-06-12T13:45:46.993Z",
       "mainScreenGameRec": true
+    },
+    {
+      "id": "2026-06-12:WORLDCUP:espn-760417",
+      "date": "2026-06-12",
+      "gameKey": "WORLDCUP:espn-760417",
+      "league": "WORLDCUP",
+      "awayTeam": "Paraguay",
+      "homeTeam": "United States",
+      "recommendedTeam": "PAR",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "PAR",
+        "rawText": "PAR",
+        "displayText": "PAR"
+      },
+      "betType": "moneyline",
+      "americanOdds": 290,
+      "consensusLabel": "+290",
+      "consensusOdds": 290,
+      "bookProvider": "DraftKings",
+      "confidence": 87,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "760417",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-12T14:59:04.953Z"
     }
   ]
 }
