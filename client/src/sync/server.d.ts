@@ -122,6 +122,42 @@ declare module "@server/services/sportsOddsAlgo.js" {
   }
 }
 
+declare module "@server/services/mainScreenPicks.js" {
+  import type {
+    GameConsolidatedRecommendation,
+    MatchedRecommendation,
+  } from "@server/types.js";
+  export interface MainScreenFilterOptions {
+    leagueFilter?: string;
+    signalFilter?: string;
+  }
+  export function isActionableGameRec(
+    rec: GameConsolidatedRecommendation
+  ): boolean;
+  export function isVisiblePick(rec: MatchedRecommendation): boolean;
+  export function selectMainScreenGameRecommendations<
+    T extends GameConsolidatedRecommendation,
+  >(
+    gameRecommendations: T[],
+    recommendations: MatchedRecommendation[],
+    options?: MainScreenFilterOptions
+  ): T[];
+  export function selectTrackableGameRecommendations<
+    T extends GameConsolidatedRecommendation,
+  >(
+    gameRecommendations: T[],
+    recommendations: MatchedRecommendation[],
+    options?: MainScreenFilterOptions
+  ): T[];
+  export function selectMainScreenStandalonePicks<
+    T extends MatchedRecommendation,
+  >(
+    gameRecommendations: GameConsolidatedRecommendation[],
+    recommendations: T[],
+    options?: MainScreenFilterOptions
+  ): T[];
+}
+
 declare module "@server/services/recommendations.js" {
   import type { DratingsGameTrend } from "@server/services/dratingsTrends.js";
   import type { SportsOddsGamePrediction } from "@server/services/sportsOddsAlgo.js";
@@ -258,18 +294,74 @@ declare module "@server/types.js" {
     detail?: string;
   }
 
+  export type BetType = "spread" | "moneyline" | "total";
+  export type TotalDirection = "over" | "under";
+  export type SignalPolarity = "positive" | "negative" | "inverted";
+
+  export interface ParsedBet {
+    betType: BetType;
+    team?: string;
+    rawText: string;
+    spread?: number;
+    odds?: number;
+    totalDirection?: TotalDirection;
+    totalLine?: number;
+    displayText: string;
+  }
+
+  export interface DualFadeHistoricalSampleInfo {
+    weeks: number;
+    months: number;
+    archiveDays: number;
+    totalPicksTracked: number;
+    totalDataPoints: number;
+    label: string;
+  }
+
+  export interface DualFadeInfo {
+    isDualFade: boolean;
+    isOpposingNoBet?: boolean;
+    bookNeedsFadeTeam?: string;
+    squareFadeTeam?: string;
+    strongerFadeColumn?: "book_needs_fade" | "square_fade";
+    archiveWinRate?: number;
+    historicalSample?: DualFadeHistoricalSampleInfo;
+  }
+
   export interface GameConsolidatedRecommendation {
     gameKey: string;
     league: LeagueCode;
     awayTeam: string;
     homeTeam: string;
     recommendedTeam: string;
+    recommendedBet?: ParsedBet;
+    betType?: BetType;
     confidence: number;
+    noBet?: boolean;
+    noBetReason?: string;
     confidenceBreakdown: ConfidenceBreakdownItem[];
     hasConflict: boolean;
     pickIds: string[];
     reasoning: string;
     matchedGame?: CalendarGame;
+    dualFade?: DualFadeInfo;
+    highConviction?: boolean;
+    historicalWinRate?: number;
+    historicalRoi?: number;
+    weeklyTrend?: "up" | "down" | "flat";
+    dratingsConfirmed?: boolean;
+    dratingsStatus?: "agrees" | "disagrees" | "unavailable";
+    dratingsTrendLabel?: string;
+    sportsOddsConfirmed?: boolean;
+    sportsOddsForced?: boolean;
+    sportsOddsStatus?: "agrees" | "disagrees" | "unavailable";
+    sportsOddsTrendLabel?: string;
+    dualAlgoConfirmed?: boolean;
+    bookProvider?: string;
+    consensusOdds?: number;
+    consensusSpread?: number;
+    consensusTotal?: number;
+    consensusLabel?: string;
   }
 
   export interface MatchedRecommendation {
@@ -282,12 +374,35 @@ declare module "@server/types.js" {
     gameTime?: string;
     postingTime?: string;
     line?: string;
+    parsedBet?: ParsedBet;
+    recommendedBet?: ParsedBet;
+    opponentBet?: ParsedBet;
     confidence: number;
     confidenceBreakdown: ConfidenceBreakdownItem[];
+    opponentPick?: string;
+    opponentConfidence?: number;
+    signalPolarity: SignalPolarity;
+    edgeLabel: string;
     reasoning: string;
     status: "recommended" | "pending" | "matched" | "settled";
     matchedGame?: CalendarGame;
     gameDate: string;
     gameKey?: string;
+    gameConflict?: boolean;
+    conflictNote?: string;
+    standaloneConfidence?: number;
+    consolidatedTeam?: string;
+    consolidatedConfidence?: number;
+    historicalWinRate?: number;
+    historicalRoi?: number;
+    weeklyTrend?: "up" | "down" | "flat";
+    highConviction?: boolean;
+    dratingsConfirmed?: boolean;
+    dratingsStatus?: "agrees" | "disagrees" | "unavailable";
+    dratingsBlocked?: boolean;
+    sportsOddsConfirmed?: boolean;
+    sportsOddsStatus?: "agrees" | "disagrees" | "unavailable";
+    sportsOddsBlocked?: boolean;
+    dualAlgoConfirmed?: boolean;
   }
 }
