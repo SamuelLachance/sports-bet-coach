@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { fadeParsedBet, parsePickBet } from "../parsers/pickBetParser.js";
 import {
+  buildPeriodRollups,
   buildTrackingResponse,
   calculateUnits,
   DEFAULT_JUICE,
@@ -518,6 +519,97 @@ function spreadBetFromParsed(
   );
   assert.equal(response.weekly.length, 1);
   assert.equal(response.monthly.length, 1);
+  assert.equal(response.daily.length, 1);
+  assert.equal(response.yearly.length, 1);
+  assert.equal(response.daily[0].roiPercent, response.summary.roiPercent);
+}
+
+// Daily, weekly, monthly, yearly rollups across dates
+{
+  let store = emptyStore();
+  store = recordRecommendations(store, [sampleGameRec()], [sampleRec()], "2026-06-10");
+  store = recordRecommendations(store, [sampleGameRec({ gameKey: "mlb:test2" })], [sampleRec()], "2026-06-11");
+  store.bets[0] = gradeBet(store.bets[0], finalResult("away"));
+  store.bets[1] = gradeBet(store.bets[1], finalResult("home"));
+
+  const response = buildTrackingResponse(store);
+  assert.equal(response.daily.length, 2);
+  assert.equal(response.weekly.length, 1);
+  assert.equal(response.monthly.length, 1);
+  assert.equal(response.yearly.length, 1);
+
+  const dailyKeys = response.daily.map((d) => d.key).sort();
+  assert.deepEqual(dailyKeys, ["2026-06-10", "2026-06-11"]);
+
+  for (const row of response.daily) {
+    assert.equal(row.bets, 1);
+    assert.ok(typeof row.roiPercent === "number");
+  }
+}
+
+// buildPeriodRollups ROI on settled bets only
+{
+  const bets: TrackedBet[] = [
+    {
+      id: "win-1",
+      date: "2026-01-15",
+      gameKey: "mlb:a",
+      league: "MLB",
+      awayTeam: "A",
+      homeTeam: "B",
+      recommendedTeam: "A",
+      confidence: 70,
+      signalTypes: ["sharp_money"],
+      signalLabels: ["Sharp Money"],
+      status: "win",
+      units: 0.909,
+      stakeUnits: 1,
+      recordedAt: new Date().toISOString(),
+    },
+    {
+      id: "loss-1",
+      date: "2026-01-16",
+      gameKey: "mlb:b",
+      league: "MLB",
+      awayTeam: "C",
+      homeTeam: "D",
+      recommendedTeam: "C",
+      confidence: 70,
+      signalTypes: ["sharp_money"],
+      signalLabels: ["Sharp Money"],
+      status: "loss",
+      units: -1,
+      stakeUnits: 1,
+      recordedAt: new Date().toISOString(),
+    },
+    {
+      id: "pending-1",
+      date: "2026-01-17",
+      gameKey: "mlb:c",
+      league: "MLB",
+      awayTeam: "E",
+      homeTeam: "F",
+      recommendedTeam: "E",
+      confidence: 70,
+      signalTypes: ["sharp_money"],
+      signalLabels: ["Sharp Money"],
+      status: "pending",
+      units: 0,
+      stakeUnits: 1,
+      recordedAt: new Date().toISOString(),
+    },
+  ];
+
+  const daily = buildPeriodRollups(
+    bets,
+    (d) => d,
+    (k) => k
+  );
+  assert.equal(daily.length, 3);
+  const winDay = daily.find((d) => d.key === "2026-01-15")!;
+  assert.ok(Math.abs(winDay.roiPercent - 90.9) < 0.1);
+  const lossDay = daily.find((d) => d.key === "2026-01-16")!;
+  assert.equal(lossDay.roiPercent, -100);
 }
 
 // Odds-based unit calculation

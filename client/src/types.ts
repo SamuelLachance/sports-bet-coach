@@ -238,6 +238,7 @@ export interface PeriodRollup {
   pending: number;
   units: number;
   bets: number;
+  roiPercent: number;
 }
 
 export interface TrackingSummary {
@@ -254,8 +255,10 @@ export interface TrackingSummary {
 export interface TrackingResponse {
   bets: TrackedBet[];
   summary: TrackingSummary;
+  daily: PeriodRollup[];
   weekly: PeriodRollup[];
   monthly: PeriodRollup[];
+  yearly: PeriodRollup[];
   trackingSince: string | null;
   note?: string;
   timezone: string;

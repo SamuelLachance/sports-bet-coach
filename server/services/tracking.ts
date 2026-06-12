@@ -135,6 +135,7 @@ export interface PeriodRollup {
   pending: number;
   units: number;
   bets: number;
+  roiPercent: number;
 }
 
 export interface TrackingSummary {
@@ -151,8 +152,10 @@ export interface TrackingSummary {
 export interface TrackingResponse {
   bets: TrackedBet[];
   summary: TrackingSummary;
+  daily: PeriodRollup[];
   weekly: PeriodRollup[];
   monthly: PeriodRollup[];
+  yearly: PeriodRollup[];
   trackingSince: string | null;
   note?: string;
   timezone: string;
@@ -565,12 +568,28 @@ function monthLabel(key: string): string {
   return `${MONTH_SHORT[idx] ?? month} ${year}`;
 }
 
-function buildPeriodRollups(
+function dailyRollupKey(dateStr: string): string {
+  return dateStr;
+}
+
+function dailyLabel(key: string): string {
+  return formatInTimeZone(parseISO(`${key}T12:00:00`), TIMEZONE, "MMM d, yyyy");
+}
+
+function yearRollupKey(dateStr: string): string {
+  return formatInTimeZone(zonedDate(dateStr), TIMEZONE, "yyyy");
+}
+
+function yearLabel(key: string): string {
+  return key;
+}
+
+export function buildPeriodRollups(
   bets: TrackedBet[],
   keyFn: (date: string) => string,
   labelFn: (key: string) => string
 ): PeriodRollup[] {
-  const map = new Map<string, PeriodRollup>();
+  const map = new Map<string, PeriodRollup & { staked: number }>();
 
   for (const bet of bets) {
     const key = keyFn(bet.date);
@@ -584,6 +603,8 @@ function buildPeriodRollups(
         pending: 0,
         units: 0,
         bets: 0,
+        roiPercent: 0,
+        staked: 0,
       });
     }
     const row = map.get(key)!;
@@ -593,9 +614,18 @@ function buildPeriodRollups(
     else if (bet.status === "loss") row.losses += 1;
     else if (bet.status === "push") row.pushes += 1;
     else row.pending += 1;
+
+    if (bet.status === "win" || bet.status === "loss" || bet.status === "push") {
+      row.staked += bet.stakeUnits;
+    }
   }
 
-  return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
+  return [...map.values()]
+    .map(({ staked, ...row }) => ({
+      ...row,
+      roiPercent: staked > 0 ? (row.units / staked) * 100 : 0,
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
 
 function buildSummary(bets: TrackedBet[]): TrackingSummary {
@@ -664,8 +694,10 @@ export function buildTrackingResponse(store: TrackingStore): TrackingResponse {
   return {
     bets: sorted,
     summary: buildSummary(sorted),
+    daily: buildPeriodRollups(sorted, dailyRollupKey, dailyLabel),
     weekly: buildPeriodRollups(sorted, weekRollupKey, weekLabel),
     monthly: buildPeriodRollups(sorted, monthRollupKey, monthLabel),
+    yearly: buildPeriodRollups(sorted, yearRollupKey, yearLabel),
     trackingSince,
     note:
       sorted.length === 0

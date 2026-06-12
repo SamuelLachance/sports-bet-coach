@@ -1,19 +1,31 @@
 import { useMemo, useState } from "react";
-import type { PeriodRollup, TrackedBet, TrackingResponse } from "../types";
+import type { TrackedBet, TrackingResponse } from "../types";
+import {
+  type CalendarViewMode,
+  filterBetsByPeriod,
+  formatUnits,
+  getPeriodLabel,
+} from "../utils/trackingCalendar";
+import { TrackingCalendar } from "./TrackingCalendar";
 
 interface TrackingViewProps {
   tracking: TrackingResponse | null;
 }
 
-type RollupMode = "weekly" | "monthly";
-
 export function TrackingView({ tracking }: TrackingViewProps) {
-  const [rollupMode, setRollupMode] = useState<RollupMode>("weekly");
+  const [viewMode, setViewMode] = useState<CalendarViewMode>("month");
+  const [anchorDate, setAnchorDate] = useState(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  });
 
-  const rollups = useMemo(() => {
+  const filteredBets = useMemo(() => {
     if (!tracking) return [];
-    return rollupMode === "weekly" ? tracking.weekly : tracking.monthly;
-  }, [tracking, rollupMode]);
+    return filterBetsByPeriod(tracking.bets, anchorDate, viewMode);
+  }, [tracking, anchorDate, viewMode]);
 
   if (!tracking) {
     return (
@@ -24,6 +36,11 @@ export function TrackingView({ tracking }: TrackingViewProps) {
   }
 
   const { summary } = tracking;
+  const periodLabel = getPeriodLabel(anchorDate, viewMode);
+  const logTitle =
+    viewMode === "all"
+      ? "Bet log — all time"
+      : `Bet log — ${periodLabel}`;
 
   return (
     <div className="space-y-6">
@@ -59,82 +76,25 @@ export function TrackingView({ tracking }: TrackingViewProps) {
         <p className="text-xs text-slate-500 text-center">{tracking.note}</p>
       )}
 
-      <section className="card">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <h3 className="font-display font-semibold text-lg">Period rollup</h3>
-          <div className="flex gap-1">
-            <RollupToggle
-              active={rollupMode === "weekly"}
-              onClick={() => setRollupMode("weekly")}
-              label="Weekly"
-            />
-            <RollupToggle
-              active={rollupMode === "monthly"}
-              onClick={() => setRollupMode("monthly")}
-              label="Monthly"
-            />
-          </div>
-        </div>
-
-        {rollups.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-6">
-            No settled periods yet. Bets appear here once recommendations are logged.
-          </p>
-        ) : (
-          <>
-            <RollupChart rollups={rollups} />
-            <div className="overflow-x-auto mt-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-slate-500 text-left border-b border-surface-border">
-                    <th className="pb-2 pr-4">Period</th>
-                    <th className="pb-2 pr-4">Bets</th>
-                    <th className="pb-2 pr-4">W-L</th>
-                    <th className="pb-2 pr-4">Pending</th>
-                    <th className="pb-2">Units</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...rollups].reverse().map((row) => (
-                    <tr
-                      key={row.key}
-                      className="border-b border-surface-border/50"
-                    >
-                      <td className="py-2 pr-4 font-medium">{row.label}</td>
-                      <td className="py-2 pr-4">{row.bets}</td>
-                      <td className="py-2 pr-4">
-                        {row.wins}-{row.losses}
-                        {row.pushes > 0 ? `-${row.pushes}` : ""}
-                      </td>
-                      <td className="py-2 pr-4 text-slate-400">
-                        {row.pending || "—"}
-                      </td>
-                      <td
-                        className={`py-2 font-medium ${
-                          row.units >= 0 ? "text-success" : "text-danger"
-                        }`}
-                      >
-                        {row.units > 0 ? "+" : ""}
-                        {row.units.toFixed(2)}u
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </section>
+      <TrackingCalendar
+        tracking={tracking}
+        viewMode={viewMode}
+        anchorDate={anchorDate}
+        onViewModeChange={setViewMode}
+        onAnchorDateChange={setAnchorDate}
+      />
 
       <section className="card">
-        <h3 className="font-display font-semibold text-lg mb-4">Bet log</h3>
-        {tracking.bets.length === 0 ? (
+        <h3 className="font-display font-semibold text-lg mb-4">{logTitle}</h3>
+        {filteredBets.length === 0 ? (
           <p className="text-sm text-slate-500 text-center py-8">
-            No bets tracked yet. Load Daily Picks to record today&apos;s recommendations.
+            {viewMode === "all"
+              ? "No bets tracked yet. Load Daily Picks to record today's recommendations."
+              : "No bets in this period. Try another date or view mode."}
           </p>
         ) : (
           <div className="space-y-3">
-            {tracking.bets.map((bet) => (
+            {filteredBets.map((bet) => (
               <BetLogRow key={bet.id} bet={bet} />
             ))}
           </div>
@@ -175,60 +135,6 @@ function SummaryCard({
   );
 }
 
-function RollupToggle({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-        active
-          ? "bg-accent/20 text-accent-glow border border-accent/30"
-          : "text-slate-400 hover:text-slate-200 hover:bg-surface-raised border border-transparent"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function RollupChart({ rollups }: { rollups: PeriodRollup[] }) {
-  const maxAbs = Math.max(...rollups.map((r) => Math.abs(r.units)), 1);
-
-  return (
-    <div className="flex items-end gap-1 h-32 px-1">
-      {rollups.map((row) => {
-        const height = Math.max(4, (Math.abs(row.units) / maxAbs) * 100);
-        const positive = row.units >= 0;
-        return (
-          <div
-            key={row.key}
-            className="flex-1 flex flex-col items-center justify-end min-w-0 group"
-            title={`${row.label}: ${row.units > 0 ? "+" : ""}${row.units.toFixed(2)}u`}
-          >
-            <div
-              className={`w-full max-w-[2.5rem] rounded-t transition-all ${
-                positive ? "bg-success/70" : "bg-danger/70"
-              }`}
-              style={{ height: `${height}%` }}
-            />
-            <span className="text-[10px] text-slate-500 mt-1 truncate w-full text-center hidden sm:block">
-              {row.label.split(" ")[0]}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function formatAmericanOdds(odds: number): string {
   return `${odds > 0 ? "+" : ""}${odds}`;
 }
@@ -262,11 +168,6 @@ function consensusOddsDisplay(bet: TrackedBet): string {
   if (bet.consensusLabel) return bet.consensusLabel;
   const odds = effectiveAmericanOdds(bet);
   return odds != null ? formatAmericanOdds(odds) : "—";
-}
-
-function formatUnits(units: number): string {
-  const rounded = Math.round(units * 100) / 100;
-  return `${rounded > 0 ? "+" : ""}${rounded.toFixed(2)}u`;
 }
 
 function betTypeLabel(bet: TrackedBet): string {
