@@ -2,6 +2,46 @@
   "version": 1,
   "bets": [
     {
+      "id": "2026-06-12:WNBA:espn-401856985",
+      "date": "2026-06-12",
+      "gameKey": "WNBA:espn-401856985",
+      "league": "WNBA",
+      "awayTeam": "Golden State Valkyries",
+      "homeTeam": "Seattle Storm",
+      "recommendedTeam": "Sea +9.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "SEA",
+        "rawText": "SEA 9.5",
+        "spread": 9.5,
+        "odds": -115,
+        "displayText": "Sea +9.5"
+      },
+      "betType": "spread",
+      "spread": 9.5,
+      "americanOdds": -115,
+      "consensusLabel": "+9.5 (-115)",
+      "consensusOdds": -115,
+      "consensusSpread": 9.5,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [
+        "sharp_money",
+        "reverse_line_movement"
+      ],
+      "signalLabels": [
+        "Sharp Money",
+        "Reverse Line Movement (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401856985",
+      "recordedAt": "2026-06-12T12:44:04.802Z",
+      "odds": -115,
+      "mainScreenGameRec": true
+    },
+    {
       "id": "2026-06-12:WORLDCUP:espn-760416",
       "date": "2026-06-12",
       "gameKey": "WORLDCUP:espn-760416",
@@ -29,6 +69,35 @@
       "espnGameId": "760416",
       "recordedAt": "2026-06-12T13:45:46.993Z",
       "mainScreenGameRec": true
+    },
+    {
+      "id": "2026-06-12:WORLDCUP:espn-760417",
+      "date": "2026-06-12",
+      "gameKey": "WORLDCUP:espn-760417",
+      "league": "WORLDCUP",
+      "awayTeam": "Paraguay",
+      "homeTeam": "United States",
+      "recommendedTeam": "PAR",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "PAR",
+        "rawText": "PAR",
+        "displayText": "PAR"
+      },
+      "betType": "moneyline",
+      "americanOdds": 290,
+      "consensusLabel": "+290",
+      "consensusOdds": 290,
+      "bookProvider": "DraftKings",
+      "confidence": 87,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "760417",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-12T14:59:04.953Z"
     }
   ]
 }
