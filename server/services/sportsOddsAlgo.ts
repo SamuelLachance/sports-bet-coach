@@ -489,6 +489,19 @@ export function teamSideForBet(
   return null;
 }
 
+function sportsOddsAgreementSide(
+  prediction: SportsOddsGamePrediction,
+  game: CalendarGame
+): "away" | "home" | "draw" {
+  if (prediction.topPick?.side === "draw") {
+    return "draw";
+  }
+  if (sportsOddsUsesSpread(game.league) && prediction.topPick?.side) {
+    return prediction.topPick.side;
+  }
+  return prediction.model.favoriteSide;
+}
+
 export function sportsOddsAgreesWithBet(
   ourBet: ParsedBet | undefined,
   game: CalendarGame | undefined,
@@ -503,7 +516,7 @@ export function sportsOddsAgreesWithBet(
   if (prediction.topPick?.side === "draw") {
     return false;
   }
-  return side === prediction.model.favoriteSide;
+  return side === sportsOddsAgreementSide(prediction, game);
 }
 
 export function sportsOddsAppliesToLeague(league: LeagueCode): boolean {

@@ -18,6 +18,7 @@ import {
   teamSideForBet,
   type SportsOddsGamePrediction,
 } from "../services/sportsOddsAlgo.js";
+import { pickBelongsToGame, resolveGameTeamDisplay } from "../services/calendar.js";
 import type { CalendarGame, GameConsolidatedRecommendation, ParsedBet } from "../types.js";
 
 const KNICKS_GAME: CalendarGame = {
@@ -487,5 +488,71 @@ assert.equal(
 );
 const drawValueBet = sportsOddsValueBet(soccerDrawPrediction, KNICKS_GAME);
 assert.equal(drawValueBet.displayText, "Draw");
+
+const WNBA_GAME: CalendarGame = {
+  id: "401856985",
+  league: "WNBA",
+  homeTeam: "Seattle Storm",
+  awayTeam: "Golden State Valkyries",
+  homeAbbr: "SEA",
+  awayAbbr: "GS",
+  startTime: "2026-06-13T02:00:00Z",
+  status: "Scheduled",
+};
+
+const MLB_SEA_BAL: CalendarGame = {
+  id: "401815687",
+  league: "MLB",
+  homeTeam: "Baltimore Orioles",
+  awayTeam: "Seattle Mariners",
+  homeAbbr: "BAL",
+  awayAbbr: "SEA",
+  startTime: "2026-06-09T22:35:00Z",
+  status: "Scheduled",
+};
+
+assert.equal(resolveGameTeamDisplay("Storm", WNBA_GAME), "Seattle Storm");
+assert.equal(resolveGameTeamDisplay("Valkyries", WNBA_GAME), "Golden State Valkyries");
+assert.equal(pickBelongsToGame("Seattle", "Golden State", WNBA_GAME), true);
+assert.equal(resolveGameTeamDisplay("Seattle", MLB_SEA_BAL), "Seattle Mariners");
+assert.equal(resolveGameTeamDisplay("Seattle", WNBA_GAME), "Seattle Storm");
+assert.equal(pickBelongsToGame("Storm", "Orioles", MLB_SEA_BAL), false);
+
+const stormSpreadBet: ParsedBet = {
+  betType: "spread",
+  team: "Storm",
+  spread: 9.5,
+  rawText: "Storm +9.5",
+  displayText: "Storm +9.5",
+};
+
+const gsStormPrediction: SportsOddsGamePrediction = {
+  eventId: "401856985",
+  league: "WNBA",
+  awayTeam: "Golden State Valkyries",
+  homeTeam: "Seattle Storm",
+  model: { favoriteSide: "away", winProbability: 60.04 },
+  market: { spread: 9.5 },
+  topPick: {
+    side: "home",
+    teamName: "Seattle Storm",
+    edge: 166,
+    marketOdds: -115,
+    modelProjection: -24,
+    betType: "spread",
+    spreadLine: 9.5,
+    spreadOdds: -115,
+    consensusSpread: 9.5,
+  },
+};
+
+assert.equal(
+  sportsOddsAgreesWithBet(stormSpreadBet, WNBA_GAME, gsStormPrediction),
+  true
+);
+assert.equal(
+  sportsOddsAgreesWithBet(spursMlBet, WNBA_GAME, gsStormPrediction),
+  false
+);
 
 console.log("sportsOddsAlgo.test.ts: all tests passed");
