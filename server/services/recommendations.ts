@@ -588,7 +588,7 @@ export function applyEventTeamConflictFilter(result: {
   recommendations: MatchedRecommendation[];
   gameRecommendations: GameConsolidatedRecommendation[];
 } {
-  const sidesByEvent = new Map<string, Set<"away" | "home">>();
+  const sidesByEvent = new Map<string, Set<"away" | "home" | "draw">>();
   const pickIdsByEvent = new Map<string, Set<string>>();
   const actionableGameRecsByEvent = new Map<
     string,
@@ -602,7 +602,7 @@ export function applyEventTeamConflictFilter(result: {
     pickIdsByEvent.set(key, ids);
   };
 
-  const noteSide = (game: CalendarGame, side: "away" | "home") => {
+  const noteSide = (game: CalendarGame, side: "away" | "home" | "draw") => {
     const key = eventKeyForGame(game);
     const sides = sidesByEvent.get(key) ?? new Set();
     sides.add(side);

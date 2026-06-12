@@ -555,4 +555,61 @@ assert.equal(
   false
 );
 
+const SOCCER_GAME: CalendarGame = {
+  id: "760416",
+  league: "NBA",
+  homeTeam: "Canada",
+  awayTeam: "Bosnia-Herzegovina",
+  homeAbbr: "CAN",
+  awayAbbr: "BIH",
+  startTime: "2026-06-12T19:00:00Z",
+  status: "Scheduled",
+};
+
+const homeMlBet: ParsedBet = {
+  betType: "moneyline",
+  team: "CAN",
+  rawText: "CAN",
+  displayText: "CAN",
+};
+
+const awayMlBet: ParsedBet = {
+  betType: "moneyline",
+  team: "BIH",
+  rawText: "BIH",
+  displayText: "BIH",
+};
+
+const homeGameRec: GameConsolidatedRecommendation = {
+  gameKey: "soccer-home",
+  league: "NBA",
+  awayTeam: SOCCER_GAME.awayTeam,
+  homeTeam: SOCCER_GAME.homeTeam,
+  recommendedTeam: "CAN",
+  recommendedBet: homeMlBet,
+  betType: "moneyline",
+  confidence: 80,
+  confidenceBreakdown: [],
+  hasConflict: false,
+  pickIds: ["home-pick"],
+  reasoning: "test",
+  matchedGame: SOCCER_GAME,
+};
+
+const awayGameRec: GameConsolidatedRecommendation = {
+  ...homeGameRec,
+  gameKey: "soccer-away",
+  recommendedTeam: "BIH",
+  recommendedBet: awayMlBet,
+  pickIds: ["away-pick"],
+};
+
+const soccerConflict = applyEventTeamConflictFilter({
+  recommendations: [],
+  gameRecommendations: [homeGameRec, awayGameRec],
+}).gameRecommendations;
+
+assert.equal(soccerConflict.length, 1);
+assert.equal(soccerConflict[0]?.noBet, true);
+
 console.log("sportsOddsAlgo.test.ts: all tests passed");
