@@ -1,6 +1,29 @@
 import type { GameConsolidatedRecommendation } from "../types";
 import { SignalBreakdown } from "./SignalBreakdown";
 
+const SOCCER_LEAGUES = new Set([
+  "MLS",
+  "EPL",
+  "LALIGA",
+  "BUNDESLIGA",
+  "SERIEA",
+  "LIGUE1",
+  "WORLDCUP",
+  "FIFA_FRIENDLIES",
+  "CONCACAF_WCQ",
+  "CONCACAF_GOLD",
+  "CONCACAF_NATIONS",
+  "UEFA_EURO",
+  "UEFA_NATIONS",
+  "COPA_AMERICA",
+]);
+
+function unifiedThreeLayerBadge(league: string): string {
+  if (league === "MLB") return "Unified 3-layer MLB ✓";
+  if (SOCCER_LEAGUES.has(league)) return "Unified 3-layer Soccer ✓";
+  return "Unified 3-layer ✓";
+}
+
 function confidenceColor(c: number) {
   if (c >= 85) return "text-success";
   if (c >= 75) return "text-accent-glow";
@@ -87,7 +110,7 @@ export function GameRecommendationCard({ game }: { game: GameConsolidatedRecomme
           {game.sportsOddsConfirmed && !game.dualAlgoConfirmed && !game.sportsOddsForced && (
             <span className="badge bg-accent/20 text-accent-glow" title={game.sportsOddsTrendLabel}>
               {game.sportsOddsTrendLabel?.includes("Unified 3-layer")
-                ? "Unified 3-layer ✓"
+                ? unifiedThreeLayerBadge(game.league)
                 : game.sportsOddsTrendLabel?.includes("Unified")
                   ? "Unified algo ✓"
                   : "Odds algo ✓"}

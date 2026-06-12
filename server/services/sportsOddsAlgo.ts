@@ -60,6 +60,41 @@ export interface SportsOddsModelPrediction {
     predictedMargin?: number;
     param?: number;
   };
+  baseballPred?: {
+    algorithm?: string;
+    source?: string;
+    homeWinProbability?: number;
+    eloExp?: number;
+    homePythagorean?: number;
+    awayPythagorean?: number;
+    formDiff?: number;
+    predictedMargin?: number;
+    predictedHomeRuns?: number;
+    predictedAwayRuns?: number;
+    param?: number;
+  };
+  soccerPred?: {
+    algorithm?: string;
+    source?: string;
+    homeWinProbability?: number;
+    drawProbability?: number;
+    awayWinProbability?: number;
+    expectedHomeGoals?: number;
+    expectedAwayGoals?: number;
+    eloHome?: number;
+    eloAway?: number;
+    piExpectedGd?: number;
+  };
+  legacyThreeway?: {
+    homeWinProbability?: number;
+    drawProbability?: number;
+    awayWinProbability?: number;
+  };
+  powerThreeway?: {
+    homeWinProbability?: number;
+    drawProbability?: number;
+    awayWinProbability?: number;
+  };
 }
 
 export interface SportsOddsTopPick {
@@ -155,6 +190,41 @@ interface RemoteSlateGame {
       predicted_away_score?: number;
       predicted_margin?: number;
       param?: number;
+    };
+    baseball_pred?: {
+      algorithm?: string;
+      source?: string;
+      home_win_probability?: number;
+      elo_exp?: number;
+      home_pythagorean?: number;
+      away_pythagorean?: number;
+      form_diff?: number;
+      predicted_margin?: number;
+      predicted_home_runs?: number;
+      predicted_away_runs?: number;
+      param?: number;
+    };
+    soccer_pred?: {
+      algorithm?: string;
+      source?: string;
+      home_win_probability?: number;
+      draw_probability?: number;
+      away_win_probability?: number;
+      expected_home_goals?: number;
+      expected_away_goals?: number;
+      elo_home?: number;
+      elo_away?: number;
+      pi_expected_gd?: number;
+    };
+    legacy_threeway?: {
+      home_win_probability?: number;
+      draw_probability?: number;
+      away_win_probability?: number;
+    };
+    power_threeway?: {
+      home_win_probability?: number;
+      draw_probability?: number;
+      away_win_probability?: number;
     };
   };
   top_pick?: {
@@ -365,6 +435,49 @@ function mapRemoteGame(raw: RemoteSlateGame): SportsOddsGamePrediction | null {
             predictedAwayScore: raw.model.basketball_pred.predicted_away_score,
             predictedMargin: raw.model.basketball_pred.predicted_margin,
             param: raw.model.basketball_pred.param,
+          }
+        : undefined,
+      baseballPred: raw.model?.baseball_pred
+        ? {
+            algorithm: raw.model.baseball_pred.algorithm,
+            source: raw.model.baseball_pred.source,
+            homeWinProbability: raw.model.baseball_pred.home_win_probability,
+            eloExp: raw.model.baseball_pred.elo_exp,
+            homePythagorean: raw.model.baseball_pred.home_pythagorean,
+            awayPythagorean: raw.model.baseball_pred.away_pythagorean,
+            formDiff: raw.model.baseball_pred.form_diff,
+            predictedMargin: raw.model.baseball_pred.predicted_margin,
+            predictedHomeRuns: raw.model.baseball_pred.predicted_home_runs,
+            predictedAwayRuns: raw.model.baseball_pred.predicted_away_runs,
+            param: raw.model.baseball_pred.param,
+          }
+        : undefined,
+      soccerPred: raw.model?.soccer_pred
+        ? {
+            algorithm: raw.model.soccer_pred.algorithm,
+            source: raw.model.soccer_pred.source,
+            homeWinProbability: raw.model.soccer_pred.home_win_probability,
+            drawProbability: raw.model.soccer_pred.draw_probability,
+            awayWinProbability: raw.model.soccer_pred.away_win_probability,
+            expectedHomeGoals: raw.model.soccer_pred.expected_home_goals,
+            expectedAwayGoals: raw.model.soccer_pred.expected_away_goals,
+            eloHome: raw.model.soccer_pred.elo_home,
+            eloAway: raw.model.soccer_pred.elo_away,
+            piExpectedGd: raw.model.soccer_pred.pi_expected_gd,
+          }
+        : undefined,
+      legacyThreeway: raw.model?.legacy_threeway
+        ? {
+            homeWinProbability: raw.model.legacy_threeway.home_win_probability,
+            drawProbability: raw.model.legacy_threeway.draw_probability,
+            awayWinProbability: raw.model.legacy_threeway.away_win_probability,
+          }
+        : undefined,
+      powerThreeway: raw.model?.power_threeway
+        ? {
+            homeWinProbability: raw.model.power_threeway.home_win_probability,
+            drawProbability: raw.model.power_threeway.draw_probability,
+            awayWinProbability: raw.model.power_threeway.away_win_probability,
           }
         : undefined,
     },
