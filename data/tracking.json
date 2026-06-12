@@ -31,7 +31,7 @@
       "betType": "moneyline",
       "odds": 145,
       "americanOdds": 145,
-      "gradedAt": "2026-06-12T13:01:59.666Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "St. Louis Cardinals 4 – New York Mets 5"
     },
     {
@@ -62,7 +62,7 @@
         "displayText": "Miami Marlins -105"
       },
       "betType": "moneyline",
-      "gradedAt": "2026-06-12T13:01:59.666Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "Arizona Diamondbacks 0 – Miami Marlins 2",
       "odds": -105,
       "americanOdds": -105
@@ -103,7 +103,7 @@
       "consensusOdds": -110,
       "bookProvider": "DraftKings",
       "consensusSpread": 6.5,
-      "gradedAt": "2026-06-12T13:01:59.666Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "Phoenix Mercury 70 – Dallas Wings 85"
     },
     {
@@ -144,7 +144,7 @@
       "consensusOdds": -110,
       "bookProvider": "DraftKings",
       "consensusSpread": -10.5,
-      "gradedAt": "2026-06-12T13:01:59.666Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "Las Vegas Aces 105 – Portland Fire 89"
     },
     {
@@ -179,7 +179,7 @@
       "spread": -9.5,
       "odds": -110,
       "americanOdds": -110,
-      "gradedAt": "2026-06-12T13:01:59.667Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "Chicago Sky 106 – Indiana Fever 114"
     },
     {
@@ -212,7 +212,7 @@
       "betType": "moneyline",
       "odds": 115,
       "americanOdds": 115,
-      "gradedAt": "2026-06-12T13:01:59.667Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "Texas Rangers 4 – Kansas City Royals 2"
     },
     {
@@ -247,7 +247,7 @@
       "espnGameId": "401815718",
       "recordedAt": "2026-06-11T18:54:06.774Z",
       "americanOdds": -110,
-      "gradedAt": "2026-06-12T13:01:59.667Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "Chicago Cubs 9 – Colorado Rockies 3"
     },
     {
@@ -284,7 +284,7 @@
       "recordedAt": "2026-06-11T18:54:06.774Z",
       "odds": -110,
       "americanOdds": -110,
-      "gradedAt": "2026-06-12T13:01:59.667Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "Chicago Sky 106 – Indiana Fever 114"
     },
     {
@@ -321,7 +321,7 @@
       "recordedAt": "2026-06-11T18:54:06.774Z",
       "odds": -110,
       "americanOdds": -110,
-      "gradedAt": "2026-06-12T13:01:59.667Z",
+      "gradedAt": "2026-06-12T13:22:46.355Z",
       "finalScore": "New York Liberty 104 – Atlanta Dream 90"
     },
     {
@@ -395,7 +395,7 @@
       "stakeUnits": 1,
       "espnGameId": "401815712",
       "recordedAt": "2026-06-11T21:27:07.801Z",
-      "gradedAt": "2026-06-12T13:01:59.667Z",
+      "gradedAt": "2026-06-12T13:22:46.356Z",
       "finalScore": "Los Angeles Dodgers 8 – Pittsburgh Pirates 6"
     },
     {
@@ -416,7 +416,7 @@
       "betType": "spread",
       "spread": -8.5,
       "americanOdds": -110,
-      "consensusLabel": "-8.5 (-110)",
+      "consensusLabel": "-8.5 (+330)",
       "consensusOdds": -110,
       "consensusSpread": -8.5,
       "bookProvider": "DraftKings",
@@ -448,9 +448,9 @@
         "displayText": "CHW"
       },
       "betType": "moneyline",
-      "americanOdds": 123,
-      "consensusLabel": "+123",
-      "consensusOdds": 123,
+      "americanOdds": 124,
+      "consensusLabel": "+124",
+      "consensusOdds": 124,
       "bookProvider": "DraftKings",
       "confidence": 92,
       "signalTypes": [],
@@ -476,9 +476,9 @@
         "displayText": "PHI"
       },
       "betType": "moneyline",
-      "americanOdds": 204,
-      "consensusLabel": "+204",
-      "consensusOdds": 204,
+      "americanOdds": 203,
+      "consensusLabel": "+203",
+      "consensusOdds": 203,
       "bookProvider": "DraftKings",
       "confidence": 84,
       "signalTypes": [],
@@ -504,9 +504,9 @@
         "displayText": "LAA"
       },
       "betType": "moneyline",
-      "americanOdds": 149,
-      "consensusLabel": "+149",
-      "consensusOdds": 149,
+      "americanOdds": 144,
+      "consensusLabel": "+144",
+      "consensusOdds": 144,
       "bookProvider": "DraftKings",
       "confidence": 92,
       "signalTypes": [],
