@@ -7,7 +7,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   CACHE_DIR,
-  SOCCER_SCHEDULE_LEAGUES,
   SPORTS_ODDS_BASE_URL,
   SPORTS_ODDS_LEAGUE_TO_COACH,
   SPORTS_ODDS_SPREAD_LEAGUES,
@@ -331,14 +330,6 @@ const LEAGUE_MARGIN_SCALE: Record<string, number> = {
   cfb: 0.18,
 };
 
-const SOCCER_DRAW_BASE: Record<string, number> = {
-  default: 25.0,
-  epl: 24.0,
-  laliga: 26.5,
-  mls: 23.0,
-  worldcup: 25.0,
-};
-
 const THREE_LAYER_BASKETBALL_LEAGUES = ["NBA", "WNBA", "CBB"] as const;
 const THREE_LAYER_BASEBALL_LEAGUES = ["MLB"] as const;
 
@@ -383,38 +374,6 @@ function modelMoneylines(totalScore: number): { awayProj: number; homeProj: numb
   };
 }
 
-function soccerThreewayProbs(
-  totalScore: number,
-  league: LeagueCode
-): { homeProb: number; drawProb: number; awayProb: number } {
-  const winProb = Math.abs(totalScore);
-  const homeIsFavorite = totalScore <= 0;
-  const homeBinary = homeIsFavorite ? winProb : 100 - winProb;
-  const awayBinary = 100 - homeBinary;
-  const baseDraw =
-    SOCCER_DRAW_BASE[league.toLowerCase()] ?? SOCCER_DRAW_BASE.default;
-  const closeness = 1 - Math.abs(winProb - 50) / 50;
-  const drawProb = Math.min(35, Math.max(18, baseDraw + closeness * 8));
-  const scale = (100 - drawProb) / 100;
-  return {
-    homeProb: homeBinary * scale,
-    drawProb,
-    awayProb: awayBinary * scale,
-  };
-}
-
-function soccerModelMoneylines(
-  homeProb: number,
-  drawProb: number,
-  awayProb: number
-): { awayProj: number; drawProj: number; homeProj: number } {
-  return {
-    awayProj: probabilityToAmerican(awayProb),
-    drawProj: probabilityToAmerican(drawProb),
-    homeProj: probabilityToAmerican(homeProb),
-  };
-}
-
 function modelHomeMargin(totalScore: number, league: LeagueCode): number {
   const winProb = Math.abs(totalScore);
   const scale = LEAGUE_MARGIN_SCALE[league.toLowerCase()] ?? 0.14;
@@ -442,36 +401,6 @@ function bestValueSideBinary(
   return edges.reduce((best, current) => (current[1] > best[1] ? current : best))[0];
 }
 
-function bestValueOutcomeThreeway(
-  homeProb: number,
-  drawProb: number,
-  awayProb: number,
-  awayMarket?: number,
-  drawMarket?: number,
-  homeMarket?: number
-): SportsOddsLayerSide | undefined {
-  const { awayProj, drawProj, homeProj } = soccerModelMoneylines(
-    homeProb,
-    drawProb,
-    awayProb
-  );
-  const edges: Array<[SportsOddsLayerSide, number]> = [];
-  if (awayMarket != null) {
-    const edge = oddsEdge(awayProj, awayMarket, awayProb);
-    if (edge > 0) edges.push(["away", edge]);
-  }
-  if (drawMarket != null) {
-    const edge = oddsEdge(drawProj, drawMarket, drawProb);
-    if (edge > 0) edges.push(["draw", edge]);
-  }
-  if (homeMarket != null) {
-    const edge = oddsEdge(homeProj, homeMarket, homeProb);
-    if (edge > 0) edges.push(["home", edge]);
-  }
-  if (!edges.length) return undefined;
-  return edges.reduce((best, current) => (current[1] > best[1] ? current : best))[0];
-}
-
 function layerHasValueOnSideBinary(
   totalScore: number,
   side: SportsOddsLayerSide,
@@ -482,29 +411,6 @@ function layerHasValueOnSideBinary(
   const { awayProj, homeProj } = modelMoneylines(totalScore);
   if (side === "away") {
     return awayMarket != null && oddsEdge(awayProj, awayMarket, awayProb) > 0;
-  }
-  return homeMarket != null && oddsEdge(homeProj, homeMarket, homeProb) > 0;
-}
-
-function layerHasValueOnOutcomeThreeway(
-  homeProb: number,
-  drawProb: number,
-  awayProb: number,
-  outcome: SportsOddsLayerSide,
-  awayMarket?: number,
-  drawMarket?: number,
-  homeMarket?: number
-): boolean {
-  const { awayProj, drawProj, homeProj } = soccerModelMoneylines(
-    homeProb,
-    drawProb,
-    awayProb
-  );
-  if (outcome === "away") {
-    return awayMarket != null && oddsEdge(awayProj, awayMarket, awayProb) > 0;
-  }
-  if (outcome === "draw") {
-    return drawMarket != null && oddsEdge(drawProj, drawMarket, drawProb) > 0;
   }
   return homeMarket != null && oddsEdge(homeProj, homeMarket, homeProb) > 0;
 }
@@ -569,22 +475,18 @@ function meetsSportsOddsEdgeThreshold(
 export function sportsOddsRequiresThreeLayerAgreement(league: LeagueCode): boolean {
   return (
     (THREE_LAYER_BASKETBALL_LEAGUES as readonly string[]).includes(league) ||
-    (THREE_LAYER_BASEBALL_LEAGUES as readonly string[]).includes(league) ||
-    (SOCCER_SCHEDULE_LEAGUES as readonly string[]).includes(league)
+    (THREE_LAYER_BASEBALL_LEAGUES as readonly string[]).includes(league)
   );
 }
 
 function thirdLayerFromModel(
   model: SportsOddsModelPrediction
-): { key: string; payload: NonNullable<SportsOddsModelPrediction["basketballPred"]> | NonNullable<SportsOddsModelPrediction["baseballPred"]> | NonNullable<SportsOddsModelPrediction["soccerPred"]> } | undefined {
+): { key: string; payload: NonNullable<SportsOddsModelPrediction["basketballPred"]> | NonNullable<SportsOddsModelPrediction["baseballPred"]> } | undefined {
   if (model.basketballPred) {
     return { key: "basketball_pred", payload: model.basketballPred };
   }
   if (model.baseballPred) {
     return { key: "baseball_pred", payload: model.baseballPred };
-  }
-  if (model.soccerPred) {
-    return { key: "soccer_pred", payload: model.soccerPred };
   }
   return undefined;
 }
@@ -602,10 +504,8 @@ export function computeSportsOddsModelAgreement(
   const legacy = model.legacy;
   const power = model.power;
   const third = thirdLayerFromModel(model);
-  const isSoccer = (SOCCER_SCHEDULE_LEAGUES as readonly string[]).includes(league);
   const awayMarket = market?.awayMoneyline;
   const homeMarket = market?.homeMoneyline;
-  const drawMarket = market?.drawMoneyline;
   const consensusSpread = market?.spread;
   const useSpread =
     sportsOddsUsesSpreadBets(league) && consensusSpread != null;
@@ -659,100 +559,10 @@ export function computeSportsOddsModelAgreement(
   };
 
   const hasThreeLayers =
-    model.blendLayers === 3 &&
-    third != null &&
-    (isSoccer
-      ? Boolean(model.legacyThreeway && model.powerThreeway)
-      : Boolean(legacy && power));
+    model.blendLayers === 3 && third != null && Boolean(legacy && power);
 
   if (!hasThreeLayers) {
     return incompletePayload();
-  }
-
-  if (isSoccer) {
-    const legacyTw = model.legacyThreeway;
-    const powerTw = model.powerThreeway;
-    const soccerPred = model.soccerPred;
-    if (!legacyTw || !powerTw || !soccerPred) {
-      return incompletePayload();
-    }
-    const legacyProbs = {
-      home: legacyTw.homeWinProbability ?? 0,
-      draw: legacyTw.drawProbability ?? 0,
-      away: legacyTw.awayWinProbability ?? 0,
-    };
-    const powerProbs = {
-      home: powerTw.homeWinProbability ?? 0,
-      draw: powerTw.drawProbability ?? 0,
-      away: powerTw.awayWinProbability ?? 0,
-    };
-    const thirdProbs = {
-      home: soccerPred.homeWinProbability ?? 0,
-      draw: soccerPred.drawProbability ?? 0,
-      away: soccerPred.awayWinProbability ?? 0,
-    };
-    const valueOutcomes = (["home", "draw", "away"] as const).filter(
-      (outcome) =>
-        layerHasValueOnOutcomeThreeway(
-          legacyProbs.home,
-          legacyProbs.draw,
-          legacyProbs.away,
-          outcome,
-          awayMarket,
-          drawMarket,
-          homeMarket
-        ) &&
-        layerHasValueOnOutcomeThreeway(
-          powerProbs.home,
-          powerProbs.draw,
-          powerProbs.away,
-          outcome,
-          awayMarket,
-          drawMarket,
-          homeMarket
-        ) &&
-        layerHasValueOnOutcomeThreeway(
-          thirdProbs.home,
-          thirdProbs.draw,
-          thirdProbs.away,
-          outcome,
-          awayMarket,
-          drawMarket,
-          homeMarket
-        )
-    );
-    return {
-      required: 3,
-      agreed: valueOutcomes.length > 0,
-      legacySide: bestValueOutcomeThreeway(
-        legacyProbs.home,
-        legacyProbs.draw,
-        legacyProbs.away,
-        awayMarket,
-        drawMarket,
-        homeMarket
-      ),
-      powerSide: bestValueOutcomeThreeway(
-        powerProbs.home,
-        powerProbs.draw,
-        powerProbs.away,
-        awayMarket,
-        drawMarket,
-        homeMarket
-      ),
-      thirdSide: bestValueOutcomeThreeway(
-        thirdProbs.home,
-        thirdProbs.draw,
-        thirdProbs.away,
-        awayMarket,
-        drawMarket,
-        homeMarket
-      ),
-      thirdSource: third.key,
-      agreementMode: "value",
-      valueOutcomes,
-      valueSides: valueOutcomes,
-    };
   }
 
   const legacyTotal = layerBinaryTotalScore(legacy);
@@ -991,20 +801,6 @@ function buildRemoteModelPayload(raw: RemoteSlateGame): SportsOddsModelPredictio
           param: raw.model.baseball_pred.param,
         }
       : undefined,
-    soccerPred: raw.model?.soccer_pred
-      ? {
-          algorithm: raw.model.soccer_pred.algorithm,
-          source: raw.model.soccer_pred.source,
-          homeWinProbability: raw.model.soccer_pred.home_win_probability,
-          drawProbability: raw.model.soccer_pred.draw_probability,
-          awayWinProbability: raw.model.soccer_pred.away_win_probability,
-          expectedHomeGoals: raw.model.soccer_pred.expected_home_goals,
-          expectedAwayGoals: raw.model.soccer_pred.expected_away_goals,
-          eloHome: raw.model.soccer_pred.elo_home,
-          eloAway: raw.model.soccer_pred.elo_away,
-          piExpectedGd: raw.model.soccer_pred.pi_expected_gd,
-        }
-      : undefined,
     legacyThreeway: raw.model?.legacy_threeway
       ? {
           homeWinProbability: raw.model.legacy_threeway.home_win_probability,
@@ -1047,15 +843,6 @@ function buildRemoteModelPayload(raw: RemoteSlateGame): SportsOddsModelPredictio
                 ? {
                     homeWinProbability:
                       raw.model.baseball_pred.home_win_probability,
-                  }
-                : undefined,
-              soccerPred: raw.model?.soccer_pred
-                ? {
-                    homeWinProbability:
-                      raw.model.soccer_pred.home_win_probability,
-                    drawProbability: raw.model.soccer_pred.draw_probability,
-                    awayWinProbability:
-                      raw.model.soccer_pred.away_win_probability,
                   }
                 : undefined,
               legacyThreeway: raw.model?.legacy_threeway,

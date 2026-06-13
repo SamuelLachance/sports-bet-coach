@@ -481,52 +481,6 @@ const spreadConsensus = sportsOddsConsensusForBet(
 assert.equal(spreadConsensus?.spread, -5.5);
 assert.equal(spreadConsensus?.label, "-5.5 (-108)");
 
-const drawBet: ParsedBet = {
-  betType: "moneyline",
-  team: "Draw",
-  rawText: "Draw",
-  displayText: "Draw",
-};
-
-const soccerDrawPrediction: SportsOddsGamePrediction = {
-  eventId: "760416",
-  league: "NBA",
-  awayTeam: "Brazil",
-  homeTeam: "Spain",
-  model: {
-    favoriteSide: "home",
-    winProbability: 58,
-    threeway: true,
-    homeWinProbability: 42,
-    drawProbability: 28,
-    awayWinProbability: 30,
-    drawProjection: 250,
-  },
-  market: {
-    drawMoneyline: 280,
-  },
-  topPick: {
-    side: "draw",
-    teamName: "Draw",
-    edge: 120,
-    marketOdds: 280,
-    modelProjection: 250,
-    betType: "moneyline",
-  },
-};
-
-assert.equal(teamSideForBet(drawBet, KNICKS_GAME), "draw");
-assert.equal(
-  sportsOddsAgreesWithBet(drawBet, KNICKS_GAME, soccerDrawPrediction),
-  true
-);
-assert.equal(
-  sportsOddsAgreesWithBet(spursMlBet, KNICKS_GAME, soccerDrawPrediction),
-  false
-);
-const drawValueBet = sportsOddsValueBet(soccerDrawPrediction, KNICKS_GAME);
-assert.equal(drawValueBet.displayText, "Draw");
-
 const WNBA_GAME: CalendarGame = {
   id: "401856985",
   league: "WNBA",
@@ -618,63 +572,6 @@ assert.equal(
   sportsOddsAgreesWithBet(spursMlBet, WNBA_GAME, gsStormPrediction),
   false
 );
-
-const SOCCER_GAME: CalendarGame = {
-  id: "760416",
-  league: "NBA",
-  homeTeam: "Canada",
-  awayTeam: "Bosnia-Herzegovina",
-  homeAbbr: "CAN",
-  awayAbbr: "BIH",
-  startTime: "2026-06-12T19:00:00Z",
-  status: "Scheduled",
-};
-
-const homeMlBet: ParsedBet = {
-  betType: "moneyline",
-  team: "CAN",
-  rawText: "CAN",
-  displayText: "CAN",
-};
-
-const awayMlBet: ParsedBet = {
-  betType: "moneyline",
-  team: "BIH",
-  rawText: "BIH",
-  displayText: "BIH",
-};
-
-const homeGameRec: GameConsolidatedRecommendation = {
-  gameKey: "soccer-home",
-  league: "NBA",
-  awayTeam: SOCCER_GAME.awayTeam,
-  homeTeam: SOCCER_GAME.homeTeam,
-  recommendedTeam: "CAN",
-  recommendedBet: homeMlBet,
-  betType: "moneyline",
-  confidence: 80,
-  confidenceBreakdown: [],
-  hasConflict: false,
-  pickIds: ["home-pick"],
-  reasoning: "test",
-  matchedGame: SOCCER_GAME,
-};
-
-const awayGameRec: GameConsolidatedRecommendation = {
-  ...homeGameRec,
-  gameKey: "soccer-away",
-  recommendedTeam: "BIH",
-  recommendedBet: awayMlBet,
-  pickIds: ["away-pick"],
-};
-
-const soccerConflict = applyEventTeamConflictFilter({
-  recommendations: [],
-  gameRecommendations: [homeGameRec, awayGameRec],
-}).gameRecommendations;
-
-assert.equal(soccerConflict.length, 1);
-assert.equal(soccerConflict[0]?.noBet, true);
 
 // Rays @ Angels — away favorite projections align with favoriteSide (live slate regression)
 const RAYS_GAME: CalendarGame = {
@@ -954,59 +851,6 @@ const threeLayerDisagree = computeSportsOddsModelAgreement(
   { awayMoneyline: 70, homeMoneyline: -110 }
 );
 assert.equal(threeLayerDisagree.agreed, false);
-
-const soccerThreeLayerAgree = computeSportsOddsModelAgreement(
-  {
-    favoriteSide: "home",
-    winProbability: 52,
-    blendLayers: 3,
-    legacyThreeway: {
-      homeWinProbability: 52,
-      drawProbability: 24,
-      awayWinProbability: 24,
-    },
-    powerThreeway: {
-      homeWinProbability: 50,
-      drawProbability: 26,
-      awayWinProbability: 24,
-    },
-    soccerPred: {
-      homeWinProbability: 55,
-      drawProbability: 22,
-      awayWinProbability: 23,
-    },
-  },
-  "EPL",
-  { awayMoneyline: 280, drawMoneyline: 320, homeMoneyline: 180 }
-);
-assert.equal(soccerThreeLayerAgree.agreed, true);
-assert.ok(soccerThreeLayerAgree.valueOutcomes?.includes("home"));
-
-const soccerThreeLayerDisagree = computeSportsOddsModelAgreement(
-  {
-    favoriteSide: "home",
-    winProbability: 52,
-    blendLayers: 3,
-    legacyThreeway: {
-      homeWinProbability: 52,
-      drawProbability: 24,
-      awayWinProbability: 24,
-    },
-    powerThreeway: {
-      homeWinProbability: 50,
-      drawProbability: 26,
-      awayWinProbability: 24,
-    },
-    soccerPred: {
-      homeWinProbability: 20,
-      drawProbability: 55,
-      awayWinProbability: 25,
-    },
-  },
-  "EPL",
-  { awayMoneyline: 120, drawMoneyline: 200, homeMoneyline: 250 }
-);
-assert.equal(soccerThreeLayerDisagree.agreed, false);
 
 const valueAgreedLowEdgePrediction: SportsOddsGamePrediction = {
   ...highValuePrediction,

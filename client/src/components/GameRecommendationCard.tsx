@@ -1,26 +1,8 @@
 import type { GameConsolidatedRecommendation } from "../types";
 import { SignalBreakdown } from "./SignalBreakdown";
 
-const SOCCER_LEAGUES = new Set([
-  "MLS",
-  "EPL",
-  "LALIGA",
-  "BUNDESLIGA",
-  "SERIEA",
-  "LIGUE1",
-  "WORLDCUP",
-  "FIFA_FRIENDLIES",
-  "CONCACAF_WCQ",
-  "CONCACAF_GOLD",
-  "CONCACAF_NATIONS",
-  "UEFA_EURO",
-  "UEFA_NATIONS",
-  "COPA_AMERICA",
-]);
-
 function unifiedThreeLayerBadge(league: string): string {
   if (league === "MLB") return "Unified 3-layer MLB ✓";
-  if (SOCCER_LEAGUES.has(league)) return "Unified 3-layer Soccer ✓";
   return "Unified 3-layer ✓";
 }
 
