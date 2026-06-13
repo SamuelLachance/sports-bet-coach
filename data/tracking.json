@@ -34,12 +34,14 @@
         "Sharp Money",
         "Reverse Line Movement (Fade)"
       ],
-      "status": "pending",
-      "units": 0,
+      "status": "win",
+      "units": 0.9090909090909091,
       "stakeUnits": 1,
       "espnGameId": "401856985",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-12T17:17:42.209Z"
+      "recordedAt": "2026-06-12T17:17:42.209Z",
+      "gradedAt": "2026-06-13T09:20:08.994Z",
+      "finalScore": "Golden State Valkyries 76 – Seattle Storm 72"
     },
     {
       "id": "2026-06-12:MLB:espn-401815729",
@@ -63,12 +65,14 @@
       "confidence": 86,
       "signalTypes": [],
       "signalLabels": [],
-      "status": "pending",
-      "units": 0,
+      "status": "loss",
+      "units": -1,
       "stakeUnits": 1,
       "espnGameId": "401815729",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-12T17:17:42.209Z"
+      "recordedAt": "2026-06-12T17:17:42.209Z",
+      "gradedAt": "2026-06-13T09:20:08.994Z",
+      "finalScore": "Philadelphia Phillies 0 – Milwaukee Brewers 6"
     },
     {
       "id": "2026-06-12:MLB:espn-401815732",
@@ -92,12 +96,49 @@
       "confidence": 79,
       "signalTypes": [],
       "signalLabels": [],
-      "status": "pending",
-      "units": 0,
+      "status": "loss",
+      "units": -1,
       "stakeUnits": 1,
       "espnGameId": "401815732",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-12T17:17:42.209Z"
+      "recordedAt": "2026-06-12T17:17:42.209Z",
+      "gradedAt": "2026-06-13T09:20:08.994Z",
+      "finalScore": "Colorado Rockies 4 – Athletics 6"
+    },
+    {
+      "id": "2026-06-13:MLB:espn-401815735",
+      "date": "2026-06-13",
+      "gameKey": "MLB:espn-401815735",
+      "league": "MLB",
+      "awayTeam": "Atlanta Braves",
+      "homeTeam": "New York Mets",
+      "recommendedTeam": "Atlanta Braves +130",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "Atlanta Braves",
+        "rawText": "NY METS -130",
+        "odds": 130,
+        "displayText": "Atlanta Braves +130"
+      },
+      "betType": "moneyline",
+      "odds": 130,
+      "americanOdds": 105,
+      "consensusLabel": "+105",
+      "consensusOdds": 105,
+      "bookProvider": "DraftKings",
+      "confidence": 75,
+      "signalTypes": [
+        "book_needs_fade"
+      ],
+      "signalLabels": [
+        "Book Needs (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815735",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-13T09:20:08.959Z"
     }
   ]
 }
