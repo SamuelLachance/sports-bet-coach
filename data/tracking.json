@@ -40,7 +40,7 @@
       "espnGameId": "401856985",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-13T10:33:23.899Z",
+      "gradedAt": "2026-06-14T10:20:31.834Z",
       "finalScore": "Golden State Valkyries 76 – Seattle Storm 72"
     },
     {
@@ -71,7 +71,7 @@
       "espnGameId": "401815729",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-13T10:33:23.899Z",
+      "gradedAt": "2026-06-14T10:20:31.834Z",
       "finalScore": "Philadelphia Phillies 0 – Milwaukee Brewers 6"
     },
     {
@@ -102,7 +102,7 @@
       "espnGameId": "401815732",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-13T10:33:23.899Z",
+      "gradedAt": "2026-06-14T10:20:31.834Z",
       "finalScore": "Colorado Rockies 4 – Athletics 6"
     },
     {
@@ -133,12 +133,117 @@
       "signalLabels": [
         "Book Needs (Fade)"
       ],
-      "status": "pending",
-      "units": 0,
+      "status": "win",
+      "units": 1.05,
       "stakeUnits": 1,
       "espnGameId": "401815735",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-13T09:20:08.959Z"
+      "recordedAt": "2026-06-13T09:20:08.959Z",
+      "gradedAt": "2026-06-14T10:20:31.834Z",
+      "finalScore": "Atlanta Braves 3 – New York Mets 1"
+    },
+    {
+      "id": "2026-06-14:WNBA:row-11:slot-1:MINNESOTA|PHOENIX",
+      "date": "2026-06-14",
+      "gameKey": "WNBA:row-11:slot-1:MINNESOTA|PHOENIX",
+      "league": "WNBA",
+      "awayTeam": "MINNESOTA",
+      "homeTeam": "PHOENIX",
+      "recommendedTeam": "Minnesota +2.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "MINNESOTA",
+        "rawText": "MINNESOTA +2.5",
+        "spread": 2.5,
+        "displayText": "Minnesota +2.5"
+      },
+      "betType": "spread",
+      "spread": 2.5,
+      "americanOdds": -110,
+      "confidence": 85,
+      "signalTypes": [
+        "sharp_money",
+        "reverse_line_movement"
+      ],
+      "signalLabels": [
+        "Sharp Money",
+        "Reverse Line Movement (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-14T10:20:31.780Z"
+    },
+    {
+      "id": "2026-06-14:MLB:espn-401815750",
+      "date": "2026-06-14",
+      "gameKey": "MLB:espn-401815750",
+      "league": "MLB",
+      "awayTeam": "Atlanta Braves",
+      "homeTeam": "New York Mets",
+      "recommendedTeam": "Atlanta Braves +115",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "Atlanta Braves",
+        "rawText": "NY METS -115",
+        "odds": 115,
+        "displayText": "Atlanta Braves +115"
+      },
+      "betType": "moneyline",
+      "odds": 115,
+      "americanOdds": -102,
+      "consensusLabel": "-102",
+      "consensusOdds": -102,
+      "bookProvider": "DraftKings",
+      "confidence": 75,
+      "signalTypes": [
+        "book_needs_fade"
+      ],
+      "signalLabels": [
+        "Book Needs (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815750",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-14T10:20:31.780Z"
+    },
+    {
+      "id": "2026-06-14:MLB:espn-401815755",
+      "date": "2026-06-14",
+      "gameKey": "MLB:espn-401815755",
+      "league": "MLB",
+      "awayTeam": "Seattle Mariners",
+      "homeTeam": "Washington Nationals",
+      "recommendedTeam": "Seattle Mariners +111",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "Seattle Mariners",
+        "rawText": "NATIONALS -111",
+        "odds": 111,
+        "displayText": "Seattle Mariners +111"
+      },
+      "betType": "moneyline",
+      "odds": 111,
+      "americanOdds": 101,
+      "consensusLabel": "+101",
+      "consensusOdds": 101,
+      "bookProvider": "DraftKings",
+      "confidence": 75,
+      "signalTypes": [
+        "model_best_values"
+      ],
+      "signalLabels": [
+        "Model Best Values (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815755",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-14T10:20:31.780Z"
     }
   ]
 }
