@@ -40,7 +40,7 @@
       "espnGameId": "401856985",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-14T10:51:44.399Z",
+      "gradedAt": "2026-06-15T12:59:13.910Z",
       "finalScore": "Golden State Valkyries 76 – Seattle Storm 72"
     },
     {
@@ -71,7 +71,7 @@
       "espnGameId": "401815729",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-14T10:51:44.399Z",
+      "gradedAt": "2026-06-15T12:59:13.911Z",
       "finalScore": "Philadelphia Phillies 0 – Milwaukee Brewers 6"
     },
     {
@@ -102,7 +102,7 @@
       "espnGameId": "401815732",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-14T10:51:44.399Z",
+      "gradedAt": "2026-06-15T12:59:13.911Z",
       "finalScore": "Colorado Rockies 4 – Athletics 6"
     },
     {
@@ -139,7 +139,7 @@
       "espnGameId": "401815735",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-13T09:20:08.959Z",
-      "gradedAt": "2026-06-14T10:51:44.418Z",
+      "gradedAt": "2026-06-15T12:59:13.994Z",
       "finalScore": "Atlanta Braves 3 – New York Mets 1"
     },
     {
@@ -203,12 +203,14 @@
       "signalLabels": [
         "Book Needs (Fade)"
       ],
-      "status": "pending",
-      "units": 0,
+      "status": "loss",
+      "units": -1,
       "stakeUnits": 1,
       "espnGameId": "401815750",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-14T10:20:31.780Z"
+      "recordedAt": "2026-06-14T10:20:31.780Z",
+      "gradedAt": "2026-06-15T12:59:13.995Z",
+      "finalScore": "Atlanta Braves 1 – New York Mets 8"
     },
     {
       "id": "2026-06-14:MLB:espn-401815755",
@@ -238,12 +240,14 @@
       "signalLabels": [
         "Model Best Values (Fade)"
       ],
-      "status": "pending",
-      "units": 0,
+      "status": "loss",
+      "units": -1,
       "stakeUnits": 1,
       "espnGameId": "401815755",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-14T10:20:31.780Z"
+      "recordedAt": "2026-06-14T10:20:31.780Z",
+      "gradedAt": "2026-06-15T12:59:13.995Z",
+      "finalScore": "Seattle Mariners 1 – Washington Nationals 10"
     }
   ]
 }
