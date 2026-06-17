@@ -40,7 +40,7 @@
       "espnGameId": "401856985",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-16T12:58:16.776Z",
+      "gradedAt": "2026-06-17T11:29:32.061Z",
       "finalScore": "Golden State Valkyries 76 – Seattle Storm 72"
     },
     {
@@ -71,7 +71,7 @@
       "espnGameId": "401815729",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-16T12:58:16.777Z",
+      "gradedAt": "2026-06-17T11:29:32.061Z",
       "finalScore": "Philadelphia Phillies 0 – Milwaukee Brewers 6"
     },
     {
@@ -102,7 +102,7 @@
       "espnGameId": "401815732",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-16T12:58:16.777Z",
+      "gradedAt": "2026-06-17T11:29:32.061Z",
       "finalScore": "Colorado Rockies 4 – Athletics 6"
     },
     {
@@ -139,7 +139,7 @@
       "espnGameId": "401815735",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-13T09:20:08.959Z",
-      "gradedAt": "2026-06-16T12:58:16.809Z",
+      "gradedAt": "2026-06-17T11:29:32.111Z",
       "finalScore": "Atlanta Braves 3 – New York Mets 1"
     },
     {
@@ -209,7 +209,7 @@
       "espnGameId": "401815750",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-14T10:20:31.780Z",
-      "gradedAt": "2026-06-16T12:58:16.833Z",
+      "gradedAt": "2026-06-17T11:29:32.130Z",
       "finalScore": "Atlanta Braves 1 – New York Mets 8"
     },
     {
@@ -246,8 +246,152 @@
       "espnGameId": "401815755",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-14T10:20:31.780Z",
-      "gradedAt": "2026-06-16T12:58:16.833Z",
+      "gradedAt": "2026-06-17T11:29:32.130Z",
       "finalScore": "Seattle Mariners 1 – Washington Nationals 10"
+    },
+    {
+      "id": "2026-06-17:WNBA:espn-401856997",
+      "date": "2026-06-17",
+      "gameKey": "WNBA:espn-401856997",
+      "league": "WNBA",
+      "awayTeam": "New York Liberty",
+      "homeTeam": "Chicago Sky",
+      "recommendedTeam": "Chi +9.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "CHI",
+        "rawText": "CHI 9.5",
+        "spread": 9.5,
+        "odds": -102,
+        "displayText": "Chi +9.5"
+      },
+      "betType": "spread",
+      "spread": 9.5,
+      "odds": -102,
+      "americanOdds": -102,
+      "consensusLabel": "+9.5 (-102)",
+      "consensusOdds": -102,
+      "consensusSpread": 9.5,
+      "bookProvider": "DraftKings",
+      "confidence": 89,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401856997",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-17T11:29:31.950Z"
+    },
+    {
+      "id": "2026-06-17:WNBA:espn-401857000",
+      "date": "2026-06-17",
+      "gameKey": "WNBA:espn-401857000",
+      "league": "WNBA",
+      "awayTeam": "Las Vegas Aces",
+      "homeTeam": "Phoenix Mercury",
+      "recommendedTeam": "Phx +7.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "PHX",
+        "rawText": "PHX 7.5",
+        "spread": 7.5,
+        "odds": -115,
+        "displayText": "Phx +7.5"
+      },
+      "betType": "spread",
+      "spread": 7.5,
+      "odds": -115,
+      "americanOdds": -115,
+      "consensusLabel": "+7.5 (-115)",
+      "consensusOdds": -115,
+      "consensusSpread": 7.5,
+      "bookProvider": "DraftKings",
+      "confidence": 87,
+      "signalTypes": [
+        "reverse_line_movement"
+      ],
+      "signalLabels": [
+        "Reverse Line Movement (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401857000",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-17T11:29:31.950Z"
+    },
+    {
+      "id": "2026-06-17:WNBA:espn-401856999",
+      "date": "2026-06-17",
+      "gameKey": "WNBA:espn-401856999",
+      "league": "WNBA",
+      "awayTeam": "Minnesota Lynx",
+      "homeTeam": "Los Angeles Sparks",
+      "recommendedTeam": "La +8.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "LA",
+        "rawText": "LA 8.5",
+        "spread": 8.5,
+        "odds": -105,
+        "displayText": "La +8.5"
+      },
+      "betType": "spread",
+      "spread": 8.5,
+      "odds": -105,
+      "americanOdds": -105,
+      "consensusLabel": "+8.5 (-105)",
+      "consensusOdds": -105,
+      "consensusSpread": 8.5,
+      "bookProvider": "DraftKings",
+      "confidence": 86,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401856999",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-17T11:29:31.950Z"
+    },
+    {
+      "id": "2026-06-17:WNBA:espn-401857001",
+      "date": "2026-06-17",
+      "gameKey": "WNBA:espn-401857001",
+      "league": "WNBA",
+      "awayTeam": "Seattle Storm",
+      "homeTeam": "Portland Fire",
+      "recommendedTeam": "Sea +3.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "SEA",
+        "rawText": "SEA 3.5",
+        "spread": 3.5,
+        "odds": -115,
+        "displayText": "Sea +3.5"
+      },
+      "betType": "spread",
+      "spread": 3.5,
+      "odds": -115,
+      "americanOdds": -115,
+      "consensusLabel": "+3.5 (-115)",
+      "consensusOdds": -115,
+      "consensusSpread": 3.5,
+      "bookProvider": "DraftKings",
+      "confidence": 85,
+      "signalTypes": [
+        "reverse_line_movement"
+      ],
+      "signalLabels": [
+        "Reverse Line Movement (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401857001",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-17T11:29:31.950Z"
     }
   ]
 }
