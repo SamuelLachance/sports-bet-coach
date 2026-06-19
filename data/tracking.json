@@ -40,7 +40,7 @@
       "espnGameId": "401856985",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-18T11:53:38.699Z",
+      "gradedAt": "2026-06-19T11:15:05.041Z",
       "finalScore": "Golden State Valkyries 76 – Seattle Storm 72"
     },
     {
@@ -71,7 +71,7 @@
       "espnGameId": "401815729",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-18T11:53:38.699Z",
+      "gradedAt": "2026-06-19T11:15:05.041Z",
       "finalScore": "Philadelphia Phillies 0 – Milwaukee Brewers 6"
     },
     {
@@ -102,7 +102,7 @@
       "espnGameId": "401815732",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-18T11:53:38.699Z",
+      "gradedAt": "2026-06-19T11:15:05.041Z",
       "finalScore": "Colorado Rockies 4 – Athletics 6"
     },
     {
@@ -139,7 +139,7 @@
       "espnGameId": "401815735",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-13T09:20:08.959Z",
-      "gradedAt": "2026-06-18T11:53:38.928Z",
+      "gradedAt": "2026-06-19T11:15:05.073Z",
       "finalScore": "Atlanta Braves 3 – New York Mets 1"
     },
     {
@@ -209,7 +209,7 @@
       "espnGameId": "401815750",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-14T10:20:31.780Z",
-      "gradedAt": "2026-06-18T11:53:39.030Z",
+      "gradedAt": "2026-06-19T11:15:05.105Z",
       "finalScore": "Atlanta Braves 1 – New York Mets 8"
     },
     {
@@ -246,7 +246,7 @@
       "espnGameId": "401815755",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-14T10:20:31.780Z",
-      "gradedAt": "2026-06-18T11:53:39.030Z",
+      "gradedAt": "2026-06-19T11:15:05.105Z",
       "finalScore": "Seattle Mariners 1 – Washington Nationals 10"
     },
     {
@@ -282,7 +282,7 @@
       "espnGameId": "401856997",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-17T11:29:31.950Z",
-      "gradedAt": "2026-06-18T11:53:39.151Z",
+      "gradedAt": "2026-06-19T11:15:05.133Z",
       "finalScore": "New York Liberty 96 – Chicago Sky 95"
     },
     {
@@ -322,7 +322,7 @@
       "espnGameId": "401857000",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-17T11:29:31.950Z",
-      "gradedAt": "2026-06-18T11:53:39.152Z",
+      "gradedAt": "2026-06-19T11:15:05.133Z",
       "finalScore": "Las Vegas Aces 86 – Phoenix Mercury 76"
     },
     {
@@ -358,7 +358,7 @@
       "espnGameId": "401856999",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-17T11:29:31.950Z",
-      "gradedAt": "2026-06-18T11:53:39.152Z",
+      "gradedAt": "2026-06-19T11:15:05.134Z",
       "finalScore": "Minnesota Lynx 99 – Los Angeles Sparks 83"
     },
     {
@@ -398,8 +398,172 @@
       "espnGameId": "401857001",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-17T11:29:31.950Z",
-      "gradedAt": "2026-06-18T11:53:39.152Z",
+      "gradedAt": "2026-06-19T11:15:05.134Z",
       "finalScore": "Seattle Storm 89 – Portland Fire 94"
+    },
+    {
+      "id": "2026-06-19:WNBA:espn-401857004",
+      "date": "2026-06-19",
+      "gameKey": "WNBA:espn-401857004",
+      "league": "WNBA",
+      "awayTeam": "Washington Mystics",
+      "homeTeam": "New York Liberty",
+      "recommendedTeam": "Wsh +12.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "WSH",
+        "rawText": "WSH 12.5",
+        "spread": 12.5,
+        "odds": -108,
+        "displayText": "Wsh +12.5"
+      },
+      "betType": "spread",
+      "spread": 12.5,
+      "odds": -108,
+      "americanOdds": -108,
+      "consensusLabel": "+12.5 (-108)",
+      "consensusOdds": -108,
+      "consensusSpread": 12.5,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401857004",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-19T11:15:04.834Z"
+    },
+    {
+      "id": "2026-06-19:MLB:espn-401815812",
+      "date": "2026-06-19",
+      "gameKey": "MLB:espn-401815812",
+      "league": "MLB",
+      "awayTeam": "Chicago White Sox",
+      "homeTeam": "Detroit Tigers",
+      "recommendedTeam": "CHW",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "CHW",
+        "rawText": "CHW",
+        "displayText": "CHW"
+      },
+      "betType": "moneyline",
+      "americanOdds": 192,
+      "consensusLabel": "+192",
+      "consensusOdds": 192,
+      "bookProvider": "DraftKings",
+      "confidence": 83,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815812",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-19T11:15:04.834Z"
+    },
+    {
+      "id": "2026-06-19:MLB:espn-401815814",
+      "date": "2026-06-19",
+      "gameKey": "MLB:espn-401815814",
+      "league": "MLB",
+      "awayTeam": "Milwaukee Brewers",
+      "homeTeam": "Atlanta Braves",
+      "recommendedTeam": "ATL",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "ATL",
+        "rawText": "ATL",
+        "displayText": "ATL"
+      },
+      "betType": "moneyline",
+      "americanOdds": 153,
+      "consensusLabel": "+153",
+      "consensusOdds": 153,
+      "bookProvider": "DraftKings",
+      "confidence": 80,
+      "signalTypes": [
+        "sharp_money",
+        "square_fade",
+        "model_best_values"
+      ],
+      "signalLabels": [
+        "Sharp Money",
+        "Square Top (Fade)",
+        "Model Best Values (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815814",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-19T11:15:04.834Z"
+    },
+    {
+      "id": "2026-06-19:MLB:espn-401815824",
+      "date": "2026-06-19",
+      "gameKey": "MLB:espn-401815824",
+      "league": "MLB",
+      "awayTeam": "Minnesota Twins",
+      "homeTeam": "Arizona Diamondbacks",
+      "recommendedTeam": "MIN",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "MIN",
+        "rawText": "MIN",
+        "displayText": "MIN"
+      },
+      "betType": "moneyline",
+      "americanOdds": 144,
+      "consensusLabel": "+144",
+      "consensusOdds": 144,
+      "bookProvider": "DraftKings",
+      "confidence": 80,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815824",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-19T11:15:04.834Z"
+    },
+    {
+      "id": "2026-06-19:MLB:espn-401815818",
+      "date": "2026-06-19",
+      "gameKey": "MLB:espn-401815818",
+      "league": "MLB",
+      "awayTeam": "San Diego Padres",
+      "homeTeam": "Texas Rangers",
+      "recommendedTeam": "San Diego Padres -105",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "San Diego Padres",
+        "rawText": "RANGERS +105",
+        "odds": -105,
+        "displayText": "San Diego Padres -105"
+      },
+      "betType": "moneyline",
+      "odds": -105,
+      "americanOdds": 135,
+      "consensusLabel": "+135",
+      "consensusOdds": 135,
+      "bookProvider": "DraftKings",
+      "confidence": 75,
+      "signalTypes": [
+        "model_best_values"
+      ],
+      "signalLabels": [
+        "Model Best Values (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815818",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-19T11:15:04.834Z"
     }
   ]
 }
