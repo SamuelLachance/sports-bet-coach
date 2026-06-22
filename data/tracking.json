@@ -40,7 +40,7 @@
       "espnGameId": "401856985",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-21T11:19:34.165Z",
+      "gradedAt": "2026-06-22T12:44:17.995Z",
       "finalScore": "Golden State Valkyries 76 – Seattle Storm 72"
     },
     {
@@ -71,7 +71,7 @@
       "espnGameId": "401815729",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-21T11:19:34.165Z",
+      "gradedAt": "2026-06-22T12:44:17.995Z",
       "finalScore": "Philadelphia Phillies 0 – Milwaukee Brewers 6"
     },
     {
@@ -102,7 +102,7 @@
       "espnGameId": "401815732",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-12T17:17:42.209Z",
-      "gradedAt": "2026-06-21T11:19:34.165Z",
+      "gradedAt": "2026-06-22T12:44:17.995Z",
       "finalScore": "Colorado Rockies 4 – Athletics 6"
     },
     {
@@ -139,7 +139,7 @@
       "espnGameId": "401815735",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-13T09:20:08.959Z",
-      "gradedAt": "2026-06-21T11:19:34.184Z",
+      "gradedAt": "2026-06-22T12:44:18.027Z",
       "finalScore": "Atlanta Braves 3 – New York Mets 1"
     },
     {
@@ -209,7 +209,7 @@
       "espnGameId": "401815750",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-14T10:20:31.780Z",
-      "gradedAt": "2026-06-21T11:19:34.203Z",
+      "gradedAt": "2026-06-22T12:44:18.050Z",
       "finalScore": "Atlanta Braves 1 – New York Mets 8"
     },
     {
@@ -246,7 +246,7 @@
       "espnGameId": "401815755",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-14T10:20:31.780Z",
-      "gradedAt": "2026-06-21T11:19:34.203Z",
+      "gradedAt": "2026-06-22T12:44:18.050Z",
       "finalScore": "Seattle Mariners 1 – Washington Nationals 10"
     },
     {
@@ -282,7 +282,7 @@
       "espnGameId": "401856997",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-17T11:29:31.950Z",
-      "gradedAt": "2026-06-21T11:19:34.233Z",
+      "gradedAt": "2026-06-22T12:44:18.071Z",
       "finalScore": "New York Liberty 96 – Chicago Sky 95"
     },
     {
@@ -322,7 +322,7 @@
       "espnGameId": "401857000",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-17T11:29:31.950Z",
-      "gradedAt": "2026-06-21T11:19:34.233Z",
+      "gradedAt": "2026-06-22T12:44:18.071Z",
       "finalScore": "Las Vegas Aces 86 – Phoenix Mercury 76"
     },
     {
@@ -358,7 +358,7 @@
       "espnGameId": "401856999",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-17T11:29:31.950Z",
-      "gradedAt": "2026-06-21T11:19:34.233Z",
+      "gradedAt": "2026-06-22T12:44:18.072Z",
       "finalScore": "Minnesota Lynx 99 – Los Angeles Sparks 83"
     },
     {
@@ -398,7 +398,7 @@
       "espnGameId": "401857001",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-17T11:29:31.950Z",
-      "gradedAt": "2026-06-21T11:19:34.233Z",
+      "gradedAt": "2026-06-22T12:44:18.072Z",
       "finalScore": "Seattle Storm 89 – Portland Fire 94"
     },
     {
@@ -434,7 +434,7 @@
       "espnGameId": "401857008",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-20T09:58:23.977Z",
-      "gradedAt": "2026-06-21T11:19:34.242Z",
+      "gradedAt": "2026-06-22T12:44:18.086Z",
       "finalScore": "Chicago Sky 92 – Dallas Wings 93"
     },
     {
@@ -470,7 +470,7 @@
       "espnGameId": "401857007",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-20T09:58:23.977Z",
-      "gradedAt": "2026-06-21T11:19:34.242Z",
+      "gradedAt": "2026-06-22T12:44:18.086Z",
       "finalScore": "Seattle Storm 73 – Phoenix Mercury 93"
     },
     {
@@ -506,7 +506,7 @@
       "espnGameId": "401857006",
       "mainScreenGameRec": true,
       "recordedAt": "2026-06-20T09:58:23.977Z",
-      "gradedAt": "2026-06-21T11:19:34.242Z",
+      "gradedAt": "2026-06-22T12:44:18.086Z",
       "finalScore": "Indiana Fever 96 – Atlanta Dream 113"
     },
     {
@@ -536,12 +536,14 @@
       "confidence": 92,
       "signalTypes": [],
       "signalLabels": [],
-      "status": "pending",
-      "units": 0,
+      "status": "win",
+      "units": 0.8695652173913043,
       "stakeUnits": 1,
       "espnGameId": "401857010",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-21T10:26:19.411Z"
+      "recordedAt": "2026-06-21T10:26:19.411Z",
+      "gradedAt": "2026-06-22T12:44:18.087Z",
+      "finalScore": "Washington Mystics 84 – Minnesota Lynx 79"
     },
     {
       "id": "2026-06-21:WNBA:row-9:slot-1:CHICAGO|CHICAGO +10.5 6/",
@@ -607,12 +609,14 @@
       "signalLabels": [
         "Model Best Values (Fade)"
       ],
-      "status": "pending",
-      "units": 0,
+      "status": "win",
+      "units": 0.9090909090909091,
       "stakeUnits": 1,
       "espnGameId": "401857011",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-21T10:26:19.411Z"
+      "recordedAt": "2026-06-21T10:26:19.411Z",
+      "gradedAt": "2026-06-22T12:44:18.087Z",
+      "finalScore": "New York Liberty 97 – Los Angeles Sparks 98"
     },
     {
       "id": "2026-06-21:WNBA:espn-401857009",
@@ -641,12 +645,14 @@
       "confidence": 80,
       "signalTypes": [],
       "signalLabels": [],
-      "status": "pending",
-      "units": 0,
+      "status": "loss",
+      "units": -1,
       "stakeUnits": 1,
       "espnGameId": "401857009",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-21T10:26:19.411Z"
+      "recordedAt": "2026-06-21T10:26:19.411Z",
+      "gradedAt": "2026-06-22T12:44:18.087Z",
+      "finalScore": "Golden State Valkyries 73 – Las Vegas Aces 92"
     },
     {
       "id": "2026-06-21:MLB:espn-401815842",
@@ -670,12 +676,14 @@
       "confidence": 80,
       "signalTypes": [],
       "signalLabels": [],
-      "status": "pending",
-      "units": 0,
+      "status": "loss",
+      "units": -1,
       "stakeUnits": 1,
       "espnGameId": "401815842",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-21T10:26:19.411Z"
+      "recordedAt": "2026-06-21T10:26:19.411Z",
+      "gradedAt": "2026-06-22T12:44:18.087Z",
+      "finalScore": "New York Mets 2 – Philadelphia Phillies 6"
     },
     {
       "id": "2026-06-21:MLB:espn-401815846",
@@ -705,12 +713,14 @@
       "signalLabels": [
         "Book Needs (Fade)"
       ],
-      "status": "pending",
-      "units": 0,
+      "status": "loss",
+      "units": -1,
       "stakeUnits": 1,
       "espnGameId": "401815846",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-21T10:26:19.411Z"
+      "recordedAt": "2026-06-21T10:26:19.411Z",
+      "gradedAt": "2026-06-22T12:44:18.087Z",
+      "finalScore": "San Diego Padres 3 – Texas Rangers 4"
     },
     {
       "id": "2026-06-21:MLB:espn-401815851",
@@ -738,12 +748,119 @@
       "signalLabels": [
         "Whale Plays (Fade)"
       ],
-      "status": "pending",
-      "units": 0,
+      "status": "win",
+      "units": 1.78,
       "stakeUnits": 1,
       "espnGameId": "401815851",
       "mainScreenGameRec": true,
-      "recordedAt": "2026-06-21T10:26:19.411Z"
+      "recordedAt": "2026-06-21T10:26:19.411Z",
+      "gradedAt": "2026-06-22T12:44:18.087Z",
+      "finalScore": "Baltimore Orioles 12 – Los Angeles Dodgers 1"
+    },
+    {
+      "id": "2026-06-22:MLB:espn-401857015",
+      "date": "2026-06-22",
+      "gameKey": "MLB:espn-401857015",
+      "league": "WNBA",
+      "awayTeam": "Dallas Wings",
+      "homeTeam": "Seattle Storm",
+      "recommendedTeam": "Sea +9.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "SEA",
+        "rawText": "SEA 9.5",
+        "spread": 9.5,
+        "odds": -110,
+        "displayText": "Sea +9.5"
+      },
+      "betType": "spread",
+      "spread": 9.5,
+      "odds": -110,
+      "americanOdds": -110,
+      "consensusLabel": "+9.5 (-110)",
+      "consensusOdds": -110,
+      "consensusSpread": 9.5,
+      "bookProvider": "DraftKings",
+      "confidence": 92,
+      "signalTypes": [
+        "model_best_values"
+      ],
+      "signalLabels": [
+        "Model Best Values (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401857015",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-22T12:44:17.883Z"
+    },
+    {
+      "id": "2026-06-22:WNBA:espn-401857014",
+      "date": "2026-06-22",
+      "gameKey": "WNBA:espn-401857014",
+      "league": "WNBA",
+      "awayTeam": "Phoenix Mercury",
+      "homeTeam": "Indiana Fever",
+      "recommendedTeam": "Phx +6.5",
+      "recommendedBet": {
+        "betType": "spread",
+        "team": "PHX",
+        "rawText": "PHX 6.5",
+        "spread": 6.5,
+        "odds": -115,
+        "displayText": "Phx +6.5"
+      },
+      "betType": "spread",
+      "spread": 6.5,
+      "odds": -115,
+      "americanOdds": -115,
+      "consensusLabel": "+6.5 (-115)",
+      "consensusOdds": -115,
+      "consensusSpread": 6.5,
+      "bookProvider": "DraftKings",
+      "confidence": 89,
+      "signalTypes": [
+        "reverse_line_movement"
+      ],
+      "signalLabels": [
+        "Reverse Line Movement (Fade)"
+      ],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401857014",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-22T12:44:17.883Z"
+    },
+    {
+      "id": "2026-06-22:MLB:espn-401815856",
+      "date": "2026-06-22",
+      "gameKey": "MLB:espn-401815856",
+      "league": "MLB",
+      "awayTeam": "Kansas City Royals",
+      "homeTeam": "Tampa Bay Rays",
+      "recommendedTeam": "KC",
+      "recommendedBet": {
+        "betType": "moneyline",
+        "team": "KC",
+        "rawText": "KC",
+        "displayText": "KC"
+      },
+      "betType": "moneyline",
+      "americanOdds": 159,
+      "consensusLabel": "+159",
+      "consensusOdds": 159,
+      "bookProvider": "DraftKings",
+      "confidence": 80,
+      "signalTypes": [],
+      "signalLabels": [],
+      "status": "pending",
+      "units": 0,
+      "stakeUnits": 1,
+      "espnGameId": "401815856",
+      "mainScreenGameRec": true,
+      "recordedAt": "2026-06-22T12:44:17.883Z"
     }
   ]
 }
